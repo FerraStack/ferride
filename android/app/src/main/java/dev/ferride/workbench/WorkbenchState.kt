@@ -312,7 +312,7 @@ class WorkbenchState(
             key: KeyChord? = null,
             enabled: () -> Boolean = { true },
             run: () -> Unit,
-        ) = r.register(Command(id, title, category, key, enabled, run))
+        ) = r.register(Command(id, title, category, key, enabled, run = run))
         val hasEditor = { activeTab != null }
 
         cmd(CommandIds.SHOW_COMMANDS, "Show All Commands", null, KeyChord.ctrl(KeyEvent.KEYCODE_P, shift = true)) {
