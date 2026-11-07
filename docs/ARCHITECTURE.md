@@ -36,9 +36,10 @@ Ferride is a phone-first code editor for Android: a **Rust core** for everything
 | `ferride-lsp` | LSP client: `Content-Length` codec, request/response correlation with timeouts and `$/cancelRequest`, default answers to server→client requests, events for diagnostics/messages, typed helpers (initialize, didOpen/didChange/didSave/didClose, completion, hover, shutdown). Transport is any `Read` + `Write`. | `lsp-types`, `serde_json` |
 | `ferride-workspace` | Opened folder: path confinement, directory listing, atomic writes, create/rename/delete, gitignore-aware walk, fuzzy file finder, full-text search with ripgrep's engine. | `ignore`, `grep-searcher`, `grep-regex` |
 | `ferride-host` | `ProcessHost` / `HostProcess` traits (spawn, take I/O streams, resize PTY, kill, wait). `UnavailableHost` stub (what the app uses today), `LocalHost` for desktop dev/tests. `FerruxHost` comes with the Ferrux Host API. | — |
+| `ferride-scm` | Source control on **gix** (pure Rust): discovery/`init`, status grouped like VS Code (Merge Changes / Staged Changes / Changes), file diffs with hunks and word highlights, gutter line changes, stage/unstage/discard per file and per hunk, commit/amend (identity from settings or repo config), paged log with ref decorations, branches (list, create, checkout that refuses to overwrite local changes), HTTPS clone/fetch/pull (fast-forward only)/push with progress, cancellation and app-supplied credentials. | `gix`, `gix-pack`, `reqwest` + `rustls` (`ring`) |
 | `ferride-ffi` | UniFFI surface: `Document`, `WorkspaceHandle`, `LspSession` + `LspListener` callback, `ferruxStatus()`. All offsets crossing the FFI are **UTF-16 `Int`s**. Also builds the `uniffi-bindgen` binary (feature `bindgen`). | `uniffi` |
 
-Planned: `ferride-git` (gix with the rustls/`ring` backend first; `git2` only if gix lacks something we need), `ferride-term` glue around Ferrux's `ferrux-term` crate (git dependency) for the terminal emulator state, a `ferride-cli` package shipped into Ferrux (`ferride .` opens a folder in the app).
+Planned: `ferride-term` glue around Ferrux's `ferrux-term` crate (git dependency) for the terminal emulator state, a `ferride-cli` package shipped into Ferrux (`ferride .` opens a folder in the app).
 
 ## Kotlin app (`android/`)
 
@@ -135,7 +136,15 @@ Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already 
 
 ## Git
 
-Planned crate `ferride-git` on **gix** (pure Rust, builds with the NDK; use the `ring`/rustls backend, aws-lc-rs is harder to cross-compile). Scope for the MVP: status (gutter markers, tree decorations), diff against HEAD, stage/unstage, commit, branch switch. Network operations (clone/fetch/push with credentials) either via gix with HTTPS or by running `git` inside Ferrux, whichever is more robust on device.
+`ferride-scm` is built on **gix** and is path based: it works on a working tree on a real file system path (app-private projects, Ferrux's home). SAF folders can't host a `.git` directory, so the Source Control view offers to copy such a folder into Ferride's projects instead.
+
+- **Repositories** are opened *isolated*: only `.git/config` counts (no `~/.gitconfig`, `/etc/gitconfig` or `GIT_*` variables), so behaviour doesn't depend on the device. The commit identity comes from the `git.user.name` / `git.user.email` settings, else the repository's `user.name` / `user.email`; without either, commit fails with VS Code's "Make sure you configure your user.name and user.email in git."
+- **Status** = `git status -uall` without renames: `HEAD`↔index ("Staged Changes"), index↔working tree plus untracked files ("Changes"), unmerged paths ("Merge Changes"). Letters and tooltips are VS Code's (`M`, `A`, `D`, `U`, `T`, `!`, "Index Modified", "Conflict: Both Modified", …).
+- **Diffs** use gix's imara-diff (histogram, line post-processing) with a word diff inside replaced blocks; ranges cross the FFI as UTF-16 columns. Gutter decorations compare the editor text with the *index* version, like VS Code's quick diff. Hunk staging applies selected hunks to the index text (or reverts them in the working tree) and is verified against `git` in tests.
+- **Index writes** go through `gix-index`; trees are built from the index with gix's tree editor; commits and ref updates write reflogs like git (`commit (initial): …`, `checkout: moving from a to b`).
+- **Checkout / fast-forward** update only the paths that differ between the two trees and refuse (git's "Your local changes … would be overwritten by checkout") when one of them has local changes; unrelated local changes are carried over.
+- **Network:** HTTPS through gix's reqwest transport with rustls and the `ring` provider (no aws-lc / cmake in the NDK build). Roots come from Android's system store (`/apex/com.android.conscrypt/cacerts`, `/system/etc/security/cacerts`), falling back to Mozilla's (`webpki-roots`). Credentials are asked from the app (`CredentialProvider`) on 401, never sent over plain `http://`, never logged, and stripped from URLs in error messages. Clone and fetch are gix's; **push is ours** (gix has no push yet): ref advertisement from `git-receive-pack`, a non-thin pack of the new commits' objects built with `gix-pack`, `report-status` parsing. Pull is `fetch` + fast-forward only. Progress is polled from gix's progress tree; cancellation is an `AtomicBool`.
+- **Tests** run against temp repositories and cross-check with the `git` CLI (`status --porcelain`, `show :path`, `fsck --strict`), including clone/push/pull through `file://` and through a local smart-HTTP server (`git http-backend`) that requires a token.
 
 ## Terminal and the Ferrux host
 
@@ -162,7 +171,7 @@ Planned crate `ferride-git` on **gix** (pure Rust, builds with the NDK; use the 
 | **M2** | Ferrux Host API v1 | Agree `ferrux-host-proto` with Ferrux; `FerruxConnector` + `FerruxHost`; pairing/permission UX; open folders in Ferrux `$HOME` | Ferride lists and edits files in Ferrux's home; `ferruxStatus()` = Ready |
 | **M3** | Terminal | `ferrux-term` integration, `TerminalView`, PTY via host, multiple sessions, attach to Ferrux sessions, extra-keys for the terminal | Run `cargo build`/`python` in the panel; sessions survive app switches |
 | **M4** | LSP on device | Server registry (per language, command in Ferrux), lazy start/stop, diagnostics in gutter and squiggles, completion popup, hover, go to definition, rename, formatting, incremental sync | rust-analyzer, pyright and typescript-language-server usable on a 6 GB phone |
-| **M5** | Git | `ferride-git` (gix): status, diff gutter, stage/commit, branches; push/pull | Daily commit workflow without leaving the app |
+| **M5** | Git | `ferride-scm` (gix): status, diff gutter, stage/commit, branches; push/pull | Daily commit workflow without leaving the app |
 | **M6** | Release 0.1 | Crash/ANR hardening, state restore, accessibility pass, split editors on tablets/foldables/DeX, snippets (VS Code JSON), minimap, multi-cursor UI, reproducible signed builds, F-Droid + GitHub, Play listing | Public 0.1 |
 
 ## Non-goals (for now)

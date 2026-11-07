@@ -7,6 +7,7 @@ members = [
     "crates/ferride-workspace",
     "crates/ferride-host",
     "crates/ferride-ffi",
+    "crates/ferride-scm",
 ]
 
 [workspace.package]
@@ -23,6 +24,7 @@ ferride-syntax = { path = "crates/ferride-syntax" }
 ferride-lsp = { path = "crates/ferride-lsp" }
 ferride-workspace = { path = "crates/ferride-workspace" }
 ferride-host = { path = "crates/ferride-host" }
+ferride-scm = { path = "crates/ferride-scm" }
 
 ropey = { version = "1.6.1", default-features = false, features = ["simd"] }
 tree-sitter = "0.27.2"
@@ -44,6 +46,12 @@ thiserror = "2.0.21"
 unicode-segmentation = "1.12.0"
 log = "0.4.35"
 tempfile = "3.27.0"
+gix = { version = "0.90.0", default-features = false, features = ["sha1", "basic", "status", "worktree-mutation", "dirwalk", "credentials", "blocking-http-transport-reqwest", "progress-tree", "parallel"] }
+gix-pack = { version = "0.77.0", default-features = false, features = ["generate"] }
+# TLS for gix's reqwest transport: rustls with the `ring` provider (builds with the NDK without cmake/aws-lc).
+reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "rustls-no-provider"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+webpki-roots = "1.0.4"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

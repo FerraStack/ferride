@@ -1,0 +1,26 @@
+[package]
+name = "ferride-scm"
+description = "Source control for Ferride on gix: status, diff, stage, commit, log, branches, clone, fetch, pull, push"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+gix.workspace = true
+gix-pack.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+webpki-roots.workspace = true
+thiserror.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+# Tests serve git over plain http on localhost; the app only ever sends credentials over https.
+gix-transport = { version = "0.62.0", features = ["http-client-insecure-credentials"] }
+
+[lints]
+workspace = true

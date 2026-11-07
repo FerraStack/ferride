@@ -25,6 +25,7 @@ ferride-ffi ─┬─ ferride-buffer     rope, edits, undo, selections, offsets
              ├─ ferride-syntax     tree-sitter, incremental parse, viewport highlights
              ├─ ferride-workspace  file tree, fuzzy find, ripgrep search
              ├─ ferride-lsp        JSON-RPC/LSP client over any byte stream
+             ├─ ferride-scm        git on gix: status, diff, stage, commit, branches, clone/pull/push
              └─ ferride-host       ProcessHost trait (Ferrux integration, stub today)
                      │ AIDL + file descriptors
                    Ferrux: shells, PTYs, language servers, toolchains
