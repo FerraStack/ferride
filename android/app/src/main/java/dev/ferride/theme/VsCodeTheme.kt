@@ -109,6 +109,7 @@ object VsCodeTheme {
             buttonBackground = col("button.background", base.buttonBackground),
             buttonForeground = col("button.foreground", base.buttonForeground),
             descriptionForeground = col("descriptionForeground", base.descriptionForeground),
+            textLinkForeground = col("textLink.foreground", base.textLinkForeground),
             errorForeground = col("errorForeground", base.errorForeground),
             warningForeground = col("editorWarning.foreground", base.warningForeground),
             menuBackground = col("menu.background", col("editorWidget.background", base.menuBackground)),

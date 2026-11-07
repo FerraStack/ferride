@@ -57,7 +57,7 @@ class WorkspaceSwitchTest {
         var remembered: WorkspaceBackend? = null
         s.onWorkspaceOpened = { remembered = it }
         assertTrue(s.openWorkspace(saf))
-        assertTrue(s.tabs.isEmpty())
+        assertEquals("only the Welcome page is open", listOf(TabKind.Welcome), s.tabs.map { it.kind })
         assertTrue(s.expanded.isEmpty())
         assertEquals(saf, s.backend)
         assertEquals(saf, remembered)
@@ -109,5 +109,64 @@ class WorkspaceSwitchTest {
         assertNull(StoragePaths.treeUriToPath(a, "nocolon"))
         assertEquals("app", SafDocumentTree.displayNameFromId("primary:Projects/app"))
         assertEquals("primary", SafDocumentTree.displayNameFromId("primary:"))
+    }
+
+    private class RecentHost(override val projectsDir: String) : WorkspaceHost {
+        var saved: List<RecentFolder> = emptyList()
+        val failing = mutableSetOf<String>()
+        override fun pickFolder() {}
+        override fun openLocal(path: String): WorkspaceBackend = FakeWorkspaceBackend(name = path.substringAfterLast('/'), root = path)
+        override fun openRecent(recent: RecentFolder): WorkspaceBackend {
+            check(recent.root !in failing) { "access to this folder was revoked" }
+            return openLocal(recent.root)
+        }
+        override fun loadRecents() = saved
+        override fun saveRecents(recents: List<RecentFolder>) {
+            saved = recents
+        }
+    }
+
+    @Test
+    fun recentFoldersAreRememberedNewestFirst() {
+        val host = RecentHost(tmp.root.path)
+        val s = state(FakeWorkspaceBackend(name = "a", root = "/p/a"), host)
+        s.start(openFirst = null)
+        s.openWorkspace(FakeWorkspaceBackend(name = "b", root = "/p/b"))
+        s.openWorkspace(FakeWorkspaceBackend(name = "a", root = "/p/a"))
+        assertEquals(listOf("/p/a", "/p/b"), s.recentFolders.map { it.root })
+        assertEquals(s.recentFolders.toList(), host.saved)
+        // A second workbench (next launch) starts with the saved list.
+        val again = state(FakeWorkspaceBackend(name = "a", root = "/p/a"), host)
+        assertEquals(listOf("/p/a", "/p/b"), again.recentFolders.map { it.root })
+    }
+
+    @Test
+    fun openingARecentFolderSwitchesOrDropsIt() {
+        val host = RecentHost(tmp.root.path)
+        host.saved = listOf(
+            RecentFolder(WorkspaceKind.LOCAL, "/p/b", "b"),
+            RecentFolder(WorkspaceKind.SAF, "content://x/tree/gone", "gone"),
+        )
+        host.failing += "content://x/tree/gone"
+        val s = state(FakeWorkspaceBackend(name = "a", root = "/p/a"), host)
+        s.openRecent(s.recentFolders.first { it.name == "b" })
+        assertEquals("/p/b", s.backend.root)
+        s.openRecent(s.recentFolders.first { it.name == "gone" })
+        assertEquals("/p/b", s.backend.root)
+        assertFalse(s.recentFolders.any { it.name == "gone" })
+        assertTrue(s.message!!.contains("removed from Recent"))
+    }
+
+    @Test
+    fun welcomeOpensOnStartAndAfterSwitchingUnlessTurnedOff() {
+        val s = state()
+        s.start("src/main.rs", showWelcome = true)
+        assertEquals(listOf(TabKind.Welcome, TabKind.File), s.tabs.map { it.kind })
+        s.updateSettings { it.copy(startupEditor = "none") }
+        s.closeTab(1)
+        s.openWorkspace(FakeWorkspaceBackend(name = "other"))
+        assertTrue(s.tabs.isEmpty())
+        assertTrue(s.commands.execute(CommandIds.WELCOME))
+        assertEquals(TabKind.Welcome, s.activeTab!!.kind)
     }
 }

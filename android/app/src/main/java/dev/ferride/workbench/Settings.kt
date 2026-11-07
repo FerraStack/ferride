@@ -23,6 +23,8 @@ data class Settings(
     val colorTheme: String = "",
     val autoDetectColorScheme: Boolean = true,
     val extraKeys: Boolean = true,
+    /** `workbench.startupEditor`: `welcomePage` (default) or `none`. */
+    val startupEditor: String = "welcomePage",
     private val unknown: Map<String, Any?> = emptyMap(),
 ) {
     /** Known keys → JSON-ready values (`null` = leave the key out). */
@@ -40,6 +42,7 @@ data class Settings(
         WORKBENCH_COLOR_THEME to colorTheme.ifEmpty { null },
         WINDOW_AUTO_DETECT to autoDetectColorScheme,
         FERRIDE_EXTRA_KEYS to extraKeys,
+        WORKBENCH_STARTUP_EDITOR to startupEditor,
     )
 
     /**
@@ -71,6 +74,7 @@ data class Settings(
         if (colorTheme.isNotEmpty()) o.put(WORKBENCH_COLOR_THEME, colorTheme)
         o.put(WINDOW_AUTO_DETECT, autoDetectColorScheme)
         o.put(FERRIDE_EXTRA_KEYS, extraKeys)
+        o.put(WORKBENCH_STARTUP_EDITOR, startupEditor)
         return o.toString(2)
     }
 
@@ -88,11 +92,12 @@ data class Settings(
         const val WORKBENCH_COLOR_THEME = "workbench.colorTheme"
         const val WINDOW_AUTO_DETECT = "window.autoDetectColorScheme"
         const val FERRIDE_EXTRA_KEYS = "ferride.extraKeys.enabled"
+        const val WORKBENCH_STARTUP_EDITOR = "workbench.startupEditor"
 
         private val KNOWN = setOf(
             EDITOR_FONT_SIZE, EDITOR_TAB_SIZE, EDITOR_INSERT_SPACES, EDITOR_WORD_WRAP, EDITOR_LINE_NUMBERS,
             EDITOR_MINIMAP, EDITOR_INDENT_GUIDES, EDITOR_LINE_HIGHLIGHT, EDITOR_BRACKET_PAIRS, FILES_AUTO_SAVE,
-            WORKBENCH_COLOR_THEME, WINDOW_AUTO_DETECT, FERRIDE_EXTRA_KEYS,
+            WORKBENCH_COLOR_THEME, WINDOW_AUTO_DETECT, FERRIDE_EXTRA_KEYS, WORKBENCH_STARTUP_EDITOR,
         )
 
         /** Parses settings; malformed input falls back to defaults (use [parseResult] to detect it). */
@@ -122,6 +127,7 @@ data class Settings(
                 colorTheme = o.optString(WORKBENCH_COLOR_THEME, ""),
                 autoDetectColorScheme = o.optBoolean(WINDOW_AUTO_DETECT, d.autoDetectColorScheme),
                 extraKeys = o.optBoolean(FERRIDE_EXTRA_KEYS, d.extraKeys),
+                startupEditor = o.optString(WORKBENCH_STARTUP_EDITOR, d.startupEditor),
                 unknown = unknown,
             )
         }

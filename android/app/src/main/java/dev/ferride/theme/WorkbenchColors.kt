@@ -75,6 +75,7 @@ data class WorkbenchColors(
     val buttonBackground: Color,
     val buttonForeground: Color,
     val descriptionForeground: Color,
+    val textLinkForeground: Color,
     val errorForeground: Color,
     val warningForeground: Color,
     // Menus (context menu, the selection toolbar)
@@ -155,6 +156,7 @@ val DarkModern = WorkbenchColors(
     buttonBackground = c(0xFF1F6FBF),
     buttonForeground = c(0xFFFFFFFF),
     descriptionForeground = c(0xFF9D9D9D),
+    textLinkForeground = c(0xFF4DAAFC),
     errorForeground = c(0xFFF48771),
     warningForeground = c(0xFFCCA700),
     menuBackground = c(0xFF1F1F1F),
@@ -247,6 +249,7 @@ val LightModern = WorkbenchColors(
     buttonBackground = c(0xFF1868B8),
     buttonForeground = c(0xFFFFFFFF),
     descriptionForeground = c(0xFF6A6A6A),
+    textLinkForeground = c(0xFF005FB8),
     errorForeground = c(0xFFD32F2F),
     warningForeground = c(0xFFB27C00),
     menuBackground = c(0xFFFFFFFF),
