@@ -981,7 +981,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
                 val handle = dragHandle
                 val wasTap = !dragMoved
                 dragHandle = null
-                magnifier?.dismiss()
+                runCatching { magnifier?.dismiss() }
                 if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
                     publishSelectionUi()
                 } else if (handle == Handle.Caret) {

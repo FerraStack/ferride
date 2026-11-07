@@ -15,10 +15,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.GraphicsMode
 import java.time.Duration
 
 /** Touch selection: long press, handle drags and the toolbar lifecycle, on a real [CodeEditorView]. */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SelectionHandlesTest {
     private val text = "fn main() {\n    let total = word_counts(text);\n    println!(\"{total}\");\n}\n"
     private lateinit var view: CodeEditorView
