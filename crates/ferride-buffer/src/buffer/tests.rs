@@ -1,4 +1,5 @@
 use super::*;
+use crate::TYPING_PAUSE;
 
 // "a😀b\n" — 😀 is U+1F600: 1 char, 4 UTF-8 bytes, 2 UTF-16 units (surrogate pair).
 const EMOJI: &str = "a😀b\nñx\n";
@@ -387,4 +388,77 @@ fn delete_forward_removes_a_whole_cluster() {
         b.delete_forward();
         assert_eq!(b.text(), "z", "{cluster:?}");
     }
+}
+
+// ----- undo grouping by word and pause (#2) ----------------------------------
+
+fn type_chars(b: &mut Buffer, text: &str) {
+    for c in text.chars() {
+        b.insert_at_selections(&c.to_string(), EditKind::Typing);
+    }
+}
+
+#[test]
+fn undo_steps_are_words() {
+    let mut b = Buffer::new("");
+    b.set_clock(Some(std::time::Instant::now()));
+    type_chars(&mut b, "let total = a.b(c);");
+    let mut steps = vec![b.text()];
+    while b.undo().is_some() {
+        steps.push(b.text());
+    }
+    assert_eq!(
+        steps,
+        vec![
+            "let total = a.b(c);",
+            "let total = a.b(",
+            "let total = a.",
+            "let total = ",
+            "let ",
+            ""
+        ]
+    );
+}
+
+#[test]
+fn a_typing_pause_starts_a_new_step() {
+    let t0 = std::time::Instant::now();
+    let mut b = Buffer::new("");
+    b.set_clock(Some(t0));
+    type_chars(&mut b, "inter");
+    b.set_clock(Some(t0 + TYPING_PAUSE + std::time::Duration::from_millis(1)));
+    type_chars(&mut b, "national");
+    b.undo().unwrap();
+    assert_eq!(b.text(), "inter");
+    b.undo().unwrap();
+    assert_eq!(b.text(), "");
+}
+
+#[test]
+fn backspace_run_after_a_pause_is_its_own_step() {
+    let t0 = std::time::Instant::now();
+    let mut b = Buffer::new("abcdef");
+    b.set_clock(Some(t0));
+    b.set_selection(Selection::caret(6));
+    b.delete_backward();
+    b.set_clock(Some(t0 + TYPING_PAUSE * 2));
+    b.delete_backward();
+    b.undo().unwrap();
+    assert_eq!(b.text(), "abcde");
+}
+
+#[test]
+fn slow_ime_composition_is_still_one_step() {
+    // Composing "word" with long pauses between updates, then committing.
+    let t0 = std::time::Instant::now();
+    let mut b = Buffer::new("x ");
+    b.set_selection(Selection::caret(2));
+    let steps = [(2..2, "w"), (2..3, "wo"), (2..4, "wor"), (2..5, "word")];
+    for (i, (range, text)) in steps.into_iter().enumerate() {
+        b.set_clock(Some(t0 + TYPING_PAUSE * 3 * i as u32));
+        b.apply(vec![Edit::new(range, text)], EditKind::Typing).unwrap();
+    }
+    assert_eq!(b.text(), "x word");
+    b.undo().unwrap();
+    assert_eq!(b.text(), "x ");
 }

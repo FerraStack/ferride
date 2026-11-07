@@ -17,5 +17,5 @@ mod history;
 mod selection;
 
 pub use buffer::{Buffer, BufferError, ByteEdit, Edit, EditKind, LineEnding, Point};
-pub use history::{Change, Transaction};
+pub use history::{Change, TYPING_PAUSE, Transaction};
 pub use selection::{Selection, Selections};
