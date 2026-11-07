@@ -72,7 +72,8 @@ Compose's `BasicTextField` is not built for 10k-line documents, per-token stylin
 - **Input type:** `TYPE_CLASS_TEXT | TYPE_TEXT_FLAG_MULTI_LINE | TYPE_TEXT_FLAG_NO_SUGGESTIONS`, `IME_FLAG_NO_EXTRACT_UI | IME_FLAG_NO_FULLSCREEN`: code doesn't want autocorrect, and landscape must not switch to the full-screen extract UI.
 - **Hardware keyboards:** `onKeyDown` handles arrows (with Shift to extend), Home/End, Page Up/Down, Tab, Enter (auto-indent), Backspace/Delete, Ctrl+Z/Y/A/C/X/V/S, and printable characters via `KeyEvent.unicodeChar`.
 - **Symbols row:** a Compose row pinned above the keyboard (`imePadding`) with Tab, brackets, quotes, arrows, undo and redo, calling the view's public API.
-- **CursorAnchorInfo** (floating-cursor and handwriting support) and accessibility (`AccessibilityNodeProvider` exposing text and selection) are M2 items.
+- **CursorAnchorInfo:** `requestCursorUpdates` (`IMMEDIATE`/`MONITOR`, API 33 filter overload) gets the selection, the insertion marker, the composing text with per-character bounds (for CJK candidate windows), editor/handwriting bounds (API 33+) and visible line bounds (API 34+); while monitored it's re-sent after edits, selection changes, scrolls and resizes.
+- Accessibility (`AccessibilityNodeProvider` exposing text and selection) is an M2 item.
 
 ## Workbench UX: VS Code look and feel, phone-first
 

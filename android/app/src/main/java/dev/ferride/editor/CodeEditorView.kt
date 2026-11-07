@@ -4,10 +4,13 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Build
 import android.text.InputType
 import android.util.TypedValue
 import android.view.GestureDetector
@@ -16,6 +19,8 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.inputmethod.CursorAnchorInfo
+import android.view.inputmethod.EditorBoundsInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedText
 import android.view.inputmethod.ExtractedTextRequest
@@ -199,7 +204,12 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         super.onSizeChanged(w, h, oldw, oldh)
         if (w != oldw) wrap = null
         if (h != oldh) post { ensureCaretVisible() }
-        if (w != oldw || h != oldh) post { publishSelectionUi() }
+        if (w != oldw || h != oldh) {
+            post {
+                publishSelectionUi()
+                if (cursorAnchorMonitor) publishCursorAnchorInfo()
+            }
+        }
     }
 
     // ----- layout: tabs and wrapping -----------------------------------------------
@@ -654,6 +664,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         sy = y.coerceIn(0f, maxScrollY)
         invalidate()
         if (toolbarShown) publishSelectionUi()
+        if (cursorAnchorMonitor) publishCursorAnchorInfo()
     }
 
     override fun computeScroll() {
@@ -1141,8 +1152,79 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         }
         // A new connection starts without monitors; the keyboard asks again.
         extractMonitor = null
+        cursorAnchorMonitor = false
         return EditorInputConnection(this).also { inputConnection = it }
     }
+
+    // ----- cursor anchor info (#4) --------------------------------------------------------------
+    // CJK keyboards place their candidate window from CursorAnchorInfo, stylus
+    // handwriting (API 33+) needs the editor and line bounds, and the floating
+    // cursor needs the insertion marker. Positions are view-local; the matrix
+    // maps them to the screen.
+
+    private var cursorAnchorMonitor = false
+    private val anchorBuilder = CursorAnchorInfo.Builder()
+    private val anchorMatrix = Matrix()
+    private val screenLocation = IntArray(2)
+
+    internal fun requestCursorUpdates(mode: Int): Boolean {
+        cursorAnchorMonitor = mode and InputConnection.CURSOR_UPDATE_MONITOR != 0
+        if (mode and InputConnection.CURSOR_UPDATE_IMMEDIATE != 0) publishCursorAnchorInfo()
+        return true
+    }
+
+    private fun publishCursorAnchorInfo() {
+        buildCursorAnchorInfo()?.let { imeSink.updateCursorAnchorInfo(this, it) }
+    }
+
+    internal fun buildCursorAnchorInfo(): CursorAnchorInfo? {
+        val m = liveModel ?: return null
+        if (width == 0 || height == 0) return null
+        computeGutter()
+        val s = m.selection
+        val b = anchorBuilder
+        b.reset()
+        b.setSelectionRange(s.start, s.end)
+        getLocationOnScreen(screenLocation)
+        anchorMatrix.setTranslate(screenLocation[0].toFloat(), screenLocation[1].toFloat())
+        b.setMatrix(anchorMatrix)
+        val (cx, cy) = caretPoint(s.head)
+        val x = textLeft - sx + cx
+        val top = cy - sy
+        b.setInsertionMarkerLocation(x, top, top + baseline, top + lineHeight, regionFlags(x, top))
+        composingRange()?.let { (cs, ce) ->
+            b.setComposingText(cs, m.textRange(cs, ce))
+            for (i in cs until min(ce, cs + MAX_ANCHOR_CHARS)) {
+                val (lx, ly) = caretPoint(i)
+                val (rx, ry) = caretPoint(i + 1)
+                val left = textLeft - sx + lx
+                // The last char of a wrapped row ends at the row's end, not at the next row's start.
+                val right = if (ry == ly) textLeft - sx + rx else left + charWidth
+                val charTop = ly - sy
+                b.addCharacterBounds(i, left, charTop, max(left, right), charTop + lineHeight, regionFlags(left, charTop))
+            }
+        }
+        val editor = RectF(0f, 0f, width.toFloat(), height.toFloat())
+        if (Build.VERSION.SDK_INT >= 33) {
+            b.setEditorBoundsInfo(EditorBoundsInfo.Builder().setEditorBounds(editor).setHandwritingBounds(editor).build())
+        }
+        if (Build.VERSION.SDK_INT >= 34) {
+            val firstRow = max(0, (sy / lineHeight).toInt())
+            val lastRow = min(totalRows() - 1, ((sy + height) / lineHeight).toInt())
+            for (row in firstRow..lastRow) {
+                val rowTop = row * lineHeight - sy
+                b.addVisibleLineBounds(textLeft, max(0f, rowTop), width.toFloat(), min(height.toFloat(), rowTop + lineHeight))
+            }
+        }
+        return b.build()
+    }
+
+    private fun regionFlags(x: Float, top: Float): Int =
+        if (x >= gutterWidth && x <= width && top + lineHeight > 0 && top < height) {
+            CursorAnchorInfo.FLAG_HAS_VISIBLE_REGION
+        } else {
+            CursorAnchorInfo.FLAG_HAS_INVISIBLE_REGION
+        }
 
     // ----- extracted text (#3) ------------------------------------------------------------------
     // Samsung Keyboard and older SwiftKey read "extracted text" for cursor
@@ -1226,6 +1308,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         val (cs, ce) = composingRange() ?: (-1 to -1)
         imeSink.updateSelection(this, s.start, s.end, cs, ce)
         updateExtractedText()
+        if (cursorAnchorMonitor) publishCursorAnchorInfo()
     }
 
     /** After any content change: refresh, keep the caret visible, notify. */
@@ -1468,6 +1551,8 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         private const val SQRT2 = 1.4142135f
         /** Chars of context on each side of the selection in extracted text. */
         internal const val EXTRACT_WINDOW = 2000
+        /** Character bounds reported for at most this many composing chars. */
+        private const val MAX_ANCHOR_CHARS = 64
         private const val MAX_WRAP_CHARS = 2_000_000
         private val NO_BREAKS = intArrayOf(0)
         private val VERTICAL = setOf(

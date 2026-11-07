@@ -139,6 +139,13 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
 
     override fun getCursorCapsMode(reqModes: Int): Int = 0
 
+    /** CursorAnchorInfo for candidate windows, handwriting and the floating cursor. */
+    override fun requestCursorUpdates(cursorUpdateMode: Int): Boolean = view.requestCursorUpdates(cursorUpdateMode)
+
+    /** API 33+: the filter only narrows what the keyboard needs; we always send everything. */
+    override fun requestCursorUpdates(cursorUpdateMode: Int, cursorUpdateFilter: Int): Boolean =
+        view.requestCursorUpdates(cursorUpdateMode)
+
     override fun sendKeyEvent(event: KeyEvent): Boolean {
         view.dispatchKeyEvent(event)
         return true

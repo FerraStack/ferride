@@ -165,4 +165,31 @@ class ImeTest {
         assertEquals(count, sink.extracted.size)
         assertTrue(model.text().contains("?"))
     }
+
+    @Test
+    fun cursorAnchorInfoForCandidateWindows() {
+        editor("let x = 1\n", caret = 4)
+        sink.anchors.clear()
+        assertTrue(ic.requestCursorUpdates(InputConnection.CURSOR_UPDATE_IMMEDIATE))
+        assertEquals("immediate request sends one update", 1, sink.anchors.size)
+        val first = sink.anchors.last()
+        assertEquals(4, first.selectionStart)
+        assertTrue(first.insertionMarkerHorizontal > 0f)
+        assertTrue(first.insertionMarkerBottom > first.insertionMarkerTop)
+        // Not monitoring: edits don't push updates.
+        ic.commitText("y", 1)
+        assertEquals(1, sink.anchors.size)
+
+        // Monitoring: composition updates carry the composing text and per-char bounds.
+        ic.requestCursorUpdates(InputConnection.CURSOR_UPDATE_MONITOR)
+        ic.setComposingText("にほん", 1)
+        val info = sink.anchors.last()
+        assertEquals(5, info.composingTextStart)
+        assertEquals("にほん", info.composingText.toString())
+        val a = info.getCharacterBounds(5)!!
+        val b = info.getCharacterBounds(6)!!
+        assertTrue("chars advance left to right", b.left >= a.right - 0.5f)
+        assertEquals(a.top, b.top, 0.01f)
+        assertEquals(8, info.selectionStart)
+    }
 }
