@@ -1,0 +1,114 @@
+package dev.ferride.editor
+
+import dev.ferride.core.Document
+import dev.ferride.core.ViewLine
+
+/** A selection in UTF-16 offsets. */
+data class Sel(val anchor: Int, val head: Int) {
+    val start: Int get() = minOf(anchor, head)
+    val end: Int get() = maxOf(anchor, head)
+    val isEmpty: Boolean get() = anchor == head
+
+    companion object {
+        fun caret(pos: Int) = Sel(pos, pos)
+    }
+}
+
+/**
+ * What [CodeEditorView] needs from a document. All offsets are UTF-16 code
+ * units, like Android's `String` and `InputConnection`.
+ *
+ * [RustEditorModel] is the real implementation (Rust buffer + tree-sitter via
+ * UniFFI). [FakeEditorModel] is pure Kotlin, for Compose previews and JVM
+ * screenshot tests where the native library can't be loaded.
+ */
+interface EditorModel {
+    val fileName: String
+    val language: String?
+    /** Bumped by every content change. */
+    val version: Long
+    val lineCount: Int
+    val length: Int
+    val isDirty: Boolean
+    var selection: Sel
+    val canUndo: Boolean
+    val canRedo: Boolean
+
+    fun text(): String
+    fun viewport(firstLine: Int, count: Int): List<ViewLine>
+    fun lineOfOffset(offset: Int): Int
+    fun lineStart(line: Int): Int
+    /** End of [line] before its terminator. */
+    fun lineEnd(line: Int): Int
+    fun offsetAt(line: Int, column: Int): Int
+    fun textRange(start: Int, end: Int): String
+    fun wordAt(offset: Int): Sel
+
+    /** Replaces [start]..[end]; `typing` edits are coalesced for undo. */
+    fun replace(start: Int, end: Int, text: String, typing: Boolean)
+    /** Types at every selection (multi-cursor ready). */
+    fun insert(text: String, typing: Boolean)
+    /** Newline with auto-indent. */
+    fun newline()
+    fun backspace()
+    fun deleteForward()
+    fun undo(): Boolean
+    fun redo(): Boolean
+    fun sealUndoGroup()
+    fun markSaved()
+    fun close() {}
+}
+
+class RustEditorModel(private val doc: Document, override val fileName: String) : EditorModel {
+    override val language: String? get() = doc.language()
+    override val version: Long get() = doc.version()
+    override val lineCount: Int get() = doc.lineCount()
+    override val length: Int get() = doc.lenUtf16()
+    override val isDirty: Boolean get() = doc.isDirty()
+    override val canUndo: Boolean get() = doc.canUndo()
+    override val canRedo: Boolean get() = doc.canRedo()
+
+    override var selection: Sel
+        get() = doc.selection().let { Sel(it.anchor, it.head) }
+        set(value) = doc.setSelection(value.anchor, value.head)
+
+    override fun text(): String = doc.text()
+    override fun viewport(firstLine: Int, count: Int): List<ViewLine> = doc.viewport(firstLine, count)
+    override fun lineOfOffset(offset: Int): Int = doc.lineOfOffset(offset)
+    override fun lineStart(line: Int): Int = doc.lineStartOffset(line)
+    override fun lineEnd(line: Int): Int = doc.lineEndOffset(line)
+    override fun offsetAt(line: Int, column: Int): Int = doc.offsetAt(line, column)
+    override fun textRange(start: Int, end: Int): String = doc.textRange(start, end)
+    override fun wordAt(offset: Int): Sel = doc.wordAt(offset).let { Sel(it.anchor, it.head) }
+
+    override fun replace(start: Int, end: Int, text: String, typing: Boolean) {
+        doc.replace(start, end, text, typing)
+    }
+
+    override fun insert(text: String, typing: Boolean) {
+        doc.insert(text, typing)
+    }
+
+    override fun newline() {
+        doc.newline()
+    }
+
+    override fun backspace() {
+        doc.backspace()
+    }
+
+    override fun deleteForward() {
+        doc.deleteForward()
+    }
+
+    override fun undo(): Boolean = doc.undo().changed
+    override fun redo(): Boolean = doc.redo().changed
+    override fun sealUndoGroup() = doc.sealUndoGroup()
+    override fun markSaved() = doc.markSaved()
+    override fun close() = doc.close()
+
+    companion object {
+        fun create(text: String, fileName: String): RustEditorModel =
+            RustEditorModel(Document(text, fileName), fileName)
+    }
+}
