@@ -65,6 +65,8 @@ jobs:
       - name: Build Rust core, unit + screenshot tests, debug APKs (play + foss)
         working-directory: android
         run: ./gradlew --max-workers=4 testPlayDebugUnitTest -Proborazzi.test.record=true assemblePlayDebug assembleFossDebug
+      - name: Native size report (per ABI, APK, per grammar)
+        run: bash .github/scripts/native-size-report.sh . || true
       - name: Check 16 KB alignment
         run: |
           zipalign="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/zipalign"

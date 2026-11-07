@@ -43,6 +43,7 @@ impl HighlightKind {
         let sub = parts.next().unwrap_or("");
         match (head, sub) {
             ("keyword" | "conditional" | "repeat" | "include" | "exception" | "storageclass", _) => Keyword,
+            ("type", "qualifier") => Keyword,
             ("function" | "method", "builtin") => Builtin,
             ("function" | "method", _) => Function,
             ("constructor" | "type" | "module" | "namespace", "builtin") => Builtin,
@@ -58,7 +59,7 @@ impl HighlightKind {
             ("variable" | "parameter", _) => Variable,
             ("property" | "field", _) => Property,
             ("operator", _) => Operator,
-            ("punctuation", _) => Punctuation,
+            ("punctuation" | "delimiter", _) => Punctuation,
             ("tag", _) => Tag,
             ("attribute", _) => Attribute,
             ("label", _) => Label,
@@ -92,7 +93,8 @@ pub struct LineSpan {
 /// Precedence: an inner (narrower) node wins over the node containing it,
 /// and for the same node the pattern that appears *later* in the query wins
 /// (so a generic `(identifier) @variable` at the top of a query is refined
-/// by more specific patterns below it).
+/// by more specific patterns below it), unless the language's query is
+/// written the other way round ([`LanguageConfig::first_wins`]).
 pub(crate) fn highlight(
     config: &LanguageConfig,
     tree: &Tree,
@@ -127,9 +129,16 @@ pub(crate) fn highlight(
             caps.push((start, end, m.pattern_index, kind));
         }
     }
-    // Outer before inner; for equal ranges, lower pattern index first so the
-    // later pattern paints over it.
-    caps.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)).then(a.2.cmp(&b.2)));
+    // Outer before inner; for equal ranges, the winning pattern last so it
+    // paints over the others.
+    caps.sort_by(|a, b| {
+        let by_pattern = if config.first_wins {
+            b.2.cmp(&a.2)
+        } else {
+            a.2.cmp(&b.2)
+        };
+        a.0.cmp(&b.0).then(b.1.cmp(&a.1)).then(by_pattern)
+    });
 
     let mut paint: Vec<HighlightKind> = vec![HighlightKind::Plain; range.len()];
     for (start, end, _, kind) in caps {

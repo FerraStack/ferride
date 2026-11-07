@@ -1,0 +1,12 @@
+{
+  "name": "hello-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "build": "tsc -p .", "test": "vitest" },
+  "dependencies": { "react": "^19.0.0" },
+  "engines": { "node": ">=22" },
+  "workspaces": ["packages/*"],
+  "sideEffects": false,
+  "funding": null,
+  "port": 8080
+}

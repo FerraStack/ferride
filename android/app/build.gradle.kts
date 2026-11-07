@@ -82,6 +82,46 @@ abstract class UniffiBindgen : DefaultTask() {
     }
 }
 
+/**
+ * Builds `libferride_ffi.so` for the build machine, so JVM unit tests
+ * (Robolectric) can load the real Rust core through JNA: screenshots then show
+ * actual tree-sitter highlighting instead of the fake model's regexes. Same
+ * features as `uniffiBindgen`'s host build, so it mostly reuses that work.
+ */
+abstract class CargoHostBuild : DefaultTask() {
+    @get:Inject abstract val exec: ExecOperations
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sources: ConfigurableFileCollection
+
+    @get:Internal abstract val workspace: DirectoryProperty
+
+    @get:OutputFile abstract val library: RegularFileProperty
+
+    @TaskAction
+    fun build() {
+        exec.exec {
+            workingDir = workspace.get().asFile
+            commandLine("cargo", "build", "--locked", "-p", "ferride-ffi", "--features", "bindgen", "--lib")
+        }
+    }
+}
+
+val hostLibName = when {
+    System.getProperty("os.name").startsWith("Mac") -> "libferride_ffi.dylib"
+    System.getProperty("os.name").startsWith("Windows") -> "ferride_ffi.dll"
+    else -> "libferride_ffi.so"
+}
+
+val cargoHostBuild = tasks.register<CargoHostBuild>("cargoHostBuild") {
+    group = "rust"
+    description = "Builds the Rust core for this machine (JVM unit tests load it through JNA)"
+    sources.from(rustSources)
+    workspace.set(repoRoot)
+    library.set(repoRoot.file("target/debug/$hostLibName"))
+}
+
 val cargoNdkBuild = tasks.register<CargoNdkBuild>("cargoNdkBuild") {
     group = "rust"
     description = "Builds libferride_ffi.so for ${rustAbis.keys} with cargo-ndk"
@@ -149,12 +189,21 @@ android {
         buildConfig = true
     }
 
+    sourceSets {
+        // Sample files per language (shared with ferride-syntax's golden tests) for screenshots.
+        getByName("test").resources.srcDir(repoRoot.dir("crates/ferride-syntax/samples"))
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
             all {
                 it.systemProperty("robolectric.pixelCopyRenderMode", "hardware")
                 it.maxHeapSize = "2g"
+                // The host build of the Rust core (see cargoHostBuild).
+                it.dependsOn(cargoHostBuild)
+                it.inputs.file(cargoHostBuild.flatMap { t -> t.library })
+                it.systemProperty("jna.library.path", repoRoot.dir("target/debug").asFile.absolutePath)
             }
         }
     }
@@ -184,6 +233,8 @@ dependencies {
 
     testImplementation(composeBom)
     testImplementation(libs.junit)
+    // The JVM flavour of JNA (with the host's libjnidispatch) for loading the Rust core in unit tests.
+    testImplementation(libs.jna)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.test.ext.junit)

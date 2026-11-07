@@ -24,7 +24,13 @@ data class Sel(val anchor: Int, val head: Int) {
  */
 interface EditorModel {
     val fileName: String
-    val language: String?
+    /**
+     * VS Code language id of the active grammar (`null` = Plain Text).
+     * Setting it is Change Language Mode: an unknown id means plain text.
+     */
+    var language: String?
+    /** Re-detects the language from the file name and `#!` line ("Auto Detect"). */
+    fun detectLanguage(): String?
     /** Bumped by every content change. */
     val version: Long
     val lineCount: Int
@@ -75,7 +81,11 @@ interface EditorModel {
 }
 
 class RustEditorModel(private val doc: Document, override val fileName: String) : EditorModel {
-    override val language: String? get() = doc.language()
+    override var language: String?
+        get() = doc.language()
+        set(value) = doc.setLanguage(value)
+
+    override fun detectLanguage(): String? = doc.detectLanguage()
     override val version: Long get() = doc.version()
     override val lineCount: Int get() = doc.lineCount()
     override val length: Int get() = doc.lenUtf16()

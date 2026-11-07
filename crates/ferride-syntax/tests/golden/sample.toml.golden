@@ -1,0 +1,87 @@
+   1 | # Ferride sample: a Cargo manifest
+     |   comment      "# Ferride sample: a Cargo manifest"
+   2 | [package]
+     |   punctuation  "["
+     |   type         "package"
+     |   punctuation  "]"
+   3 | name = "word-count"
+     |   property     "name"
+     |   operator     "="
+     |   string       "\"word-count\""
+   4 | version = "0.1.0"
+     |   property     "version"
+     |   operator     "="
+     |   string       "\"0.1.0\""
+   5 | edition = "2024"
+     |   property     "edition"
+     |   operator     "="
+     |   string       "\"2024\""
+   6 | authors = ["FerraStack contributors"]
+     |   property     "authors"
+     |   operator     "="
+     |   punctuation  "["
+     |   string       "\"FerraStack contributors\""
+     |   punctuation  "]"
+   7 | publish = false
+     |   property     "publish"
+     |   operator     "="
+     |   constant     "false"
+   8 | 
+   9 | [dependencies]
+     |   punctuation  "["
+     |   type         "dependencies"
+     |   punctuation  "]"
+  10 | serde = { version = "1.0", features = ["derive"] }
+     |   property     "serde"
+     |   operator     "="
+     |   punctuation  "{"
+     |   property     "version"
+     |   operator     "="
+     |   string       "\"1.0\""
+     |   punctuation  ","
+     |   property     "features"
+     |   operator     "="
+     |   punctuation  "["
+     |   string       "\"derive\""
+     |   punctuation  "]"
+     |   punctuation  "}"
+  11 | regex = "1.11"
+     |   property     "regex"
+     |   operator     "="
+     |   string       "\"1.11\""
+  12 | 
+  13 | [profile.release]
+     |   punctuation  "["
+     |   type         "profile"
+     |   punctuation  "."
+     |   type         "release"
+     |   punctuation  "]"
+  14 | lto = true
+     |   property     "lto"
+     |   operator     "="
+     |   constant     "true"
+  15 | opt-level = 3
+     |   property     "opt-level"
+     |   operator     "="
+     |   number       "3"
+  16 | debug = 0.5
+     |   property     "debug"
+     |   operator     "="
+     |   number       "0.5"
+  17 | released = 2026-11-08T10:30:00Z
+     |   property     "released"
+     |   operator     "="
+     |   number       "2026-11-08T10:30:00Z"
+  18 | 
+  19 | [[bin]]
+     |   punctuation  "[["
+     |   type         "bin"
+     |   punctuation  "]]"
+  20 | name = 'wc'
+     |   property     "name"
+     |   operator     "="
+     |   string       "'wc'"
+  21 | path = "src/main.rs"
+     |   property     "path"
+     |   operator     "="
+     |   string       "\"src/main.rs\""

@@ -124,8 +124,48 @@ fn workspace_round_trip() {
 fn host_stub_and_languages() {
     assert_eq!(ferrux_status(), FerruxStatus::NotInstalled);
     assert!(supported_languages().contains(&"typescript".to_owned()));
-    assert_eq!(language_for_file("x.py".into()).as_deref(), Some("python"));
+    assert_eq!(language_for_file("x.py".into(), None).as_deref(), Some("python"));
+    assert_eq!(language_for_file("a.h".into(), None).as_deref(), Some("cpp"));
+    assert_eq!(
+        language_for_file("deploy".into(), Some("#!/bin/sh".into())).as_deref(),
+        Some("shellscript")
+    );
+    assert_eq!(language_for_file("deploy".into(), None), None);
+    assert_eq!(supported_languages().len(), 18);
     assert!(!core_version().is_empty());
+}
+
+#[test]
+fn change_language_mode_and_auto_detect() {
+    // No extension: the shebang picks the grammar.
+    let doc = Document::new(
+        "#!/usr/bin/env bash
+echo \"hi\"\n"
+            .into(),
+        Some("deploy".into()),
+    );
+    assert_eq!(doc.language().as_deref(), Some("shellscript"));
+    let kinds =
+        |doc: &Document| -> Vec<StyleKind> { doc.viewport(1, 1)[0].spans.iter().map(|s| s.kind).collect() };
+    assert!(kinds(&doc).contains(&StyleKind::String));
+
+    // Change Language Mode → Plain Text drops the highlighting…
+    doc.set_language(None);
+    assert_eq!(doc.language(), None);
+    assert!(kinds(&doc).is_empty());
+    // …an explicit pick sticks (unknown ids mean plain text)…
+    doc.set_language(Some("python".into()));
+    assert_eq!(doc.language().as_deref(), Some("python"));
+    doc.set_language(Some("cobol".into()));
+    assert_eq!(doc.language(), None);
+    // …and Auto Detect goes back to the file name / first line.
+    assert_eq!(doc.detect_language().as_deref(), Some("shellscript"));
+    assert_eq!(doc.language().as_deref(), Some("shellscript"));
+    assert!(kinds(&doc).contains(&StyleKind::String));
+
+    // Edits after detection keep the grammar (it's not re-detected while typing).
+    doc.replace(0, 0, "x".into(), false).unwrap();
+    assert_eq!(doc.language().as_deref(), Some("shellscript"));
 }
 
 #[derive(Default)]

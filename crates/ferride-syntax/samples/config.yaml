@@ -1,0 +1,25 @@
+# Ferride sample: a CI workflow
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RETRIES: 3
+  DEBUG: false
+
+jobs:
+  test: &defaults
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: |
+          cargo fmt --check
+          cargo test --locked
+  lint:
+    <<: *defaults
+    steps: ~

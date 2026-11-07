@@ -55,7 +55,15 @@ enum class PaletteMode(val prefix: String, val placeholder: String) {
     Commands(">", "Search commands"),
     GotoLine(":", "Type a line number to go to"),
     Symbols("@", "Go to symbol in editor"),
+    /** A command's own list ([WorkbenchState.quickPick]), e.g. Change Language Mode. */
+    QuickPick("", ""),
 }
+
+/**
+ * A command-specific quick pick (VS Code's `showQuickPick`): the palette
+ * shows [items] filtered by the typed text, under [placeholder].
+ */
+class QuickPick(val placeholder: String, val items: () -> List<PaletteItem>)
 
 /**
  * One row in the palette. [label] is shown with [category] dimmed in front
@@ -66,6 +74,8 @@ data class PaletteItem(
     val label: String,
     val category: String? = null,
     val detail: String? = null,
+    /** Dimmed text right after the label (VS Code's quick pick `description`). */
+    val description: String? = null,
     val keybinding: KeyChord? = null,
     val matches: List<Int> = emptyList(),
     val section: String? = null,
@@ -169,6 +179,9 @@ class WorkbenchState(
 
     var paletteOpen by mutableStateOf(false)
     var paletteQuery by mutableStateOf("")
+    /** Set while the palette shows a command's own list instead of a prefix mode. */
+    var quickPick by mutableStateOf<QuickPick?>(null)
+        private set
     /** Most recently run command ids, newest first. */
     val recentCommands = mutableStateListOf<String>()
 
@@ -573,9 +586,19 @@ class WorkbenchState(
     }
 
     fun openPalette(mode: PaletteMode) {
+        quickPick = null
         paletteQuery = mode.prefix
         paletteOpen = true
     }
+
+    fun showQuickPick(pick: QuickPick) {
+        quickPick = pick
+        paletteQuery = ""
+        paletteOpen = true
+    }
+
+    /** Placeholder of the palette's input for the current mode. */
+    fun palettePlaceholder(): String = quickPick?.placeholder ?: paletteMode().placeholder
 
     /** Esc: close the innermost overlay, then the find widget, then collapse the selection. */
     fun escape() {
@@ -588,6 +611,7 @@ class WorkbenchState(
     }
 
     fun paletteMode(): PaletteMode = when {
+        quickPick != null -> PaletteMode.QuickPick
         paletteQuery.startsWith(">") -> PaletteMode.Commands
         paletteQuery.startsWith(":") -> PaletteMode.GotoLine
         paletteQuery.startsWith("@") -> PaletteMode.Symbols
@@ -641,6 +665,18 @@ class WorkbenchState(
             PaletteMode.Symbols -> listOf(
                 PaletteItem("Document symbols need a language server", detail = "Requires Ferrux (see Languages)") {},
             )
+            PaletteMode.QuickPick -> {
+                val all = quickPick?.items?.invoke().orEmpty()
+                if (q.isEmpty()) {
+                    all
+                } else {
+                    // Keep the original order (VS Code doesn't re-sort a quick pick) and drop section headers.
+                    all.mapNotNull { item ->
+                        val m = fuzzyPositions(q, item.label)
+                        if (m.isEmpty()) null else item.copy(matches = m, section = null)
+                    }
+                }
+            }
             PaletteMode.Files -> fileHits.map { hit ->
                 val name = hit.relPath.substringAfterLast('/')
                 PaletteItem(
@@ -699,6 +735,9 @@ class WorkbenchState(
         }
         cmd(CommandIds.GOTO_SYMBOL, "Go to Symbol in Editor…", "Go", KeyChord.ctrl(KeyEvent.KEYCODE_O, shift = true), hasEditor) {
             openPalette(PaletteMode.Symbols)
+        }
+        cmd(CommandIds.CHANGE_LANGUAGE_MODE, "Change Language Mode", null, enabled = hasEditor) {
+            showQuickPick(languagePick())
         }
         cmd(CommandIds.SAVE, "Save", "File", KeyChord.ctrl(KeyEvent.KEYCODE_S), hasEditor) { save() }
         cmd(CommandIds.SAVE_ALL, "Save All", "File", KeyChord(KeyEvent.KEYCODE_S, ctrl = true, alt = true)) {
@@ -777,6 +816,34 @@ class WorkbenchState(
         cmd(CommandIds.ZOOM_OUT, "Decrease Editor Font Size", "Editor", KeyChord.ctrl(KeyEvent.KEYCODE_MINUS)) {
             updateSettings { it.copy(fontSize = (it.fontSize - 1).coerceAtLeast(6)) }
         }
+    }
+
+    /**
+     * VS Code's "Select Language Mode" list: Auto Detect, then every language
+     * by name with its id, the current one marked "Configured Language".
+     */
+    fun languagePick(): QuickPick = QuickPick("Select Language Mode") {
+        val tab = activeTab
+        val model = tab?.model?.takeIf { !it.isClosed }
+        val current = model?.language ?: Languages.PLAIN_TEXT_ID
+        fun choose(apply: (EditorModel) -> Unit) {
+            paletteOpen = false
+            quickPick = null
+            if (model == null || model.isClosed) return
+            apply(model)
+            tab.revision++
+            log("Language mode of ${tab.name}: ${Languages.displayName(model.language)}")
+        }
+        val languages = (Languages.all.map { it.id to it.name } + (Languages.PLAIN_TEXT_ID to Languages.PLAIN_TEXT_NAME))
+            .sortedBy { it.second.lowercase() }
+        listOf(PaletteItem("Auto Detect") { choose { it.detectLanguage() } }) +
+            languages.mapIndexed { i, (id, name) ->
+                PaletteItem(
+                    label = name,
+                    description = if (id == current) "($id) - Configured Language" else "($id)",
+                    section = if (i == 0) "languages (identifier)" else null,
+                ) { choose { it.language = id.takeIf { id != Languages.PLAIN_TEXT_ID } } }
+            }
     }
 
     companion object {

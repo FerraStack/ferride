@@ -1,0 +1,146 @@
+   1 | @import url("fonts.css");
+     |   keyword      "@import"
+     |   function     "url"
+     |   punctuation  "("
+     |   string       "\"fonts.css\""
+     |   punctuation  ");"
+   2 | 
+   3 | :root {
+     |   punctuation  ":"
+     |   attribute    "root"
+     |   punctuation  "{"
+   4 |   --accent: #0078d4;
+     |   variable     "--accent"
+     |   punctuation  ":"
+     |   punctuation  "#"
+     |   string       "0078d4"
+     |   punctuation  ";"
+   5 |   --radius: 6px;
+     |   variable     "--radius"
+     |   punctuation  ":"
+     |   number       "6"
+     |   type         "px"
+     |   punctuation  ";"
+   6 | }
+     |   punctuation  "}"
+   7 | 
+   8 | /* Layout */
+     |   comment      "/* Layout */"
+   9 | .app {
+     |   punctuation  "."
+     |   attribute    "app"
+     |   punctuation  "{"
+  10 |   max-width: 40rem;
+     |   property     "max-width"
+     |   punctuation  ":"
+     |   number       "40"
+     |   type         "rem"
+     |   punctuation  ";"
+  11 |   margin: 0 auto;
+     |   property     "margin"
+     |   punctuation  ":"
+     |   number       "0"
+     |   punctuation  ";"
+  12 |   padding: 1.5em;
+     |   property     "padding"
+     |   punctuation  ":"
+     |   number       "1.5"
+     |   type         "em"
+     |   punctuation  ";"
+  13 |   font-family: system-ui, sans-serif;
+     |   property     "font-family"
+     |   punctuation  ":"
+     |   punctuation  ","
+     |   punctuation  ";"
+  14 | }
+     |   punctuation  "}"
+  15 | 
+  16 | #input:focus,
+     |   punctuation  "#"
+     |   attribute    "input"
+     |   punctuation  ":"
+     |   attribute    "focus"
+     |   punctuation  ","
+  17 | button:hover:not([disabled]) {
+     |   tag          "button"
+     |   punctuation  ":"
+     |   attribute    "hover"
+     |   punctuation  ":"
+     |   attribute    "not"
+     |   punctuation  "("
+     |   attribute    "disabled"
+     |   punctuation  ")"
+     |   punctuation  "{"
+  18 |   outline: 2px solid var(--accent);
+     |   property     "outline"
+     |   punctuation  ":"
+     |   number       "2"
+     |   type         "px"
+     |   function     "var"
+     |   punctuation  "("
+     |   variable     "--accent"
+     |   punctuation  ");"
+  19 |   border-radius: var(--radius);
+     |   property     "border-radius"
+     |   punctuation  ":"
+     |   function     "var"
+     |   punctuation  "("
+     |   variable     "--radius"
+     |   punctuation  ");"
+  20 | }
+     |   punctuation  "}"
+  21 | 
+  22 | ol > li::marker {
+     |   tag          "ol"
+     |   operator     ">"
+     |   tag          "li"
+     |   punctuation  "::"
+     |   attribute    "marker"
+     |   punctuation  "{"
+  23 |   color: rgba(0, 120, 212, 0.8);
+     |   property     "color"
+     |   punctuation  ":"
+     |   function     "rgba"
+     |   punctuation  "("
+     |   number       "0"
+     |   punctuation  ","
+     |   number       "120"
+     |   punctuation  ","
+     |   number       "212"
+     |   punctuation  ","
+     |   number       "0.8"
+     |   punctuation  ");"
+  24 |   font-weight: bold !important;
+     |   property     "font-weight"
+     |   punctuation  ":"
+     |   keyword      "!important"
+     |   punctuation  ";"
+  25 | }
+     |   punctuation  "}"
+  26 | 
+  27 | @media (max-width: 600px) {
+     |   keyword      "@media"
+     |   punctuation  "("
+     |   property     "max-width"
+     |   punctuation  ":"
+     |   number       "600"
+     |   type         "px"
+     |   punctuation  ")"
+     |   punctuation  "{"
+  28 |   .app { padding: calc(1em + 2px); }
+     |   punctuation  "."
+     |   attribute    "app"
+     |   punctuation  "{"
+     |   property     "padding"
+     |   punctuation  ":"
+     |   function     "calc"
+     |   punctuation  "("
+     |   number       "1"
+     |   type         "em"
+     |   operator     "+"
+     |   number       "2"
+     |   type         "px"
+     |   punctuation  ");"
+     |   punctuation  "}"
+  29 | }
+     |   punctuation  "}"

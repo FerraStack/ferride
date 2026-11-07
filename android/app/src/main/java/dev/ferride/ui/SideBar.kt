@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ferride.core.FileNode
 import dev.ferride.theme.LocalWorkbenchColors
+import dev.ferride.workbench.Languages
 import dev.ferride.workbench.SideView
 import dev.ferride.workbench.WorkbenchState
 
@@ -248,30 +249,17 @@ private fun SourceControlView(state: WorkbenchState) {
 
 // ----- Languages (the Extensions equivalent) ----------------------------------------
 
-private data class LanguageInfo(val name: String, val server: String)
-
-private val LANGUAGES = listOf(
-    LanguageInfo("Rust", "rust-analyzer"),
-    LanguageInfo("Python", "basedpyright / pyright"),
-    LanguageInfo("JavaScript", "typescript-language-server"),
-    LanguageInfo("TypeScript", "typescript-language-server"),
-    LanguageInfo("JSON", "vscode-json-languageserver"),
-    LanguageInfo("Markdown", "marksman"),
-)
-
 @Composable
 private fun LanguagesView() {
     val c = LocalWorkbenchColors.current
     LazyColumn(Modifier.fillMaxSize()) {
-        items(LANGUAGES) { lang ->
+        items(Languages.all) { lang ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.size(36.dp).background(c.inputBackground, RoundedCornerShape(4.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    FileIcon("x." + when (lang.name) {
-                        "Rust" -> "rs"; "Python" -> "py"; "JavaScript" -> "js"; "TypeScript" -> "ts"; "JSON" -> "json"; else -> "md"
-                    })
+                    FileIcon(lang.iconFile)
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {

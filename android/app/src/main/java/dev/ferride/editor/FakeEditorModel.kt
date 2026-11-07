@@ -30,7 +30,9 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
     private val redoStack = ArrayDeque<Pair<String, Sel>>()
     private var savedVersion = 0L
 
-    override val language: String? = languageFor(fileName)
+    override var language: String? = languageFor(fileName)
+
+    override fun detectLanguage(): String? = languageFor(fileName).also { language = it }
     override var version: Long = 0
         private set
     override var selection: Sel = Sel.caret(0)
@@ -277,6 +279,17 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
             "tsx" -> "typescriptreact"
             "json" -> "json"
             "md", "markdown" -> "markdown"
+            "c" -> "c"
+            "h", "cpp", "cc", "cxx", "hpp" -> "cpp"
+            "go" -> "go"
+            "java" -> "java"
+            "kt", "kts" -> "kotlin"
+            "html", "htm" -> "html"
+            "css" -> "css"
+            "yaml", "yml" -> "yaml"
+            "toml" -> "toml"
+            "sh", "bash", "zsh" -> "shellscript"
+            "sql" -> "sql"
             else -> null
         }
     }
