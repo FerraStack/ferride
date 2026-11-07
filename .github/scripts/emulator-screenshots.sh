@@ -42,7 +42,65 @@ alive() {
   fi
 }
 
+# UI tree helpers (uiautomator sees Compose text nodes).
+ui_dump() {
+  for _ in 1 2 3; do
+    if adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; then
+      adb shell cat /sdcard/ui.xml
+      return 0
+    fi
+    sleep 1
+  done
+  echo "::warning::uiautomator dump failed" >&2
+}
+# Center "x y" of the first node whose text is exactly $1, read from a dump on stdin.
+center_of() {
+  grep -o "text=\"$1\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" | head -1 |
+    sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/' |
+    awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }'
+}
+expect_text() {
+  if ! ui_dump | grep -q "text=\"$1\""; then
+    echo "::error::Expected \"$1\" on screen: $2"
+    adb exec-out screencap -p > "$out/failure.png" || true
+    adb logcat -d -t 400 > "$out/logcat.txt" || true
+    exit 1
+  fi
+}
+expect_no_text() {
+  if ui_dump | grep -q "text=\"$1\""; then
+    echo "::error::Did not expect \"$1\" on screen: $2"
+    adb exec-out screencap -p > "$out/failure.png" || true
+    exit 1
+  fi
+}
+
 shoot dark
+
+# Touch selection (#8): long press in the editor shows the floating toolbar;
+# Select All keeps it open with Cut/Copy; Copy closes it.
+size="$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)"
+sw="${size%x*}"
+sh="${size#*x}"
+lx=$((sw / 2))
+ly=$((sh * 3 / 10))
+adb shell input swipe "$lx" "$ly" "$lx" "$ly" 1200
+sleep 2
+alive "long press in the editor"
+expect_text "Select All" "selection toolbar after a long press"
+read -r ax ay < <(ui_dump | center_of "Select All") || { echo "::error::Select All has no bounds"; exit 1; }
+adb shell input tap "$ax" "$ay"
+sleep 2
+expect_text "Copy" "toolbar stays open with Cut/Copy after Select All"
+expect_text "Cut" "toolbar stays open with Cut/Copy after Select All"
+adb exec-out screencap -p > "$out/emulator_selection_dark.png"
+read -r cx cy < <(ui_dump | center_of "Copy") || { echo "::error::Copy has no bounds"; exit 1; }
+adb shell input tap "$cx" "$cy"
+sleep 2
+expect_no_text "Cut" "toolbar closes after Copy"
+alive "selection toolbar"
+echo "selection toolbar: OK"
+
 quick_open lib
 alive "open lib.rs"
 quick_open app

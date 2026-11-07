@@ -44,6 +44,8 @@ data class EditorStyle(
     val warning: Int = 0xFFCCA700.toInt(),
     val info: Int = 0xFF3794FF.toInt(),
     val scrollbar: Int = 0x55797979,
+    /** Touch selection handles (VS Code has none; they use the accent, `focusBorder`). */
+    val handle: Int = 0xFF0078D4.toInt(),
     val fontSizeSp: Float = 14f,
     val tabSize: Int = 4,
     val insertSpaces: Boolean = true,

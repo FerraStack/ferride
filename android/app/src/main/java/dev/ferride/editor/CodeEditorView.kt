@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PointF
 import android.graphics.Typeface
 import android.text.InputType
 import android.util.TypedValue
@@ -14,14 +15,17 @@ import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
+import android.widget.Magnifier
 import android.widget.OverScroller
 import dev.ferride.core.StyleKind
 import dev.ferride.core.ViewLine
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -50,6 +54,16 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     /** Called after edits (`true`) and selection-only changes (`false`). */
     var onChange: ((contentChanged: Boolean) -> Unit)? = null
+
+    /**
+     * The floating selection toolbar should show at [SelectionUi] (or hide, on
+     * `null`). The host draws it (Compose) and calls [onSelectionToolbarAction].
+     */
+    var onSelectionUi: ((SelectionUi?) -> Unit)? = null
+        set(value) {
+            field = value
+            value?.invoke(lastSelectionUi)
+        }
 
     var style: EditorStyle = EditorStyle(
         background = 0xFF1F1F1F.toInt(), foreground = 0xFFD4D4D4.toInt(), lineHighlight = 0xFF282828.toInt(),
@@ -148,6 +162,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         }
         scrollMemory.keys.removeAll { it.isClosed }
         model = newModel
+        hideSelectionControls()
         val (x, y) = newModel?.let { scrollMemory[it] } ?: (0f to 0f)
         sx = x
         sy = y
@@ -178,6 +193,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         super.onSizeChanged(w, h, oldw, oldh)
         if (w != oldw) wrap = null
         if (h != oldh) post { ensureCaretVisible() }
+        if (w != oldw || h != oldh) post { publishSelectionUi() }
     }
 
     // ----- layout: tabs and wrapping -----------------------------------------------
@@ -483,6 +499,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         canvas.restore()
         drawGutter(canvas, firstRow, lastRow, caretLine)
         drawScrollbars(canvas)
+        drawHandles(canvas)
     }
 
     /**
@@ -608,12 +625,17 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         sx = x.coerceIn(0f, maxScrollX)
         sy = y.coerceIn(0f, maxScrollY)
         invalidate()
+        if (toolbarShown) publishSelectionUi()
     }
 
     override fun computeScroll() {
         if (scroller.computeScrollOffset()) {
             scrollToClamped(scroller.currX.toFloat(), scroller.currY.toFloat())
             postInvalidateOnAnimation()
+        } else if (restoreToolbar) {
+            // A fling hid the toolbar; bring it back once the content settles.
+            restoreToolbar = false
+            showSelectionControls(toolbar = true)
         }
     }
 
@@ -644,28 +666,45 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         override fun onSingleTapUp(e: MotionEvent): Boolean {
             val m = liveModel ?: return true
             val hadComposing = composingRange() != null
+            val offset = offsetAt(e.x, e.y)
+            // Tapping the caret again toggles the Paste / Select All toolbar (Android's insertion menu).
+            val tappedCaret = handlesShown && m.selection.isEmpty && m.selection.head == offset
             clearComposing()
             m.sealUndoGroup()
-            m.selection = Sel.caret(offsetAt(e.x, e.y))
+            m.selection = Sel.caret(offset)
             preferredX = -1f
             requestFocus()
             if (hadComposing) imm?.restartInput(this@CodeEditorView)
             showKeyboard()
             afterSelectionChange(fromIme = false)
+            restoreToolbar = false
+            showSelectionControls(toolbar = tappedCaret && !toolbarShown)
             return true
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
             selectWordAt(e)
+            showSelectionControls(toolbar = true)
             return true
         }
 
         override fun onLongPress(e: MotionEvent) {
             selectWordAt(e)
+            // Keep the finger down and drag to extend the selection word by word.
+            longPressWord = liveModel?.selection
+            lastTouchX = e.x
+            lastTouchY = e.y
+            showSelectionControls(toolbar = false)
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         }
 
         override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+            if (toolbarShown) {
+                // Like Android's text toolbar: hidden while the content moves, back afterwards.
+                toolbarShown = false
+                restoreToolbar = true
+                publishSelectionUi()
+            }
             // Lock to the dominant axis for steadier scrolling.
             when {
                 abs(dy) > abs(dx) * 1.5f -> scrollToClamped(sx, sy + dy)
@@ -690,13 +729,341 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     private fun selectWordAt(e: MotionEvent) {
         val m = liveModel ?: return
+        val hadComposing = composingRange() != null
         clearComposing()
+        m.sealUndoGroup()
         m.selection = m.wordAt(offsetAt(e.x, e.y))
         requestFocus()
+        if (hadComposing) imm?.restartInput(this)
+        restoreToolbar = false
         afterSelectionChange(fromIme = false)
     }
 
-    override fun onTouchEvent(event: MotionEvent): Boolean = gestures.onTouchEvent(event) || super.onTouchEvent(event)
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            val handle = handleAt(event.x, event.y)
+            if (handle != null && liveModel != null) {
+                startHandleDrag(handle, event)
+                return true
+            }
+        }
+        if (dragHandle != null) {
+            onHandleDrag(event)
+            return true
+        }
+        val handled = gestures.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> if (longPressWord != null) {
+                lastTouchX = event.x
+                lastTouchY = event.y
+                updateLongPressDrag()
+                startAutoScroll()
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (longPressWord != null) {
+                    longPressWord = null
+                    if (event.actionMasked == MotionEvent.ACTION_UP) showSelectionControls(toolbar = true)
+                } else if (restoreToolbar && scroller.isFinished) {
+                    restoreToolbar = false
+                    showSelectionControls(toolbar = true)
+                }
+            }
+        }
+        return handled || super.onTouchEvent(event)
+    }
+
+    // ----- touch selection: handles + floating toolbar ---------------------------------------
+
+    private enum class Handle { Start, End, Caret }
+
+    /** Selection handles (or the caret handle for an empty selection) are visible. */
+    private var handlesShown = false
+    /** The floating toolbar is requested (the host hides it while the selection is off-screen). */
+    private var toolbarShown = false
+    /** The toolbar was hidden by a scroll/fling and comes back when it ends. */
+    private var restoreToolbar = false
+    private var lastSelectionUi: SelectionUi? = null
+
+    private var dragHandle: Handle? = null
+    private var dragDx = 0f
+    private var dragDy = 0f
+    private var dragMoved = false
+    private var downX = 0f
+    private var downY = 0f
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+    /** The long-pressed word while the finger is still down (drag extends by words). */
+    private var longPressWord: Sel? = null
+    private var autoScrolling = false
+
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private val handleRadius get() = 11f * density
+    private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val magnifier: Magnifier? by lazy { runCatching { Magnifier.Builder(this).build() }.getOrNull() }
+
+    private val hideCaretHandle = Runnable {
+        if (handlesShown && !toolbarShown && dragHandle == null && liveModel?.selection?.isEmpty != false) {
+            handlesShown = false
+            invalidate()
+        }
+    }
+
+    /** Shows the handles for the current selection and, with [toolbar], the floating toolbar. */
+    fun showSelectionControls(toolbar: Boolean) {
+        val m = liveModel ?: return
+        handlesShown = true
+        toolbarShown = toolbar
+        removeCallbacks(hideCaretHandle)
+        if (m.selection.isEmpty && !toolbar) postDelayed(hideCaretHandle, CARET_HANDLE_MS)
+        invalidate()
+        publishSelectionUi()
+    }
+
+    /** Hides handles and toolbar (typing, keys, IME selection changes, focus loss, tab switch). */
+    fun hideSelectionControls() {
+        removeCallbacks(hideCaretHandle)
+        if (!handlesShown && !toolbarShown && !restoreToolbar) return
+        handlesShown = false
+        toolbarShown = false
+        restoreToolbar = false
+        invalidate()
+        publishSelectionUi()
+    }
+
+    /** Runs a toolbar entry (called by the host's toolbar). */
+    fun onSelectionToolbarAction(action: SelectionAction) {
+        when (action) {
+            SelectionAction.Cut -> cut()
+            SelectionAction.Copy -> {
+                copy()
+                // VS Code keeps the selection after copying; only the menu closes.
+                toolbarShown = false
+                publishSelectionUi()
+            }
+            SelectionAction.Paste -> paste()
+            SelectionAction.SelectAll -> {
+                selectAll()
+                showSelectionControls(toolbar = true)
+            }
+        }
+    }
+
+    private fun publishSelectionUi() {
+        val m = liveModel
+        val ui = if (m == null || !toolbarShown || dragHandle != null || width == 0) null else selectionUi(m)
+        if (ui == lastSelectionUi) return
+        lastSelectionUi = ui
+        onSelectionUi?.invoke(ui)
+    }
+
+    private fun selectionUi(m: EditorModel): SelectionUi? {
+        computeGutter()
+        val s = m.selection
+        val (x1, y1) = caretPoint(s.start)
+        val (x2, y2) = caretPoint(s.end)
+        val top = y1 - sy
+        val bottom = y2 - sy + lineHeight + (if (handlesShown) handleRadius * 2.5f else 0f)
+        if (bottom < 0f || top > height) return null
+        val oneRow = y1 == y2
+        return SelectionUi(
+            left = if (oneRow) textLeft - sx + x1 else textLeft,
+            top = top,
+            right = if (oneRow) textLeft - sx + x2 else width.toFloat(),
+            bottom = bottom,
+            hasSelection = !s.isEmpty,
+            canPaste = clipboard?.hasPrimaryClip() == true,
+        )
+    }
+
+    /** Where a handle points: x of [offset], bottom of its row (view coordinates). */
+    private fun handlePoint(offset: Int): PointF {
+        val (cx, cy) = caretPoint(offset)
+        return PointF(textLeft - sx + cx, cy - sy + lineHeight)
+    }
+
+    /** Center of a handle's round body (the part a finger grabs). */
+    private fun handleBody(kind: Handle, p: PointF): PointF {
+        val r = handleRadius
+        return when (kind) {
+            Handle.Start -> PointF(p.x - r, p.y + r)
+            Handle.End -> PointF(p.x + r, p.y + r)
+            Handle.Caret -> PointF(p.x, p.y + r * SQRT2)
+        }
+    }
+
+    /** Center of the row at [offset], in view coordinates (tests, accessibility). */
+    internal fun pointOf(offset: Int): PointF {
+        computeGutter()
+        val (cx, cy) = caretPoint(offset)
+        return PointF(textLeft - sx + cx, cy - sy + lineHeight / 2f)
+    }
+
+    /** Where to grab the visible handles: start/end for a selection, one caret handle otherwise (tests). */
+    internal fun handleBodies(): List<PointF> {
+        computeGutter()
+        return visibleHandles().map { (kind, offset) -> handleBody(kind, handlePoint(offset)) }
+    }
+
+    private fun visibleHandles(): List<Pair<Handle, Int>> {
+        val m = liveModel ?: return emptyList()
+        if (!handlesShown) return emptyList()
+        val s = m.selection
+        return if (s.isEmpty) listOf(Handle.Caret to s.head) else listOf(Handle.Start to s.start, Handle.End to s.end)
+    }
+
+    private fun handleAt(x: Float, y: Float): Handle? {
+        val reach = max(handleRadius * 2f, 24f * density)
+        return visibleHandles()
+            .map { (kind, offset) -> kind to handleBody(kind, handlePoint(offset)) }
+            .map { (kind, c) -> kind to hypot(x - c.x, y - c.y) }
+            .filter { it.second <= reach }
+            .minByOrNull { it.second }?.first
+    }
+
+    private fun drawHandles(canvas: Canvas) {
+        val handles = visibleHandles()
+        if (handles.isEmpty()) return
+        computeGutter()
+        handlePaint.color = style.handle
+        val r = handleRadius
+        for ((kind, offset) in handles) {
+            val p = handlePoint(offset)
+            if (p.x < gutterWidth - 1f || p.x > width + r || p.y < 0f || p.y > height) continue
+            canvas.save()
+            // The caret handle is the start handle turned to point straight up.
+            if (kind == Handle.Caret) canvas.rotate(-45f, p.x, p.y)
+            if (kind == Handle.End) {
+                canvas.drawCircle(p.x + r, p.y + r, r, handlePaint)
+                canvas.drawRect(p.x, p.y, p.x + r, p.y + r, handlePaint)
+            } else {
+                canvas.drawCircle(p.x - r, p.y + r, r, handlePaint)
+                canvas.drawRect(p.x - r, p.y, p.x, p.y + r, handlePaint)
+            }
+            canvas.restore()
+        }
+    }
+
+    private fun startHandleDrag(handle: Handle, event: MotionEvent) {
+        val m = liveModel ?: return
+        scroller.forceFinished(true)
+        if (composingRange() != null) {
+            clearComposing()
+            imm?.restartInput(this)
+        }
+        m.sealUndoGroup()
+        val s = m.selection
+        val p = handlePoint(if (handle == Handle.Start) s.start else if (handle == Handle.End) s.end else s.head)
+        dragHandle = handle
+        dragMoved = false
+        dragDx = event.x - p.x
+        dragDy = event.y - p.y
+        downX = event.x
+        downY = event.y
+        lastTouchX = event.x
+        lastTouchY = event.y
+        removeCallbacks(hideCaretHandle)
+        restoreToolbar = false
+        parent?.requestDisallowInterceptTouchEvent(true)
+        publishSelectionUi()
+    }
+
+    private fun onHandleDrag(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> {
+                if (!dragMoved && hypot(event.x - downX, event.y - downY) < touchSlop) return
+                dragMoved = true
+                lastTouchX = event.x
+                lastTouchY = event.y
+                updateHandleDrag()
+                startAutoScroll()
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val handle = dragHandle
+                val wasTap = !dragMoved
+                dragHandle = null
+                magnifier?.dismiss()
+                if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                    publishSelectionUi()
+                } else if (handle == Handle.Caret) {
+                    // Tapping the caret handle toggles the insertion menu; dragging it just moves the caret.
+                    showSelectionControls(toolbar = wasTap && !toolbarShown)
+                } else {
+                    showSelectionControls(toolbar = true)
+                }
+            }
+        }
+    }
+
+    private fun updateHandleDrag() {
+        val m = liveModel ?: return
+        val handle = dragHandle ?: return
+        val x = lastTouchX - dragDx
+        val y = lastTouchY - dragDy - lineHeight / 2f
+        val offset = offsetAt(x, y)
+        val s = m.selection
+        // Handles never cross: the dragged end keeps at least one character selected.
+        val next = when (handle) {
+            Handle.Caret -> Sel.caret(offset)
+            Handle.Start -> Sel(s.end, if (offset < s.end) offset else stepBack(m, s.end))
+            Handle.End -> Sel(s.start, if (offset > s.start) offset else stepForward(m, s.start))
+        }
+        if (next != s) {
+            m.selection = next
+            performHapticFeedback(HapticFeedbackConstants.TEXT_HANDLE_MOVE)
+            afterSelectionChange(fromIme = false)
+        }
+        // The magnifier is cosmetic: never let it break a drag (e.g. no window surface yet).
+        val p = handlePoint(next.head)
+        runCatching { magnifier?.show(x.coerceIn(textLeft, width.toFloat()), p.y - lineHeight / 2f) }
+    }
+
+    private fun updateLongPressDrag() {
+        val m = liveModel ?: return
+        val word = longPressWord ?: return
+        val offset = offsetAt(lastTouchX, lastTouchY)
+        val next = when {
+            offset < word.start -> Sel(word.end, m.wordAt(offset).start)
+            offset > word.end -> Sel(word.start, m.wordAt(offset).end)
+            else -> word
+        }
+        if (next != m.selection) {
+            m.selection = next
+            performHapticFeedback(HapticFeedbackConstants.TEXT_HANDLE_MOVE)
+            afterSelectionChange(fromIme = false)
+        }
+    }
+
+    /** While a handle (or a long press) is dragged near an edge, scroll toward it. */
+    private val autoScroll = object : Runnable {
+        override fun run() {
+            val dragging = dragHandle != null || longPressWord != null
+            val edge = lineHeight
+            val dy = when {
+                lastTouchY < edge -> -lineHeight / 2f
+                lastTouchY > height - edge -> lineHeight / 2f
+                else -> 0f
+            }
+            val dx = when {
+                wrapping -> 0f
+                lastTouchX < textLeft + charWidth -> -charWidth
+                lastTouchX > width - charWidth * 2 -> charWidth
+                else -> 0f
+            }
+            if (!dragging || (dx == 0f && dy == 0f)) {
+                autoScrolling = false
+                return
+            }
+            scrollToClamped(sx + dx, sy + dy)
+            if (dragHandle != null) updateHandleDrag() else updateLongPressDrag()
+            postOnAnimation(this)
+        }
+    }
+
+    private fun startAutoScroll() {
+        if (autoScrolling) return
+        autoScrolling = true
+        postOnAnimation(autoScroll)
+    }
 
     fun showKeyboard() {
         imm?.showSoftInput(this, 0)
@@ -707,7 +1074,10 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: android.graphics.Rect?) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
         restartBlink()
-        if (!gainFocus) liveModel?.sealUndoGroup()
+        if (!gainFocus) {
+            liveModel?.sealUndoGroup()
+            hideSelectionControls()
+        }
         onFocus?.invoke(gainFocus)
     }
 
@@ -720,6 +1090,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun onDetachedFromWindow() {
         removeCallbacks(blink)
+        removeCallbacks(hideCaretHandle)
         super.onDetachedFromWindow()
     }
 
@@ -765,6 +1136,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     /** After any content change: refresh, keep the caret visible, notify. */
     internal fun afterEdit(fromIme: Boolean) {
+        hideSelectionControls()
         invalidateLines()
         preferredX = -1f
         ensureCaretVisible()
@@ -792,6 +1164,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         val m = liveModel ?: return super.onKeyDown(keyCode, event)
+        hideSelectionControls()
         val shift = event.isShiftPressed
         when (keyCode) {
             KeyEvent.KEYCODE_DEL -> { m.backspace(); afterKeyEdit() }
@@ -851,6 +1224,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     override fun moveCursor(direction: EditorActions.Direction, extend: Boolean) {
         val m = liveModel ?: return
         clearComposing()
+        hideSelectionControls()
         m.sealUndoGroup()
         val sel = m.selection
         val head = sel.head
@@ -928,6 +1302,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun escape() {
         val m = liveModel ?: return
+        hideSelectionControls()
         if (m.selection.isEmpty) return
         m.selection = Sel.caret(m.selection.head)
         afterSelectionChange(fromIme = false)
@@ -936,6 +1311,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     override fun select(start: Int, end: Int) {
         val m = liveModel ?: return
         clearComposing()
+        hideSelectionControls()
         m.sealUndoGroup()
         m.selection = Sel(start.coerceIn(0, m.length), end.coerceIn(0, m.length))
         afterSelectionChange(fromIme = false)
@@ -988,6 +1364,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     override fun goToLine(line: Int) {
         val m = liveModel ?: return
         val l = line.coerceIn(0, m.lineCount - 1)
+        hideSelectionControls()
         m.sealUndoGroup()
         m.selection = Sel.caret(m.lineStart(l))
         // Center the target line.
@@ -998,6 +1375,9 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     companion object {
         private const val BLINK_MS = 530L
+        /** Android hides an idle insertion (caret) handle after a few seconds. */
+        private const val CARET_HANDLE_MS = 4000L
+        private const val SQRT2 = 1.4142135f
         private const val MAX_WRAP_CHARS = 2_000_000
         private val NO_BREAKS = intArrayOf(0)
         private val VERTICAL = setOf(

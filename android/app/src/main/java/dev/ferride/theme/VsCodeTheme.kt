@@ -105,6 +105,12 @@ object VsCodeTheme {
             descriptionForeground = col("descriptionForeground", base.descriptionForeground),
             errorForeground = col("errorForeground", base.errorForeground),
             warningForeground = col("editorWarning.foreground", base.warningForeground),
+            menuBackground = col("menu.background", col("editorWidget.background", base.menuBackground)),
+            menuForeground = col("menu.foreground", col("editorWidget.foreground", base.menuForeground)),
+            menuBorder = col("menu.border", col("editorWidget.border", base.menuBorder)),
+            menuSelectionBackground = col("menu.selectionBackground", col("list.activeSelectionBackground", base.menuSelectionBackground)),
+            menuSelectionForeground = col("menu.selectionForeground", base.menuSelectionForeground),
+            menuSeparator = col("menu.separatorBackground", base.menuSeparator),
             tokens = tokens,
         )
     }

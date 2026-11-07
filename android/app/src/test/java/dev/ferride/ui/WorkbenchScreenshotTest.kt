@@ -1,5 +1,8 @@
 package dev.ferride.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,9 +22,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ferride.editor.CodeEditorView
 import dev.ferride.editor.Sel
 import dev.ferride.theme.VsCodeTheme
 import dev.ferride.workbench.CommandIds
@@ -62,6 +67,7 @@ class WorkbenchScreenshotTest {
         dark: Boolean?,
         settingsJson: String? = null,
         ime: Boolean = false,
+        afterContent: (WorkbenchState) -> Unit = {},
         setup: (WorkbenchState) -> Unit = {},
     ) {
         val backend = FakeWorkspaceBackend()
@@ -90,6 +96,8 @@ class WorkbenchScreenshotTest {
                 FerrideWorkbench(state, imeVisible = false, hardwareKeyboard = false)
             }
         }
+        compose.waitForIdle()
+        compose.runOnIdle { afterContent(state) }
         compose.waitForIdle()
         val suffix = when (dark) {
             null -> ""
@@ -175,6 +183,39 @@ class WorkbenchScreenshotTest {
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
     fun phoneTerminalLight() = shoot("phone_terminal", dark = false) { it.showPanel(PanelTab.Terminal) }
+
+    /** Long-press result: handles around `word_counts` and the floating toolbar (clipboard has text). */
+    private fun selectionControls(s: WorkbenchState) {
+        val clipboard = ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        clipboard.setPrimaryClip(ClipData.newPlainText("code", "counts"))
+        val view = s.editor as CodeEditorView
+        view.requestFocus()
+        view.showSelectionControls(toolbar = true)
+    }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneSelectionDark() = shoot("phone_selection", dark = true, afterContent = ::selectionControls)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneSelectionLight() = shoot("phone_selection", dark = false, afterContent = ::selectionControls)
+
+    /** Tap on the caret: caret handle + the insertion menu (Paste, Select All). */
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneCaretMenuDark() = shoot(
+        "phone_caret_menu",
+        dark = true,
+        afterContent = { s ->
+            val m = s.activeModel!!
+            m.selection = Sel.caret(m.text().indexOf("counts\n}") + 3)
+            selectionControls(s)
+        },
+    )
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletSelectionDark() = shoot("tablet_selection", dark = true, afterContent = ::selectionControls)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletSelectionLight() = shoot("tablet_selection", dark = false, afterContent = ::selectionControls)
 
     // ----- tablet, landscape: desktop-like layout -----------------------------------
 
