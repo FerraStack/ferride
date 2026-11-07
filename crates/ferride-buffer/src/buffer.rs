@@ -1,4 +1,5 @@
 use std::ops::Range;
+use std::time::Instant;
 
 use ropey::Rope;
 
@@ -91,6 +92,8 @@ pub struct Buffer {
     version: u64,
     saved_version: u64,
     line_ending: LineEnding,
+    /// Fixed "now" for undo grouping (tests); `None` uses the system clock.
+    clock: Option<Instant>,
 }
 
 impl Default for Buffer {
@@ -113,6 +116,7 @@ impl Buffer {
             version: 0,
             saved_version: 0,
             line_ending,
+            clock: None,
         }
     }
 
@@ -412,12 +416,16 @@ impl Buffer {
         }
         after.clamp(self.len_chars());
         self.selections = after.clone();
-        self.history.record(Transaction {
-            changes,
-            selections_before: before,
-            selections_after: after,
-            mergeable: kind == EditKind::Typing,
-        });
+        let now = self.clock.unwrap_or_else(Instant::now);
+        self.history.record(
+            Transaction {
+                changes,
+                selections_before: before,
+                selections_after: after,
+                mergeable: kind == EditKind::Typing,
+            },
+            now,
+        );
         Ok(byte_edits)
     }
 
@@ -475,6 +483,12 @@ impl Buffer {
             })
             .collect();
         self.apply(edits, EditKind::Typing).unwrap_or_default()
+    }
+
+    /// Pins the clock used to group typing by pauses (deterministic tests and
+    /// replays); `None` goes back to the system clock.
+    pub fn set_clock(&mut self, now: Option<Instant>) {
+        self.clock = now;
     }
 
     /// Ends the current typing run: the next edit starts a new undo step.

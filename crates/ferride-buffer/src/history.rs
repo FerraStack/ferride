@@ -1,6 +1,22 @@
 //! Undo/redo history.
+//!
+//! Typing coalesces into one undo step per **word**: a run of typing edits
+//! merges while it continues the same stretch of text, and a new step starts
+//! when
+//! - a word character is typed right after a non-word one (`hello |world`:
+//!   undo removes `world`, then `hello `),
+//! - the user pauses for more than [`TYPING_PAUSE`] between keystrokes,
+//! - a newline is typed, the cursor moves, or the group is sealed explicitly.
+//!
+//! IME composition updates (replacing the text being composed) always merge,
+//! however slowly the user types, so one composed word is one undo step.
+
+use std::time::{Duration, Instant};
 
 use crate::selection::Selections;
+
+/// A typing pause longer than this starts a new undo step.
+pub const TYPING_PAUSE: Duration = Duration::from_millis(500);
 
 /// One primitive replacement, in char indices of the rope state *at the time
 /// it was applied*.
@@ -35,6 +51,8 @@ pub struct Transaction {
 pub(crate) struct History {
     undo: Vec<Transaction>,
     redo: Vec<Transaction>,
+    /// When the last transaction was recorded (for pause-based grouping).
+    last_recorded: Option<Instant>,
 }
 
 impl History {
@@ -46,14 +64,19 @@ impl History {
         !self.redo.is_empty()
     }
 
-    /// Records a transaction, coalescing it into the previous one when both
-    /// are single-change typing edits that touch the same run of text.
-    pub fn record(&mut self, tx: Transaction) {
+    /// Records a transaction at time `now`, coalescing it into the previous
+    /// one when both are single-change typing edits that continue the same
+    /// word (see the module docs).
+    pub fn record(&mut self, tx: Transaction, now: Instant) {
         self.redo.clear();
+        let paused = self
+            .last_recorded
+            .is_some_and(|t| now.saturating_duration_since(t) > TYPING_PAUSE);
+        self.last_recorded = Some(now);
         if tx.mergeable
             && let Some(last) = self.undo.last_mut()
             && last.mergeable
-            && try_merge(last, &tx)
+            && try_merge(last, &tx, paused)
         {
             last.selections_after = tx.selections_after;
             return;
@@ -88,7 +111,12 @@ impl History {
     }
 }
 
-fn try_merge(last: &mut Transaction, next: &Transaction) -> bool {
+/// Letters, digits and `_`: the same notion of a word as double-tap selection.
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+fn try_merge(last: &mut Transaction, next: &Transaction, paused: bool) -> bool {
     let ([l], [n]) = (last.changes.as_mut_slice(), next.changes.as_slice()) else {
         return false;
     };
@@ -97,6 +125,23 @@ fn try_merge(last: &mut Transaction, next: &Transaction) -> bool {
     }
     let l_ins_end = l.start + l.inserted_len();
     let n_end = n.start + n.removed_len();
+    let pure_insert = n.removed.is_empty();
+    let pure_delete = n.inserted.is_empty();
+
+    // A pause ends the run, except for IME composition updates (they replace
+    // the text being composed and must stay one step however slow the user is).
+    if paused && (pure_insert || pure_delete) {
+        return false;
+    }
+    // Typing a word char right after a non-word char starts the next word's step.
+    if pure_insert
+        && n.start == l_ins_end
+        && let (Some(prev), Some(first)) = (l.inserted.chars().last(), n.inserted.chars().next())
+        && !is_word_char(prev)
+        && is_word_char(first)
+    {
+        return false;
+    }
 
     // The new change lies within (or at the edge of) the text the last change
     // inserted: typing, IME composition updates, backspacing typed text.
