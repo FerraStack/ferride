@@ -1,0 +1,35 @@
+name: Prune PR screenshots
+
+# Deletes pr-<number>/ from the ci-screenshots branch when a PR is closed.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove this PR's screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          git -C "$work" init -q
+          git -C "$work" config user.name "github-actions[bot]"
+          git -C "$work" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$work" remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          if ! git -C "$work" fetch -q --depth 1 origin ci-screenshots; then
+            echo "No ci-screenshots branch"; exit 0
+          fi
+          git -C "$work" checkout -q -b ci-screenshots FETCH_HEAD
+          if [ ! -d "$work/pr-$PR" ]; then echo "Nothing to prune"; exit 0; fi
+          git -C "$work" rm -rq "pr-$PR"
+          git -C "$work" commit -qm "Prune screenshots of closed PR #$PR"
+          git -C "$work" push -q origin ci-screenshots

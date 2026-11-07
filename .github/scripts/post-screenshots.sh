@@ -31,11 +31,20 @@ mkdir -p "$work/$dest"
 cp "${pngs[@]}" "$work/$dest/"
 git -C "$work" add "$dest"
 git -C "$work" commit -q -m "Screenshots for PR #${PR} (run ${RUN_ID})"
-for attempt in 1 2 3; do
-  if git -C "$work" push -q origin ci-screenshots; then break; fi
-  # Another run pushed first: rebase onto it and retry.
-  git -C "$work" pull -q --rebase origin ci-screenshots
+pushed=0
+for attempt in 1 2 3 4 5; do
+  if git -C "$work" push -q origin ci-screenshots; then
+    pushed=1
+    break
+  fi
+  echo "push attempt $attempt failed; rebasing onto the latest ci-screenshots"
+  git -C "$work" pull -q --rebase origin ci-screenshots || true
+  sleep $((attempt * 2))
 done
+if [ "$pushed" != 1 ]; then
+  echo "::error::Could not push screenshots to ci-screenshots"
+  exit 1
+fi
 
 base="https://raw.githubusercontent.com/${REPO}/ci-screenshots/${dest}"
 img() { [ -f "$src/$1" ] && echo "<img src=\"${base}/$1\" width=\"260\">" || echo "—"; }
