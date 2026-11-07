@@ -32,6 +32,10 @@ data class KeyChord(
             KeyEvent.KEYCODE_PAGE_DOWN -> "PageDown"
             KeyEvent.KEYCODE_TAB -> "Tab"
             KeyEvent.KEYCODE_ESCAPE -> "Esc"
+            KeyEvent.KEYCODE_EQUALS -> "="
+            KeyEvent.KEYCODE_MINUS -> "-"
+            in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z -> ('A' + (code - KeyEvent.KEYCODE_A)).toString()
+            in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> ('0' + (code - KeyEvent.KEYCODE_0)).toString()
             in KeyEvent.KEYCODE_F1..KeyEvent.KEYCODE_F12 -> "F${code - KeyEvent.KEYCODE_F1 + 1}"
             else -> KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_").let {
                 if (it.length == 1) it else it.lowercase().replaceFirstChar(Char::uppercase)
