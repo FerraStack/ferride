@@ -39,6 +39,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -152,18 +153,22 @@ private fun PaletteRow(item: PaletteItem, selected: Boolean, files: Boolean, c: 
             FileIcon(item.label)
             Spacer(Modifier.width(6.dp))
         }
-        Text(
-            highlighted(item, c),
-            color = c.inputForeground,
-            fontSize = 13.sp,
-            maxLines = 1,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        if (files && !item.detail.isNullOrEmpty()) {
-            Spacer(Modifier.width(8.dp))
-            Text(item.detail, color = c.descriptionForeground, fontSize = 12.sp, maxLines = 1)
+        // The label takes the remaining width (one weighted child, so it isn't
+        // squeezed to half the row by a weighted spacer).
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                highlighted(item, c),
+                color = c.inputForeground,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (files && !item.detail.isNullOrEmpty()) {
+                Spacer(Modifier.width(8.dp))
+                Text(item.detail, color = c.descriptionForeground, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
-        Spacer(Modifier.weight(1f))
         item.section?.let {
             Text(it, color = c.descriptionForeground, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 6.dp))
         }

@@ -402,7 +402,7 @@ fun SymbolsRow(state: WorkbenchState) {
                     Text(key.label, color = c.sideBarForeground, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
                     if (key.alternates.isNotEmpty()) {
                         // Small hint dot for keys with alternates.
-                        Box(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(3.dp).background(c.descriptionForeground, RoundedCornerShape(50)))
+                        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 5.dp).size(3.dp).background(c.descriptionForeground, RoundedCornerShape(50)))
                     }
                     if (showAlternates) {
                         Popup(alignment = Alignment.TopCenter, offset = IntOffset(0, -140), onDismissRequest = { showAlternates = false }) {

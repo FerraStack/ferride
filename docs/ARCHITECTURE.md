@@ -58,7 +58,8 @@ Single `:app` module for now (split into `:core-bindings`, `:editor-view`, `:fea
 - **UI thread:** all `Document` calls (`replace`, `viewport`, offsets). They are short: an edit is a rope operation plus an incremental tree-sitter reparse, and `viewport()` runs the highlight query only over visible lines. `Document` is internally locked, so it's safe from any thread.
 - **`Dispatchers.IO`:** workspace listing, file read/write, fuzzy find and text search, LSP requests (they block until the response or timeout).
 - **Rust background threads:** one reader thread per LSP session; it calls `LspListener` (Kotlin), which must hop to the main thread before touching UI state.
-- **Later:** if a reparse ever exceeds a frame budget (very large files), parsing moves to a worker thread holding a rope snapshot (ropey clones are O(1)), and the view draws stale spans until the new tree lands.
+- **Parse budgets:** the initial parse (on the IO thread, together with reading the file) gets 1.5 s; an incremental reparse after an edit gets 40 ms on the UI thread. If a budget runs out the edited old tree is kept (highlights stay aligned but may be stale) and the next edit retries. Background parsing on a rope snapshot is tracked in #14.
+- **Model lifetime:** closing or replacing a tab only *retires* its native `Document`; it's freed after the editor view has switched to the next model, so neither drawing nor late IME callbacks can touch a freed object.
 
 ## The editor view and the IME
 
@@ -94,18 +95,20 @@ Width classes follow Material breakpoints (compact < 600 dp ≤ medium < 840 dp 
 
 - Every action is a **command with a VS Code id** (`workbench.action.files.save`, `workbench.action.showCommands`, `editor.action.formatDocument`, …) in one `CommandRegistry`. The palette, keybindings, toolbar buttons and menus all execute commands by id.
 - **Command Palette / Quick Open** with VS Code prefixes: no prefix = files (fuzzy), `>` = commands, `:` = go to line, `@` = symbols (stub until LSP/tree-sitter symbols land).
+- **Keybinding contexts:** text-editing chords (Ctrl+C/V/X/A/Z/Y) carry VS Code's `when: editorTextFocus` and only fire while the editor view has focus, so they keep their normal meaning in the palette, search box and settings fields.
 - **Keybindings** match VS Code's defaults for hardware keyboards (Ctrl+Shift+P, Ctrl+P, Ctrl+S, Ctrl+B, Ctrl+J, Ctrl+\`, Ctrl+G, Ctrl+Shift+E/F/G/X/M, Ctrl+W, Ctrl+PageUp/PageDown, Ctrl+Z/Y, Ctrl+=/-, …). `MainActivity.dispatchKeyEvent` routes chords to the registry before the focused view. User `keybindings.json` (VS Code format) is planned.
 
 ### Settings and themes
 
+- **Settings editor** opens as an editor tab (gear icon) with a search box, a table of contents on wide screens (Commonly Used / Text Editor / Workbench / Files / Ferride), checkboxes, compact number fields and dropdowns, and an "Open Settings (JSON)" title action. UI changes are written into `settings.json` as **minimal JSONC edits** (comments, ordering and unknown keys are preserved); if the file doesn't parse, Ferride never overwrites it and opens it for fixing.
 - `settings.json` with VS Code key names (`editor.fontSize`, `editor.tabSize`, `editor.insertSpaces`, `editor.wordWrap`, `editor.lineNumbers`, `editor.minimap.enabled`, `editor.guides.indentation`, `editor.renderLineHighlight`, `editor.bracketPairColorization.enabled`, `files.autoSave`, `workbench.colorTheme`, `window.autoDetectColorScheme`); unknown keys are preserved. A settings UI edits the same file.
 - Built-in **Ferride Dark Modern / Light Modern** (our own colors in that style), following the system light/dark mode by default.
 - **VS Code color themes** (`*-color-theme.json`) load as-is: `colors` map to `WorkbenchColors` by their VS Code ids, and `tokenColors` resolve through a table that maps each tree-sitter highlight class to the **TextMate scopes** VS Code grammars produce for the same tokens (`keyword.control`, `entity.name.function`, `string.quoted`, …), longest-prefix match wins. Drop files into `files/themes/` for now; an import UI comes later. Finer mapping (capture name → scope, not just class) is a follow-up.
 
 ### Editor behaviors
 
-Done now: current line highlight, indent guides, bracket pair colorization (depth from the document start, strings/comments skipped on screen), line numbers, VS Code-style copy/cut of the whole line without a selection, smart Home, auto-indent on Enter.
-Planned: find/replace widget (M1), word wrap (M1), minimap (optional, off on phones), multi-cursor UI (the buffer already supports it), snippets in VS Code snippet JSON format, sticky scroll, code folding.
+Done now: current line highlight, indent guides, bracket pair colorization (bracket tokens and depths come from the tree-sitter tree in Rust, so brackets in strings/comments are ignored), line numbers, **word wrap** (`editor.wordWrap`; the default is on for compact/phone windows and off otherwise, continuation rows indented like the line, numbers only on the first visual row), thin scrollbars (horizontal when wrap is off), find/replace widget (case/word/regex, n of m, replace/replace all), diagnostics squiggles + Problems panel, VS Code-style copy/cut of the whole line without a selection, smart Home, auto-indent on Enter, unsaved-changes prompt on close.
+Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already supports it), snippets in VS Code snippet JSON format, sticky scroll, code folding, selection handles (#8).
 
 ## Syntax highlighting
 
@@ -144,6 +147,7 @@ Planned crate `ferride-git` on **gix** (pure Rust, builds with the NDK; use the 
 
 - `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` on Linux.
 - Android: Gradle task `cargoNdkBuild` runs `cargo ndk -t arm64-v8a -t x86_64 build --release -p ferride-ffi` into a build directory registered as generated `jniLibs`; `uniffiBindgen` builds the host `uniffi-bindgen` and generates Kotlin from the arm64 `.so` (library mode) into a generated source dir. Both are wired through the AGP Variant API, so `assembleDebug` triggers them.
+- Toolchains are pinned: Rust in `rust-toolchain.toml`, NDK r30 (`30.0.16248370`) in CI, third-party actions by commit SHA; cargo runs with `--locked`.
 - 16 KB page alignment: NDK r28+ links with 16 KB max page size by default; CI checks `zipalign -c -P 16`.
 - Heavy builds run in GitHub Actions (see `.github/workflows/ci.yml`); local work is limited to fmt/clippy/tests of single crates.
 - **Screenshots:** Robolectric + Roborazzi render the main screens on the JVM with the fake backend (phone and tablet, light and dark); an emulator job installs the real APK, opens the sample file and captures it. On pull requests CI pushes the PNGs to the `ci-screenshots` branch and keeps one PR comment with a light/dark table up to date.
