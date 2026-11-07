@@ -213,8 +213,10 @@ fn lsp_session_over_socket_fd() {
     assert_eq!(session.hover("/w s/a.rs".into(), 0, 0).unwrap(), None);
     session.shutdown().unwrap();
     server.join().unwrap();
-    for _ in 0..100 {
-        if session.is_closed() {
+    // The reader thread marks the session closed and then calls on_closed;
+    // wait for the callback itself, not just the flag (flaked on CI).
+    for _ in 0..500 {
+        if session.is_closed() && rec.events.lock().unwrap().iter().any(|e| e == "closed") {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
