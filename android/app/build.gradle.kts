@@ -189,11 +189,6 @@ android {
         buildConfig = true
     }
 
-    sourceSets {
-        // Sample files per language (shared with ferride-syntax's golden tests) for screenshots.
-        getByName("test").resources.directories.add(repoRoot.dir("crates/ferride-syntax/samples").asFile.absolutePath)
-    }
-
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -206,6 +201,10 @@ android {
                 it.systemProperty("jna.library.path", repoRoot.dir("target/debug").asFile.absolutePath)
                 // UniFFI's Android bindings free objects through android.system.SystemCleaner,
                 // which Robolectric backs with the JDK's internal cleaner.
+                // Sample file per language (shared with ferride-syntax's golden tests) for screenshots.
+                val samples = repoRoot.dir("crates/ferride-syntax/samples")
+                it.inputs.dir(samples).withPropertyName("syntaxSamples").withPathSensitivity(PathSensitivity.RELATIVE)
+                it.systemProperty("ferride.samples.dir", samples.asFile.absolutePath)
                 it.jvmArgs("--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED", "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED")
             }
         }

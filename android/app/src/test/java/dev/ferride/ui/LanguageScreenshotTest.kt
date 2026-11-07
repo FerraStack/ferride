@@ -36,7 +36,7 @@ class LanguageScreenshotTest {
         VsCodeTheme.parse(javaClass.classLoader!!.getResource("themes/night-owl-color-theme.jsonc")!!.readText())
     }
 
-    private fun sample(name: String) = javaClass.classLoader!!.getResource(name)!!.readText()
+    private fun sample(name: String) = LanguageModeTest.sample(name)
 
     private fun shoot(png: String, file: String, nightOwlTheme: Boolean, setup: (WorkbenchState) -> Unit = {}) {
         val files = LanguageModeTest.SAMPLES.values.associateWith { sample(it) }

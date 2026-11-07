@@ -47,7 +47,7 @@ class LanguageModeTest {
     fun everySampleGetsHighlighted() {
         for (lang in Languages.all) {
             val name = SAMPLES.getValue(lang.id)
-            val text = javaClass.classLoader!!.getResource(name)!!.readText()
+            val text = LanguageModeTest.sample(name)
             val model = RustEditorModel.create(text, name)
             try {
                 assertEquals(name, lang.id, model.language)
@@ -107,7 +107,11 @@ class LanguageModeTest {
     }
 
     companion object {
-        /** Language id → sample file (test resources = crates/ferride-syntax/samples). */
+        /** Text of a file in `crates/ferride-syntax/samples` (its path comes from Gradle). */
+        fun sample(name: String): String =
+            java.io.File(checkNotNull(System.getProperty("ferride.samples.dir")) { "ferride.samples.dir not set" }, name).readText()
+
+        /** Language id → sample file in `crates/ferride-syntax/samples`. */
         val SAMPLES = mapOf(
             "c" to "sample.c",
             "cpp" to "sample.cpp",
