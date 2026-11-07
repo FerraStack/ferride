@@ -46,6 +46,7 @@ import dev.ferride.editor.EditorModel
 import dev.ferride.editor.SelectionUi
 import dev.ferride.editor.Squiggle
 import dev.ferride.theme.LocalWorkbenchColors
+import dev.ferride.scm.GitCommandIds
 import dev.ferride.workbench.CommandIds
 import dev.ferride.workbench.EditorTab
 import dev.ferride.workbench.TabKind
@@ -229,6 +230,7 @@ private fun Welcome(state: WorkbenchState, modifier: Modifier) {
             "Go to File…" to CommandIds.QUICK_OPEN,
             "Show All Commands" to CommandIds.SHOW_COMMANDS,
             "Open Explorer" to CommandIds.VIEW_EXPLORER,
+            "Clone Git Repository..." to GitCommandIds.CLONE,
             "Open Settings" to CommandIds.OPEN_SETTINGS,
         ).forEach { (label, id) ->
             val key = state.commands.get(id)?.keybinding

@@ -15,6 +15,11 @@ import dev.ferride.core.WorkspaceKind
 import dev.ferride.editor.EditorActions
 import dev.ferride.editor.EditorModel
 import dev.ferride.editor.Sel
+import dev.ferride.scm.CredentialStore
+import dev.ferride.scm.InMemoryCredentialStore
+import dev.ferride.scm.NoScmProvider
+import dev.ferride.scm.ScmProvider
+import dev.ferride.scm.ScmState
 import dev.ferride.theme.BuiltInThemes
 import dev.ferride.theme.DarkModern
 import dev.ferride.theme.LightModern
@@ -147,8 +152,13 @@ class WorkbenchState(
     private val settingsStore: SettingsStore = InMemorySettingsStore(),
     val extraThemes: List<WorkbenchColors> = emptyList(),
     var host: WorkspaceHost? = null,
+    scmProvider: ScmProvider = NoScmProvider,
+    credentialStore: CredentialStore = InMemoryCredentialStore(),
 ) {
     val commands = CommandRegistry()
+
+    /** Source Control (git) for the workspace folder. */
+    val scm = ScmState(this, scmProvider, scope, io, credentialStore)
 
     /** The open folder; replaced by [openWorkspace]. */
     var backend: WorkspaceBackend by mutableStateOf(backend)
@@ -291,6 +301,7 @@ class WorkbenchState(
 
     init {
         registerCommands()
+        scm.registerCommands()
         log("Opened workspace ${backend.name} (${backend.root})")
     }
 
@@ -308,6 +319,7 @@ class WorkbenchState(
         scope.launch {
             ferrux = withContext(io) { runCatching { backend.ferrux() }.getOrDefault(FerruxStatus.NotInstalled) }
             branch = withContext(io) { runCatching { backend.gitBranch() }.getOrNull() }
+            scm.start()
             loadDir(backend.root)
             if (openFirst != null) openFile("${backend.root}/$openFirst", preview = false)
         }
@@ -731,6 +743,7 @@ class WorkbenchState(
                     tab.dirty = model.isDirty
                 }
                 log("Saved ${tab.name}")
+                scm.refresh()
                 then()
             }.onFailure { message = "Couldn't save ${tab.name}: ${it.message}" }
         }

@@ -10,11 +10,17 @@
 
 mod document;
 mod lsp;
+mod scm;
 mod theme;
 mod workspace;
 
 pub use document::{Document, EditOutcome, SelectionRange, StyleKind, StyleSpan, ViewLine};
 pub use lsp::{LspCompletion, LspDiagnostic, LspListener, LspSession};
+pub use scm::{
+    GitError, ScmBranch, ScmCancel, ScmChange, ScmCommit, ScmCredential, ScmDiffLine, ScmFileDiff, ScmGroup,
+    ScmHead, ScmHunk, ScmIdentity, ScmLineChange, ScmLineChangeKind, ScmNetworkListener, ScmRefKind,
+    ScmRefLabel, ScmRepository, ScmWordRange, scm_clone, scm_discover, scm_init, scm_line_changes,
+};
 pub use theme::{TokenStyle, TokenTheme, scope_stack};
 pub use workspace::{
     FileHit, FileNode, MatchRange, SafDoc, SafError, SafTree, SearchCancellation, SearchHit, SearchReport,

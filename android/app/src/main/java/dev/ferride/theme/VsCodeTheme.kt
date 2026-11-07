@@ -125,6 +125,9 @@ object VsCodeTheme {
             tokens = tokens,
             tokenStyles = TokenStyles.fromThemeJson(json),
             kindColors = false,
+            themeColors = colors.keys().asSequence()
+                .mapNotNull { k -> parseColor(colors.optString(k, ""))?.let { k to it } }
+                .toMap(),
         )
     }
 

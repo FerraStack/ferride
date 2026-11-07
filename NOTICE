@@ -4,8 +4,10 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 This product includes third-party material:
 
-Codicons (android/app/src/main/res/font/codicon.ttf)
-  The icon font of Visual Studio Code, @vscode/codicons 0.0.36.
+Codicons (android/app/src/main/res/font/codicon.ttf,
+          android/app/src/main/java/dev/ferride/ui/CodiconVectors.kt)
+  The icon font of Visual Studio Code, @vscode/codicons 0.0.36, and SVG path data
+  copied from the same release (src/icons/<name>.svg), rendered as Compose vectors.
   Copyright (c) Microsoft Corporation.
   Licensed under the Creative Commons Attribution 4.0 International license
   (CC BY 4.0): https://creativecommons.org/licenses/by/4.0/

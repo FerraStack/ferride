@@ -353,3 +353,89 @@ fn token_theme_styles_span_scopes() {
     assert_eq!(theme.style(0).foreground, 0xFFCCCCCC);
     assert!(TokenTheme::new("not json".into()).is_err());
 }
+
+#[test]
+fn scm_init_stage_commit_log_and_diff() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("p");
+    let repo = scm_init(root.to_string_lossy().into_owned()).unwrap();
+    std::fs::write(root.join("a.txt"), "one\ntwo\n").unwrap();
+    let status = repo.status().unwrap();
+    assert_eq!(status.len(), 1);
+    assert_eq!(
+        (
+            status[0].group,
+            status[0].letter.as_str(),
+            status[0].tooltip.as_str()
+        ),
+        (ScmGroup::WorkingTree, "U", "Untracked")
+    );
+
+    repo.stage(vec!["a.txt".into()]).unwrap();
+    assert!(matches!(
+        repo.commit("first".into(), None, None, false, false),
+        Err(GitError::MissingIdentity { .. })
+    ));
+    let id = repo
+        .commit(
+            "first".into(),
+            Some("Ada".into()),
+            Some("ada@example.com".into()),
+            false,
+            false,
+        )
+        .unwrap();
+    let head = repo.head().unwrap();
+    assert_eq!(head.label, "main");
+    assert_eq!(head.commit.as_deref(), Some(id.as_str()));
+    let log = repo.log(None, false, 0, 10).unwrap();
+    assert_eq!(log[0].summary, "first");
+    assert_eq!(log[0].refs[0].kind, ScmRefKind::LocalBranch);
+
+    std::fs::write(root.join("a.txt"), "one\nTWO\n").unwrap();
+    let diff = repo.diff("a.txt".into(), false).unwrap();
+    assert_eq!(diff.hunks.len(), 1);
+    assert_eq!(
+        diff.hunks[0].added[0].words,
+        vec![ScmWordRange { start: 0, end: 3 }]
+    );
+    repo.stage_hunks("a.txt".into(), diff.hunks.clone()).unwrap();
+    assert_eq!(repo.status().unwrap()[0].group, ScmGroup::Index);
+
+    let found = scm_discover(root.to_string_lossy().into_owned())
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.branches().unwrap()[0].name, "main");
+    assert!(
+        scm_discover(tmp.path().to_string_lossy().into_owned())
+            .unwrap()
+            .is_none()
+    );
+
+    let changes = scm_line_changes("a\nb\n".into(), "a\nB\nc\n".into());
+    assert_eq!(
+        changes,
+        vec![ScmLineChange {
+            kind: ScmLineChangeKind::Modified,
+            start: 1,
+            end: 3
+        }]
+    );
+}
+
+#[test]
+fn scm_clone_rejects_non_https_urls() {
+    struct Silent;
+    impl ScmNetworkListener for Silent {
+        fn credentials(&self, _url: String) -> Option<ScmCredential> {
+            None
+        }
+        fn credentials_approved(&self, _url: String) {}
+        fn credentials_rejected(&self, _url: String) {}
+        fn progress(&self, _phase: String, _current: i64, _total: Option<i64>) {}
+    }
+    let tmp = tempfile::tempdir().unwrap();
+    let dest = tmp.path().join("c").to_string_lossy().into_owned();
+    let err = scm_clone("file:///etc".into(), dest, Box::new(Silent), ScmCancel::new());
+    assert!(matches!(err, Err(GitError::Unsupported { .. })));
+}

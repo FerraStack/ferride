@@ -27,6 +27,7 @@ ferride-lsp.workspace = true
 ferride-workspace.workspace = true
 ferride-host.workspace = true
 ferride-theme.workspace = true
+ferride-scm.workspace = true
 lsp-types.workspace = true
 thiserror.workspace = true
 uniffi.workspace = true

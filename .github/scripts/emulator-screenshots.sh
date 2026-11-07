@@ -176,6 +176,56 @@ sleep 1
 adb shell input keycombination 113 51
 sleep 2
 alive "close tabs with Ctrl+W"
+# Source Control (git on gix, real native core): initialize a repository in the
+# sample project, stage everything, commit with Ctrl+Enter (answering the
+# identity prompt), and check the commit exists on disk and the view moved on.
+# Key codes: SHIFT_LEFT=59, G=35, ENTER=66.
+palette_command() {
+  adb shell input keycombination 113 59 44
+  sleep 1
+  adb shell input text "$1"
+  sleep 1
+  adb shell input keyevent 66
+  sleep 3
+}
+center_of_prefix() {
+  grep -o "text=\"$1[^\"]*\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" | head -1 |
+    sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/' |
+    awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }'
+}
+repo_dir=files/projects/hello-ferride
+palette_command "Initialize%sRepository"
+alive "git init"
+adb shell input keycombination 113 59 35
+sleep 2
+expect_text "Changes" "Source Control view lists the untracked sample files"
+palette_command "Stage%sAll%sChanges"
+alive "stage all"
+expect_text "Staged Changes" "files moved to Staged Changes"
+read -r mx my < <(ui_dump | center_of_prefix "Message (Ctrl+Enter") || { echo "::error::commit message box not found"; exit 1; }
+adb shell input tap "$mx" "$my"
+sleep 1
+adb shell input text "First%scommit%sfrom%sthe%ssmoke%stest"
+sleep 1
+adb shell input keycombination 113 66
+sleep 2
+expect_text "Name" "commit asks for git.user.name"
+adb shell input text "Ferride%sSmoke"
+adb shell input keyevent 66
+sleep 2
+adb shell input text "smoke@example.com"
+adb shell input keyevent 66
+sleep 4
+alive "commit"
+expect_text "Publish Branch" "after the commit the view offers to publish the branch"
+expect_no_text "Staged Changes" "nothing is staged after the commit"
+if ! adb shell run-as dev.ferride cat "$repo_dir/.git/logs/HEAD" | grep -q "commit (initial): First commit from the smoke test"; then
+  echo "::error::the commit is not in .git/logs/HEAD"
+  adb shell run-as dev.ferride ls -la "$repo_dir/.git" || true
+  exit 1
+fi
+adb exec-out screencap -p > "$out/emulator_scm_dark.png"
+echo "source control: OK"
 shoot light
 adb logcat -d -t 400 > "$out/logcat.txt" || true
 ls -la "$out"
