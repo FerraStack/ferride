@@ -13,8 +13,9 @@ class JsoncTest {
         assertTrue(out, out.contains("\"x,}\""))
         assertTrue(out, out.contains("\"//not a comment\""))
         assertTrue(out, !out.contains("/* c */"))
-        assertTrue(out, !out.replace(" ", "").contains(",]"))
-        assertTrue(out, !out.replace(" ", "").contains(",}"))
+        // Trailing commas before ] and } are gone (the ",}" inside the string stays).
+        assertTrue(out, out.contains("2 ]"))
+        assertTrue(out, out.contains("\"//not a comment\" }"))
     }
 
     @Test

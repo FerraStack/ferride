@@ -155,9 +155,11 @@ class WorkbenchTest {
         s.openFile("${s.backend.root}/src/main.rs", preview = false)
         s.openFind(replace = true)
         s.find.query = "counts"
-        assertEquals(7, s.findMatchesInActive().size)
+        assertEquals(8, s.findMatchesInActive().size) // includes "Counts" in the doc comment
         s.find.wholeWord = true
-        assertEquals(5, s.findMatchesInActive().size) // not "word_counts"
+        assertEquals(6, s.findMatchesInActive().size) // not "word_counts"
+        s.find.caseSensitive = true
+        assertEquals(5, s.findMatchesInActive().size)
         assertTrue(findMatches("a(b", "(", caseSensitive = false, wholeWord = false, regex = true).isEmpty())
     }
 
