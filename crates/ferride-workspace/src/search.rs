@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use grep_matcher::Matcher;
 use grep_regex::RegexMatcherBuilder;
@@ -15,6 +17,15 @@ pub struct SearchOptions {
     pub whole_word: bool,
     /// Stop after this many matching lines.
     pub max_results: usize,
+    /// Set from another thread to abandon the search (a newer query started).
+    /// Checked between files and between matching lines.
+    pub cancel: Option<Arc<AtomicBool>>,
+}
+
+impl SearchOptions {
+    fn cancelled(&self) -> bool {
+        self.cancel.as_ref().is_some_and(|c| c.load(Ordering::Relaxed))
+    }
 }
 
 impl Default for SearchOptions {
@@ -24,6 +35,7 @@ impl Default for SearchOptions {
             case_sensitive: false,
             whole_word: false,
             max_results: 2000,
+            cancel: None,
         }
     }
 }
@@ -47,6 +59,8 @@ pub struct SearchResults {
     pub files_searched: usize,
     /// `max_results` was hit.
     pub truncated: bool,
+    /// The search was cancelled; `matches` is partial.
+    pub cancelled: bool,
 }
 
 const MAX_LINE_CHARS: usize = 500;
@@ -69,6 +83,10 @@ pub(crate) fn search(ws: &Workspace, query: &str, opts: &SearchOptions) -> Resul
         .build();
 
     for entry in ws.walker().filter_map(|e| e.ok()) {
+        if opts.cancelled() {
+            results.cancelled = true;
+            break;
+        }
         if !entry.file_type().is_some_and(|t| t.is_file()) {
             continue;
         }
@@ -105,7 +123,7 @@ pub(crate) fn search(ws: &Workspace, query: &str, opts: &SearchOptions) -> Resul
                 stop = true;
                 return Ok(false);
             }
-            Ok(true)
+            Ok(!opts.cancelled())
         });
         // Unreadable files and invalid UTF-8 are skipped, not fatal.
         let _ = searcher.search_path(&matcher, path, sink);
