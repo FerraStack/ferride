@@ -132,7 +132,7 @@ Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already 
 - A workspace is a folder path. Today the app uses app-private storage (`filesDir/projects`, seeded with a sample project); folders in Ferrux's `$HOME` come through the host (and its `DocumentsProvider`) once the Host API exists. SAF trees would need a mirror (VSCodroid's approach, which breaks `.git`); not planned for the MVP.
 - The tree is loaded lazily, one directory per expand (`listDir`), dirs first, `.git` hidden.
 - Quick open: gitignore-aware walk + fuzzy subsequence scoring (file-name and word-start bonuses).
-- Text search: ripgrep's `grep-searcher`/`grep-regex` (literal or regex, case, whole word), binary files and ignored paths skipped, results capped, match ranges as UTF-16 columns.
+- Text search: ripgrep's `grep-searcher`/`grep-regex` (literal or regex, case, whole word), binary files and ignored paths skipped, results capped, match ranges as UTF-16 columns. A newer query cancels the running one (`SearchCancellation`, checked between files and matching lines) and the workbench drops results from any older query that finishes late (generation counter).
 - File watching (`notify`, inotify) is optional and off for now; the tree refreshes on demand. It's unreliable on FUSE shared storage anyway.
 
 ### Storage: where workspaces live

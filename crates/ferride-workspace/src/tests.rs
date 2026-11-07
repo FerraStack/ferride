@@ -212,7 +212,10 @@ fn search_can_be_cancelled() {
     };
     let r = ws.search_text("hello", &opts).unwrap();
     assert!(r.cancelled);
-    assert!(r.matches.is_empty(), "a search cancelled before it starts finds nothing");
+    assert!(
+        r.matches.is_empty(),
+        "a search cancelled before it starts finds nothing"
+    );
     flag.store(false, std::sync::atomic::Ordering::SeqCst);
     let r = ws.search_text("hello", &opts).unwrap();
     assert!(!r.cancelled);

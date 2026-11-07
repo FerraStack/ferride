@@ -534,17 +534,45 @@ class WorkbenchState(
 
     // ----- search ----------------------------------------------------------
 
+    /** The running search, cancelled when a newer one starts. */
+    private var searchToken: SearchToken? = null
+    private var searchGeneration = 0
+
+    /** True while a search is running (the Search view shows progress). */
+    var searching by mutableStateOf(false)
+        private set
+
+    /**
+     * Runs the Search view's query. A newer query cancels the running search,
+     * and results from an older one are dropped even if it finishes last (#9).
+     */
     fun runSearch() {
         val q = searchQuery
-        if (!backend.supportsTextSearch) return
-        if (q.isEmpty()) {
-            searchResult = null
+        searchToken?.cancel()
+        val generation = ++searchGeneration
+        // System-picker (SAF) folders have no real path for ripgrep; the view explains that.
+        if (!backend.supportsTextSearch) {
+            searching = false
             return
         }
+        if (q.isEmpty()) {
+            searchToken = null
+            searchResult = null
+            searchError = null
+            searching = false
+            return
+        }
+        val token = SearchToken().also { searchToken = it }
+        val regex = searchRegex
+        val caseSensitive = searchCaseSensitive
+        val wholeWord = searchWholeWord
+        searching = true
         scope.launch {
             val r = withContext(io) {
-                runCatching { backend.searchText(q, searchRegex, searchCaseSensitive, searchWholeWord) }
+                runCatching { backend.searchText(q, regex, caseSensitive, wholeWord, token) }
             }
+            if (generation != searchGeneration) return@launch
+            searching = false
             r.onSuccess {
                 searchResult = it
                 searchError = null
