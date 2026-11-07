@@ -222,3 +222,54 @@ fn pending_request_fails_when_server_dies() {
     killer.join().unwrap();
     assert!(matches!(res, Err(LspError::Closed)), "{res:?}");
 }
+
+#[test]
+fn dropping_the_client_closes_the_connection() {
+    let (client_end, server_end) = UnixStream::pair().unwrap();
+    let shut = client_end.try_clone().unwrap();
+    let client = LspClient::start_with_closer(
+        client_end.try_clone().unwrap(),
+        client_end,
+        |_| {},
+        move || {
+            let _ = shut.shutdown(std::net::Shutdown::Both);
+        },
+    );
+    let server = thread::spawn(move || {
+        let mut r = BufReader::new(server_end);
+        // Returns None (EOF) once the client is gone.
+        codec::read_message(&mut r).unwrap()
+    });
+    drop(client);
+    assert_eq!(server.join().unwrap(), None);
+}
+
+#[test]
+fn panicking_listener_does_not_hang_requests() {
+    let (client_end, server_end) = UnixStream::pair().unwrap();
+    let client = LspClient::start(client_end.try_clone().unwrap(), client_end, |e| {
+        if !matches!(e, LspEvent::Closed) {
+            panic!("listener bug");
+        }
+    });
+    client.set_timeout(Duration::from_secs(20));
+    let server = thread::spawn(move || {
+        let mut r = BufReader::new(server_end.try_clone().unwrap());
+        let mut w = server_end;
+        codec::read_message(&mut r).unwrap();
+        // A notification makes the listener panic; then the server dies.
+        codec::write_message(
+            &mut w,
+            br#"{"jsonrpc":"2.0","method":"window/logMessage","params":{"type":3,"message":"x"}}"#,
+        )
+        .unwrap();
+        thread::sleep(Duration::from_millis(50));
+        w.shutdown(std::net::Shutdown::Both).unwrap();
+    });
+    let started = std::time::Instant::now();
+    let res = client.request_raw("initialize", json!({}));
+    server.join().unwrap();
+    assert!(matches!(res, Err(LspError::Closed)), "{res:?}");
+    assert!(started.elapsed() < Duration::from_secs(5));
+    assert!(client.is_closed());
+}

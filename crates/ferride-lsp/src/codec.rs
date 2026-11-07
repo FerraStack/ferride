@@ -2,6 +2,9 @@
 
 use std::io::{self, BufRead, Write};
 
+/// Largest message body accepted (a misbehaving server can't make us allocate more).
+pub const MAX_CONTENT_LENGTH: usize = 64 * 1024 * 1024;
+
 /// Reads one message body. Returns `Ok(None)` on a clean EOF between messages.
 pub fn read_message(reader: &mut impl BufRead) -> io::Result<Option<Vec<u8>>> {
     let mut content_length: Option<usize> = None;
@@ -41,6 +44,11 @@ pub fn read_message(reader: &mut impl BufRead) -> io::Result<Option<Vec<u8>>> {
         }
     }
     let len = content_length.ok_or_else(|| invalid("missing Content-Length".into()))?;
+    if len > MAX_CONTENT_LENGTH {
+        return Err(invalid(format!(
+            "Content-Length {len} exceeds {MAX_CONTENT_LENGTH}"
+        )));
+    }
     let mut body = vec![0; len];
     reader.read_exact(&mut body)?;
     Ok(Some(body))
@@ -92,6 +100,11 @@ mod tests {
         assert_eq!(
             read_message(&mut r).unwrap_err().kind(),
             io::ErrorKind::UnexpectedEof
+        );
+        let mut r = BufReader::new(&b"Content-Length: 99999999999\r\n\r\n"[..]);
+        assert_eq!(
+            read_message(&mut r).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
         );
         let mut r = BufReader::new(&b"Content-Length: 1\r\n"[..]);
         assert_eq!(

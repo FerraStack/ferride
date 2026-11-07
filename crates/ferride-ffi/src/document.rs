@@ -75,6 +75,17 @@ pub struct ViewLine {
     /// Document offset (UTF-16) of the line start.
     pub start_offset: i32,
     pub spans: Vec<StyleSpan>,
+    /// Syntactic brackets on this line (tree-sitter tokens, so brackets inside
+    /// strings/comments are excluded) with their nesting depth, for bracket
+    /// pair colorization.
+    pub brackets: Vec<BracketMark>,
+}
+
+/// A bracket at a UTF-16 column with its nesting depth.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
+pub struct BracketMark {
+    pub column: i32,
+    pub depth: i32,
 }
 
 /// A selection in UTF-16 document offsets.
@@ -92,6 +103,8 @@ pub struct EditOutcome {
     pub changed: bool,
     /// Primary selection after the edit.
     pub selection: SelectionRange,
+    /// For `replace`: end (UTF-16) of the inserted text; otherwise the primary head.
+    pub end: i32,
 }
 
 /// Clamps a (possibly negative) FFI index to `usize`.
@@ -121,6 +134,11 @@ impl Inner {
         }
     }
 
+    /// UTF-16 offset → char index, never between `\r` and `\n`.
+    fn snap(&self, off: i32) -> usize {
+        self.buffer.snap_out_of_crlf(self.utf16(off))
+    }
+
     fn utf16(&self, off: i32) -> usize {
         self.buffer
             .utf16_to_char(usize::try_from(off).unwrap_or(usize::MAX))
@@ -131,6 +149,7 @@ impl Inner {
             version: self.buffer.version() as i64,
             changed: self.buffer.version() as i64 != before,
             selection: self.sel_to_utf16(self.buffer.selections().primary()),
+            end: self.buffer.char_to_utf16(self.buffer.selections().primary().head) as i32,
         }
     }
 }
@@ -192,6 +211,12 @@ impl Document {
         self.lock().buffer.mark_saved();
     }
 
+    /// Marks `version` as the saved one (use the version captured before an
+    /// async write, so edits typed during the write stay dirty).
+    pub fn mark_saved_version(&self, version: i64) {
+        self.lock().buffer.mark_saved_at(version.max(0) as u64);
+    }
+
     pub fn len_utf16(&self) -> i32 {
         self.lock().buffer.len_utf16() as i32
     }
@@ -206,14 +231,18 @@ impl Document {
 
     /// Lines `first_line .. first_line + count` with highlight spans.
     pub fn viewport(&self, first_line: i32, count: i32) -> Vec<ViewLine> {
-        let inner = self.lock();
-        let b = &inner.buffer;
+        let mut guard = self.lock();
+        let Inner { buffer, syntax } = &mut *guard;
+        let b = &*buffer;
         let first = ix(first_line).min(b.len_lines());
         let end = (first + ix(count)).min(b.len_lines());
-        let spans = inner
-            .syntax
+        let spans = syntax
             .as_ref()
             .map(|s| s.line_spans(b, first..end))
+            .unwrap_or_default();
+        let brackets = syntax
+            .as_mut()
+            .map(|s| s.line_brackets(b, first..end))
             .unwrap_or_default();
         (first..end)
             .enumerate()
@@ -229,6 +258,17 @@ impl Document {
                                 start: s.start_col as i32,
                                 end: s.end_col as i32,
                                 kind: s.kind.into(),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                brackets: brackets
+                    .get(i)
+                    .map(|v| {
+                        v.iter()
+                            .map(|&(column, depth)| BracketMark {
+                                column: column as i32,
+                                depth: depth as i32,
                             })
                             .collect()
                     })
@@ -307,14 +347,14 @@ impl Document {
     /// Replaces all selections with a single one.
     pub fn set_selection(&self, anchor: i32, head: i32) {
         let mut inner = self.lock();
-        let sel = Selection::new(inner.utf16(anchor), inner.utf16(head));
+        let sel = Selection::new(inner.snap(anchor), inner.snap(head));
         inner.buffer.set_selection(sel);
     }
 
     /// Adds a cursor/selection (multi-cursor) and makes it primary.
     pub fn add_selection(&self, anchor: i32, head: i32) {
         let mut inner = self.lock();
-        let sel = Selection::new(inner.utf16(anchor), inner.utf16(head));
+        let sel = Selection::new(inner.snap(anchor), inner.snap(head));
         let mut sels: Selections = inner.buffer.selections().clone();
         sels.push(sel);
         inner.buffer.set_selections(sels);
@@ -324,6 +364,10 @@ impl Document {
 
     /// Replaces `start..end` (UTF-16) with `text`. `typing` coalesces with the
     /// previous typing edit for undo (IME composition, single characters).
+    ///
+    /// Line-ending hygiene: a range that would split a `\r\n` pair is widened,
+    /// and line breaks in `text` are converted to the document's line ending.
+    /// [`EditOutcome::end`] is where the (normalized) inserted text ends.
     pub fn replace(
         &self,
         start: i32,
@@ -334,13 +378,18 @@ impl Document {
         let mut inner = self.lock();
         let before = inner.buffer.version() as i64;
         let (a, b) = (inner.utf16(start.min(end)), inner.utf16(start.max(end)));
+        let range = inner.buffer.widen_crlf(a..b);
+        let text = inner.buffer.normalize_eol(&text);
+        let new_end = range.start + text.chars().count();
         let kind = if typing { EditKind::Typing } else { EditKind::Other };
         let edits = inner
             .buffer
-            .apply(vec![Edit::new(a..b, text)], kind)
+            .apply(vec![Edit::new(range, text)], kind)
             .map_err(|e| FerrideError::InvalidArgument { msg: e.to_string() })?;
         inner.after_edit(&edits);
-        Ok(inner.outcome(before))
+        let mut out = inner.outcome(before);
+        out.end = inner.buffer.char_to_utf16(new_end) as i32;
+        Ok(out)
     }
 
     /// Types/pastes `text` at every selection.
@@ -348,6 +397,7 @@ impl Document {
         let mut inner = self.lock();
         let before = inner.buffer.version() as i64;
         let kind = if typing { EditKind::Typing } else { EditKind::Other };
+        let text = inner.buffer.normalize_eol(&text);
         let edits = inner.buffer.insert_at_selections(&text, kind);
         inner.after_edit(&edits);
         inner.outcome(before)

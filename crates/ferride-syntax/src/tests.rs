@@ -158,3 +158,54 @@ fn capture_name_mapping() {
         assert_eq!(HighlightKind::from_capture_name(name), kind, "{name}");
     }
 }
+
+#[test]
+fn brackets_skip_strings_and_comments() {
+    let buf = Buffer::new("fn f() {\n    g(\"(\", [1]); // )\n}\n");
+    let mut syn = Syntax::new(LanguageId::Rust, buf.rope());
+    let b = syn.line_brackets(&buf, 0..3);
+    // Line 0: ( ) at depth 0, { opens at depth 0.
+    assert_eq!(b[0], vec![(4, 0), (5, 0), (7, 0)]);
+    // Line 1: g( at depth 1, [ at depth 2, ] back to 2, ) back to 1 — the "(" in the
+    // string and the ) in the comment are ignored.
+    assert_eq!(b[1], vec![(5, 1), (11, 2), (13, 2), (14, 1)]);
+    assert_eq!(b[2], vec![(0, 0)]);
+    // A later range reuses the cache and agrees.
+    assert_eq!(syn.line_brackets(&buf, 2..3), vec![vec![(0, 0)]]);
+}
+
+#[test]
+fn parse_budget_degrades_gracefully() {
+    // A large document with a zero budget: no tree, no panic, plain text.
+    let text = "fn a() { let x = [1, 2, 3]; }\n".repeat(20_000);
+    let buf = Buffer::new(&text);
+    let syn = Syntax::with_budget(LanguageId::Rust, buf.rope(), std::time::Duration::ZERO);
+    assert!(syn.tree().is_none());
+    assert!(syn.is_stale());
+    assert!(syn.line_spans(&buf, 0..2).iter().all(|l| l.is_empty()));
+
+    // An edit whose reparse runs out of time keeps the edited old tree.
+    // (Opening a string at the top forces a reparse of the whole document.)
+    let mut buf = Buffer::new(&text);
+    let big = std::time::Duration::from_secs(30);
+    let mut syn = Syntax::with_budget(LanguageId::Rust, buf.rope(), big);
+    assert!(!syn.is_stale());
+    let edits = buf
+        .apply(
+            vec![ferride_buffer::Edit::insert(0, "\"")],
+            ferride_buffer::EditKind::Other,
+        )
+        .unwrap();
+    syn.update_with_budget(buf.rope(), &edits, std::time::Duration::ZERO);
+    assert!(syn.is_stale());
+    assert!(syn.tree().is_some());
+    // The next edit with enough budget catches up.
+    let edits = buf
+        .apply(
+            vec![ferride_buffer::Edit::insert(0, " ")],
+            ferride_buffer::EditKind::Other,
+        )
+        .unwrap();
+    syn.update_with_budget(buf.rope(), &edits, big);
+    assert!(!syn.is_stale());
+}

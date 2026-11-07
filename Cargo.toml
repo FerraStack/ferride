@@ -24,7 +24,7 @@ ferride-lsp = { path = "crates/ferride-lsp" }
 ferride-workspace = { path = "crates/ferride-workspace" }
 ferride-host = { path = "crates/ferride-host" }
 
-ropey = { version = "1.6.1", default-features = false, features = ["simd", "cr_lines"] }
+ropey = { version = "1.6.1", default-features = false, features = ["simd"] }
 tree-sitter = "0.27.2"
 tree-sitter-rust = "0.24.2"
 tree-sitter-python = "0.25.0"

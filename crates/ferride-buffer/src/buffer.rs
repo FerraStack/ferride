@@ -317,8 +317,54 @@ impl Buffer {
     }
 
     pub fn mark_saved(&mut self) {
-        self.saved_version = self.version;
+        self.mark_saved_at(self.version);
+    }
+
+    /// Marks the content as of `version` as saved (an async save captures the
+    /// version it wrote; edits made meanwhile stay dirty).
+    pub fn mark_saved_at(&mut self, version: u64) {
+        self.saved_version = version;
         self.history.seal();
+    }
+
+    // ----- line-ending hygiene -------------------------------------------
+
+    /// Moves a char index that sits between `\r` and `\n` to before the `\r`,
+    /// so edits and carets never split a CRLF pair.
+    pub fn snap_out_of_crlf(&self, idx: usize) -> usize {
+        let idx = idx.min(self.len_chars());
+        if idx > 0 && idx < self.len_chars() && self.rope.char(idx - 1) == '\r' && self.rope.char(idx) == '\n'
+        {
+            idx - 1
+        } else {
+            idx
+        }
+    }
+
+    /// Widens a range so that it doesn't split a CRLF pair at either end.
+    pub fn widen_crlf(&self, range: Range<usize>) -> Range<usize> {
+        let start = self.snap_out_of_crlf(range.start);
+        if range.end <= range.start {
+            return start..start;
+        }
+        let mut end = range.end.clamp(start, self.len_chars());
+        if end > 0 && end < self.len_chars() && self.rope.char(end - 1) == '\r' && self.rope.char(end) == '\n'
+        {
+            end += 1;
+        }
+        start..end
+    }
+
+    /// Converts any `\r\n`, lone `\r` or `\n` in `text` to this buffer's line ending.
+    pub fn normalize_eol(&self, text: &str) -> String {
+        if !text.contains(['\r', '\n']) {
+            return text.to_owned();
+        }
+        let lf = text.replace("\r\n", "\n").replace('\r', "\n");
+        match self.line_ending {
+            LineEnding::Lf => lf,
+            LineEnding::CrLf => lf.replace('\n', "\r\n"),
+        }
     }
 
     // ----- editing -------------------------------------------------------

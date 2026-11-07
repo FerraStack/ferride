@@ -91,37 +91,55 @@ impl LspSession {
         writer: impl std::io::Write + Send + 'static,
         listener: Box<dyn LspListener>,
     ) -> Arc<Self> {
-        let client = LspClient::start(reader, writer, move |event| match event {
-            LspEvent::Diagnostics {
-                uri,
-                version,
-                diagnostics,
-            } => listener.on_diagnostics(
-                path_of(&uri),
-                version,
-                diagnostics
-                    .into_iter()
-                    .map(|d| LspDiagnostic {
-                        start_line: d.range.start.line as i32,
-                        start_column: d.range.start.character as i32,
-                        end_line: d.range.end.line as i32,
-                        end_column: d.range.end.character as i32,
-                        severity: match d.severity {
-                            Some(DiagnosticSeverity::ERROR) => 1,
-                            Some(DiagnosticSeverity::WARNING) => 2,
-                            Some(DiagnosticSeverity::INFORMATION) => 3,
-                            _ => 4,
-                        },
-                        message: d.message,
-                        source: d.source,
-                    })
-                    .collect(),
-            ),
-            LspEvent::LogMessage { typ, message } => listener.on_message(message_level(typ), message, false),
-            LspEvent::ShowMessage { typ, message } => listener.on_message(message_level(typ), message, true),
-            LspEvent::Notification { .. } => {}
-            LspEvent::Closed => listener.on_closed(),
-        });
+        Self::from_streams_with_closer(reader, writer, listener, || {})
+    }
+
+    fn from_streams_with_closer(
+        reader: impl std::io::Read + Send + 'static,
+        writer: impl std::io::Write + Send + 'static,
+        listener: Box<dyn LspListener>,
+        closer: impl FnOnce() + Send + 'static,
+    ) -> Arc<Self> {
+        let client = LspClient::start_with_closer(
+            reader,
+            writer,
+            move |event| match event {
+                LspEvent::Diagnostics {
+                    uri,
+                    version,
+                    diagnostics,
+                } => listener.on_diagnostics(
+                    path_of(&uri),
+                    version,
+                    diagnostics
+                        .into_iter()
+                        .map(|d| LspDiagnostic {
+                            start_line: d.range.start.line as i32,
+                            start_column: d.range.start.character as i32,
+                            end_line: d.range.end.line as i32,
+                            end_column: d.range.end.character as i32,
+                            severity: match d.severity {
+                                Some(DiagnosticSeverity::ERROR) => 1,
+                                Some(DiagnosticSeverity::WARNING) => 2,
+                                Some(DiagnosticSeverity::INFORMATION) => 3,
+                                _ => 4,
+                            },
+                            message: d.message,
+                            source: d.source,
+                        })
+                        .collect(),
+                ),
+                LspEvent::LogMessage { typ, message } => {
+                    listener.on_message(message_level(typ), message, false)
+                }
+                LspEvent::ShowMessage { typ, message } => {
+                    listener.on_message(message_level(typ), message, true)
+                }
+                LspEvent::Notification { .. } => {}
+                LspEvent::Closed => listener.on_closed(),
+            },
+            closer,
+        );
         Arc::new(Self { client })
     }
 }

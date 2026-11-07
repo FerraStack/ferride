@@ -64,6 +64,7 @@ pub enum LspEvent {
 }
 
 type EventHandler = Box<dyn Fn(LspEvent) + Send + Sync>;
+type Closer = Box<dyn FnOnce() + Send>;
 type Pending = Arc<Mutex<HashMap<i64, Sender<Result<Value, LspError>>>>>;
 type SharedWriter = Arc<Mutex<Box<dyn Write + Send>>>;
 
@@ -81,6 +82,7 @@ pub struct LspClient {
     closed: Arc<AtomicBool>,
     timeout: Mutex<Duration>,
     capabilities: Mutex<Option<ServerCapabilities>>,
+    closer: Mutex<Option<Closer>>,
 }
 
 impl std::fmt::Debug for LspClient {
@@ -92,11 +94,24 @@ impl std::fmt::Debug for LspClient {
 }
 
 impl LspClient {
-    /// Starts the reader thread. `on_event` is called on that thread.
+    /// Starts the reader thread. `on_event` is called on that thread; a panic
+    /// in it is caught and logged.
     pub fn start(
         reader: impl Read + Send + 'static,
         writer: impl Write + Send + 'static,
         on_event: impl Fn(LspEvent) + Send + Sync + 'static,
+    ) -> Self {
+        Self::start_with_closer(reader, writer, on_event, || {})
+    }
+
+    /// Like [`start`](Self::start), plus `closer`, run when the client is
+    /// dropped, e.g. `socket.shutdown(Both)` so the server sees EOF and the
+    /// reader thread unblocks even if the read side is a dup of the same fd.
+    pub fn start_with_closer(
+        reader: impl Read + Send + 'static,
+        writer: impl Write + Send + 'static,
+        on_event: impl Fn(LspEvent) + Send + Sync + 'static,
+        closer: impl FnOnce() + Send + 'static,
     ) -> Self {
         let writer: SharedWriter = Arc::new(Mutex::new(Box::new(writer)));
         let pending: Pending = Arc::default();
@@ -118,11 +133,12 @@ impl LspClient {
             closed,
             timeout: Mutex::new(Duration::from_secs(30)),
             capabilities: Mutex::new(None),
+            closer: Mutex::new(Some(Box::new(closer))),
         }
     }
 
     pub fn set_timeout(&self, timeout: Duration) {
-        *self.timeout.lock().unwrap() = timeout;
+        *lock(&self.timeout) = timeout;
     }
 
     pub fn is_closed(&self) -> bool {
@@ -131,7 +147,7 @@ impl LspClient {
 
     /// Capabilities from the `initialize` response.
     pub fn server_capabilities(&self) -> Option<ServerCapabilities> {
-        self.capabilities.lock().unwrap().clone()
+        lock(&self.capabilities).clone()
     }
 
     // ----- generic plumbing ------------------------------------------------
@@ -152,17 +168,17 @@ impl LspClient {
         }
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = mpsc::channel();
-        self.pending.lock().unwrap().insert(id, tx);
+        lock(&self.pending).insert(id, tx);
         let msg = json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params});
         if let Err(e) = send(&self.writer, &msg) {
-            self.pending.lock().unwrap().remove(&id);
+            lock(&self.pending).remove(&id);
             return Err(e);
         }
-        let timeout = *self.timeout.lock().unwrap();
+        let timeout = *lock(&self.timeout);
         match rx.recv_timeout(timeout) {
             Ok(result) => result,
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                self.pending.lock().unwrap().remove(&id);
+                lock(&self.pending).remove(&id);
                 // Best effort: tell the server we gave up.
                 let _ = self.notify_raw("$/cancelRequest", json!({"id": id}));
                 Err(LspError::Timeout)
@@ -214,7 +230,7 @@ impl LspClient {
             ..Default::default()
         };
         let result = self.request::<req::Initialize>(params)?;
-        *self.capabilities.lock().unwrap() = Some(result.capabilities.clone());
+        *lock(&self.capabilities) = Some(result.capabilities.clone());
         self.notify::<notif::Initialized>(InitializedParams {})?;
         Ok(result)
     }
@@ -312,7 +328,18 @@ impl LspClient {
 impl Drop for LspClient {
     fn drop(&mut self) {
         self.closed.store(true, Ordering::SeqCst);
+        // Close our write side so the server sees EOF, then run the closer.
+        *lock(&self.writer) = Box::new(std::io::sink());
+        if let Some(closer) = lock(&self.closer).take() {
+            closer();
+        }
     }
+}
+
+/// Locks a mutex, recovering from poisoning (a panicked holder can't leave the
+/// client unusable).
+fn lock<T: ?Sized>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 fn hover_to_text(contents: HoverContents) -> String {
@@ -363,11 +390,25 @@ fn proto(e: serde_json::Error) -> LspError {
 
 fn send(writer: &SharedWriter, msg: &Value) -> Result<(), LspError> {
     let body = serde_json::to_vec(msg).map_err(proto)?;
-    let mut w = writer.lock().unwrap();
+    let mut w = lock(writer);
     codec::write_message(&mut **w, &body).map_err(|e| match e.kind() {
         std::io::ErrorKind::BrokenPipe => LspError::Closed,
         _ => LspError::Io(e),
     })
+}
+
+struct CloseGuard {
+    closed: Arc<AtomicBool>,
+    pending: Pending,
+}
+
+impl Drop for CloseGuard {
+    fn drop(&mut self) {
+        self.closed.store(true, Ordering::SeqCst);
+        for (_, tx) in lock(&self.pending).drain() {
+            let _ = tx.send(Err(LspError::Closed));
+        }
+    }
 }
 
 struct ReaderCtx {
@@ -378,7 +419,20 @@ struct ReaderCtx {
 }
 
 impl ReaderCtx {
+    fn emit(&self, event: LspEvent) {
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (self.on_event)(event)));
+        if r.is_err() {
+            log::error!("LSP: event handler panicked");
+        }
+    }
+
     fn run(self, reader: impl Read) {
+        // Whatever happens below (including a panic), mark the client closed
+        // and fail pending requests.
+        let _guard = CloseGuard {
+            closed: self.closed.clone(),
+            pending: self.pending.clone(),
+        };
         let mut reader = BufReader::new(reader);
         loop {
             match codec::read_message(&mut reader) {
@@ -394,10 +448,10 @@ impl ReaderCtx {
             }
         }
         self.closed.store(true, Ordering::SeqCst);
-        for (_, tx) in self.pending.lock().unwrap().drain() {
+        for (_, tx) in lock(&self.pending).drain() {
             let _ = tx.send(Err(LspError::Closed));
         }
-        (self.on_event)(LspEvent::Closed);
+        self.emit(LspEvent::Closed);
     }
 
     fn dispatch(&self, mut msg: Value) {
@@ -407,7 +461,7 @@ impl ReaderCtx {
             // Response to one of our requests.
             (None, Some(id)) => {
                 let Some(id) = id.as_i64() else { return };
-                let Some(tx) = self.pending.lock().unwrap().remove(&id) else {
+                let Some(tx) = lock(&self.pending).remove(&id) else {
                     return;
                 };
                 let result = if let Some(err) = msg.get("error") {
@@ -442,7 +496,7 @@ impl ReaderCtx {
             // Notification.
             (Some(method), None) => {
                 let params = msg.get_mut("params").map(Value::take).unwrap_or(Value::Null);
-                (self.on_event)(notification_event(method, params));
+                self.emit(notification_event(method, params));
             }
             (None, None) => log::warn!("LSP: message without method or id"),
         }

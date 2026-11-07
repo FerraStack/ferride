@@ -201,3 +201,51 @@ fn text_search_literal_regex_case_word() {
     assert_eq!(r.matches.len(), 1);
     assert!(r.truncated);
 }
+
+#[cfg(unix)]
+#[test]
+fn symlinks_cannot_escape_and_writes_go_through_links() {
+    use std::os::unix::fs::symlink;
+    let (_d, ws) = fixture();
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("secret.txt"), "top secret").unwrap();
+    symlink(outside.path(), ws.root().join("escape")).unwrap();
+    assert!(matches!(
+        ws.read_file("escape/secret.txt"),
+        Err(WorkspaceError::OutsideWorkspace(_))
+    ));
+    assert!(matches!(
+        ws.write_file("escape/new.txt", "x"),
+        Err(WorkspaceError::OutsideWorkspace(_))
+    ));
+    assert!(matches!(
+        ws.list_dir("escape"),
+        Err(WorkspaceError::OutsideWorkspace(_))
+    ));
+    assert!(!outside.path().join("new.txt").exists());
+
+    // Deleting the link removes the link, not the target.
+    ws.delete("escape").unwrap();
+    assert!(outside.path().join("secret.txt").exists());
+
+    // Saving through an in-workspace link keeps the link.
+    symlink(ws.root().join("README.md"), ws.root().join("readme-link.md")).unwrap();
+    ws.write_file("readme-link.md", "via link\n").unwrap();
+    assert!(
+        std::fs::symlink_metadata(ws.root().join("readme-link.md"))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(ws.read_file("README.md").unwrap(), "via link\n");
+}
+
+#[test]
+fn invalid_utf8_is_refused() {
+    let (_d, ws) = fixture();
+    std::fs::write(ws.root().join("latin1.txt"), b"caf\xe9\n").unwrap();
+    assert!(matches!(
+        ws.read_file("latin1.txt"),
+        Err(WorkspaceError::NotUtf8(_))
+    ));
+}

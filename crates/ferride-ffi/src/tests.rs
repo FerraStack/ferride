@@ -223,3 +223,40 @@ fn lsp_session_over_socket_fd() {
     assert_eq!(events, ["msg 2 hi true", "diag /w s/a.rs 1", "closed"]);
     assert!(LspSession::connect_fds(-1, -1, Box::new(rec.clone())).is_err());
 }
+
+#[test]
+fn crlf_is_never_split_and_eol_is_normalized() {
+    let doc = Document::new("ab\r\ncd".into(), None);
+    // IME deleteSurroundingText(1, 0) at the start of line 2 targets just the \n.
+    doc.replace(3, 4, "".into(), true).unwrap();
+    assert_eq!(doc.text(), "abcd");
+    // A caret between \r and \n snaps before the \r.
+    let doc = Document::new("ab\r\ncd".into(), None);
+    doc.set_selection(3, 3);
+    assert_eq!(doc.selection().head, 2);
+    // Inserted line breaks follow the file's EOL; `end` reflects that.
+    let o = doc.replace(0, 0, "x\ny".into(), false).unwrap();
+    assert_eq!(doc.text(), "x\r\nyab\r\ncd");
+    assert_eq!(o.end, 4);
+    doc.set_selection(0, 0);
+    doc.insert("1\r2\n".into(), false);
+    assert!(doc.text().starts_with("1\r\n2\r\nx"));
+}
+
+#[test]
+fn viewport_reports_syntactic_brackets() {
+    let doc = Document::new("fn f() { let s = \"(\"; }\n".into(), Some("a.rs".into()));
+    let lines = doc.viewport(0, 1);
+    let cols: Vec<(i32, i32)> = lines[0].brackets.iter().map(|b| (b.column, b.depth)).collect();
+    assert_eq!(cols, vec![(4, 0), (5, 0), (7, 0), (22, 0)]);
+}
+
+#[test]
+fn mark_saved_version_keeps_later_edits_dirty() {
+    let doc = Document::new("".into(), None);
+    doc.insert("a".into(), false);
+    let v = doc.version();
+    doc.insert("b".into(), false);
+    doc.mark_saved_version(v);
+    assert!(doc.is_dirty());
+}

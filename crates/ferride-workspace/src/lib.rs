@@ -27,6 +27,8 @@ pub enum WorkspaceError {
     TooLarge(PathBuf, u64),
     #[error("{0} looks like a binary file")]
     Binary(PathBuf),
+    #[error("{0} is not valid UTF-8 (other encodings aren't supported yet)")]
+    NotUtf8(PathBuf),
     #[error("{0} already exists")]
     AlreadyExists(PathBuf),
     #[error("invalid search pattern: {0}")]
@@ -85,10 +87,34 @@ impl Workspace {
             .map_or_else(|| "/".to_owned(), |n| n.to_string_lossy().into_owned())
     }
 
-    /// Resolves `path` (absolute, or relative to the root) and checks it stays
-    /// inside the workspace. Works for paths that don't exist yet.
+    /// Resolves `path` (absolute, or relative to the root) and checks that it
+    /// stays inside the workspace **after following symlinks**: the deepest
+    /// existing ancestor is canonicalized, so a link like `x -> /` in a cloned
+    /// repository can't be used to read or write outside the root. Works for
+    /// paths that don't exist yet. Returns the real (link-resolved) path.
     pub fn resolve(&self, path: impl AsRef<Path>) -> Result<PathBuf> {
         let path = path.as_ref();
+        let lexical = self.lexical(path)?;
+        let real = canonicalize_existing_prefix(&lexical).map_err(io_err(&lexical))?;
+        if real.starts_with(&self.root) {
+            Ok(real)
+        } else {
+            Err(WorkspaceError::OutsideWorkspace(path.to_owned()))
+        }
+    }
+
+    /// Like [`resolve`](Self::resolve) but doesn't follow a symlink in the last
+    /// component, so delete/rename act on the link itself.
+    fn resolve_entry(&self, path: &Path) -> Result<PathBuf> {
+        let lexical = self.lexical(path)?;
+        let (Some(parent), Some(name)) = (lexical.parent(), lexical.file_name()) else {
+            return Err(WorkspaceError::OutsideWorkspace(path.to_owned()));
+        };
+        let real_parent = self.resolve(parent)?;
+        Ok(real_parent.join(name))
+    }
+
+    fn lexical(&self, path: &Path) -> Result<PathBuf> {
         let joined = if path.is_absolute() {
             path.to_owned()
         } else {
@@ -163,10 +189,9 @@ impl Workspace {
         if bytes[..bytes.len().min(8192)].contains(&0) {
             return Err(WorkspaceError::Binary(path));
         }
-        Ok(match String::from_utf8(bytes) {
-            Ok(s) => s,
-            Err(e) => String::from_utf8_lossy(e.as_bytes()).into_owned(),
-        })
+        // Refuse rather than lossy-decode: saving a lossy copy would corrupt
+        // Latin-1/Shift-JIS files. (Encoding detection is a later feature.)
+        String::from_utf8(bytes).map_err(|_| WorkspaceError::NotUtf8(path))
     }
 
     /// Writes atomically: a temp file in the same directory, then rename.
@@ -211,8 +236,8 @@ impl Workspace {
     }
 
     pub fn rename(&self, from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<PathBuf> {
-        let from = self.resolve(from)?;
-        let to = self.resolve(to)?;
+        let from = self.resolve_entry(from.as_ref())?;
+        let to = self.resolve_entry(to.as_ref())?;
         if to.exists() {
             return Err(WorkspaceError::AlreadyExists(to));
         }
@@ -221,11 +246,12 @@ impl Workspace {
     }
 
     pub fn delete(&self, path: impl AsRef<Path>) -> Result<()> {
-        let path = self.resolve(path)?;
+        let path = self.resolve_entry(path.as_ref())?;
         if path == self.root {
             return Err(WorkspaceError::OutsideWorkspace(path));
         }
-        if path.is_dir() {
+        let meta = fs::symlink_metadata(&path).map_err(io_err(&path))?;
+        if meta.is_dir() {
             fs::remove_dir_all(&path).map_err(io_err(&path))
         } else {
             fs::remove_file(&path).map_err(io_err(&path))
@@ -267,6 +293,33 @@ impl Workspace {
     /// Full-text search across the workspace (ripgrep's engine).
     pub fn search_text(&self, query: &str, options: &SearchOptions) -> Result<SearchResults> {
         search::search(self, query, options)
+    }
+}
+
+/// Canonicalizes the longest existing prefix of `path` and appends the rest.
+fn canonicalize_existing_prefix(path: &Path) -> std::io::Result<PathBuf> {
+    let mut existing = path.to_path_buf();
+    let mut tail = Vec::new();
+    loop {
+        match existing.canonicalize() {
+            Ok(real) => {
+                let mut out = real;
+                for part in tail.iter().rev() {
+                    out.push(part);
+                }
+                return Ok(out);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                let Some(name) = existing.file_name().map(|n| n.to_owned()) else {
+                    return Err(e);
+                };
+                tail.push(name);
+                if !existing.pop() {
+                    return Err(e);
+                }
+            }
+            Err(e) => return Err(e),
+        }
     }
 }
 

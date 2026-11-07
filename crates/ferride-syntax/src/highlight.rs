@@ -168,13 +168,8 @@ pub(crate) fn split_into_lines(
         let line_start = buffer.line_to_byte(line);
         let text = buffer.line_text(line);
         let line_end = line_start + text.len();
-        // byte offset within the line -> utf16 column
-        let col = |byte_in_line: usize| -> usize {
-            text[..byte_in_line.min(text.len())]
-                .chars()
-                .map(char::len_utf16)
-                .sum()
-        };
+        let map = utf16_columns(&text);
+        let col = |byte_in_line: usize| -> usize { map[byte_in_line.min(text.len())] as usize };
         let mut line_spans = Vec::new();
         // Skip spans that ended before this line.
         while next < spans.len() && spans[next].end_byte <= line_start {
@@ -195,6 +190,75 @@ pub(crate) fn split_into_lines(
             k += 1;
         }
         out.push(line_spans);
+    }
+    out
+}
+
+/// `map[byte]` = UTF-16 column of that byte offset within `text` (bytes inside a
+/// multi-byte char map to the char's column). Built once per line so span
+/// conversion is O(1) per span instead of O(line length).
+pub(crate) fn utf16_columns(text: &str) -> Vec<u32> {
+    let mut map = vec![0u32; text.len() + 1];
+    let mut col = 0u32;
+    for (i, c) in text.char_indices() {
+        for b in 0..c.len_utf8() {
+            map[i + b] = col;
+        }
+        col += c.len_utf16() as u32;
+    }
+    map[text.len()] = col;
+    map
+}
+
+/// A syntactic bracket (an anonymous `(`/`[`/`{`/`${` or closing token) and
+/// its nesting depth: for an opener, the depth before it; for a closer, the
+/// depth after it, so a matched pair shares a depth.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BracketMark {
+    pub byte: usize,
+    pub depth: u32,
+}
+
+/// Walks the tree in document order up to `end_byte`, collecting bracket
+/// tokens. Brackets inside strings and comments aren't tokens, so they're
+/// skipped naturally.
+pub(crate) fn collect_brackets(tree: &Tree, end_byte: usize) -> Vec<BracketMark> {
+    let mut out = Vec::new();
+    let mut depth: u32 = 0;
+    let mut cursor = tree.walk();
+    'walk: loop {
+        let node = cursor.node();
+        if node.start_byte() >= end_byte {
+            break;
+        }
+        if node.child_count() == 0 {
+            if !node.is_named() {
+                match node.kind() {
+                    "(" | "[" | "{" | "${" => {
+                        out.push(BracketMark {
+                            byte: node.start_byte(),
+                            depth,
+                        });
+                        depth += 1;
+                    }
+                    ")" | "]" | "}" => {
+                        depth = depth.saturating_sub(1);
+                        out.push(BracketMark {
+                            byte: node.start_byte(),
+                            depth,
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        } else if cursor.goto_first_child() {
+            continue;
+        }
+        while !cursor.goto_next_sibling() {
+            if !cursor.goto_parent() {
+                break 'walk;
+            }
+        }
     }
     out
 }

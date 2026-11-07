@@ -256,3 +256,37 @@ fn map_pos_shifts_later_positions() {
     assert_eq!(map_pos(6, &edits), 8);
     assert_eq!(map_pos(10, &edits), 12);
 }
+
+#[test]
+fn crlf_hygiene() {
+    let b = Buffer::new("a\r\nb");
+    // Index 2 is between \r and \n.
+    assert_eq!(b.snap_out_of_crlf(2), 1);
+    assert_eq!(b.snap_out_of_crlf(3), 3);
+    assert_eq!(b.widen_crlf(2..2), 1..1);
+    assert_eq!(b.widen_crlf(0..2), 0..3);
+    assert_eq!(b.normalize_eol("x\ny\rz\r\n"), "x\r\ny\r\nz\r\n");
+    let lf = Buffer::new("a\nb");
+    assert_eq!(lf.normalize_eol("x\r\ny"), "x\ny");
+    assert_eq!(lf.normalize_eol("plain"), "plain");
+}
+
+#[test]
+fn lone_cr_is_not_a_line_break() {
+    // Tree-sitter counts rows by \n only; the buffer must agree.
+    let b = Buffer::new("a\rb\nc");
+    assert_eq!(b.len_lines(), 2);
+    assert_eq!(b.char_to_point(4), Point { row: 1, column: 0 });
+}
+
+#[test]
+fn mark_saved_at_older_version_stays_dirty() {
+    let mut b = Buffer::new("");
+    b.insert_at_selections("a", EditKind::Other);
+    let v = b.version();
+    b.insert_at_selections("b", EditKind::Other);
+    b.mark_saved_at(v);
+    assert!(b.is_dirty());
+    b.mark_saved_at(b.version());
+    assert!(!b.is_dirty());
+}
