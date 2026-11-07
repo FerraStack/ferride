@@ -6,7 +6,9 @@ import dev.ferride.core.FileNode
 import dev.ferride.core.MatchRange
 import dev.ferride.core.SearchHit
 import dev.ferride.core.SearchReport
+import dev.ferride.core.SafTree
 import dev.ferride.core.WorkspaceHandle
+import dev.ferride.core.WorkspaceKind
 import dev.ferride.core.ferruxStatus
 import dev.ferride.editor.EditorModel
 import dev.ferride.editor.FakeEditorModel
@@ -21,6 +23,10 @@ import java.io.File
 interface WorkspaceBackend {
     val root: String
     val name: String
+    /** Where the files live: a real folder, a system-picker (SAF) folder or Ferrux. */
+    val kind: WorkspaceKind
+    /** ripgrep search and Git need a real directory (not SAF). */
+    val supportsTextSearch: Boolean
     fun listDir(path: String): List<FileNode>
     fun readFile(path: String): String
     fun writeFile(path: String, contents: String)
@@ -30,11 +36,17 @@ interface WorkspaceBackend {
     fun ferrux(): FerruxStatus
     /** Current branch from `.git/HEAD`, if the folder is a repository. */
     fun gitBranch(): String?
+    /** Copies the whole workspace into a new local folder [dest]; returns its path. */
+    fun copyInto(dest: String): String
+    /** Forgets cached listings under [path] (SAF), before reloading the tree. */
+    fun refresh(path: String) {}
 }
 
 class RustWorkspaceBackend(private val handle: WorkspaceHandle) : WorkspaceBackend {
     override val root: String = handle.root()
     override val name: String = handle.name()
+    override val kind: WorkspaceKind = handle.kind()
+    override val supportsTextSearch: Boolean = handle.supportsTextSearch()
     override fun listDir(path: String) = handle.listDir(path)
     override fun readFile(path: String) = handle.readFile(path)
     override fun writeFile(path: String, contents: String) = handle.writeFile(path, contents)
@@ -43,10 +55,16 @@ class RustWorkspaceBackend(private val handle: WorkspaceHandle) : WorkspaceBacke
         handle.searchText(query, regex, caseSensitive, wholeWord, 2000)
     override fun createModel(text: String, fileName: String): EditorModel = RustEditorModel.create(text, fileName)
     override fun ferrux(): FerruxStatus = ferruxStatus()
-    override fun gitBranch(): String? = readBranch(File(root, ".git/HEAD"))
+    override fun gitBranch(): String? = handle.localRoot()?.let { readBranch(File(it, ".git/HEAD")) }
+    override fun copyInto(dest: String): String = handle.copyInto(dest)
+    override fun refresh(path: String) = handle.refresh(path)
 
     companion object {
+        /** A real directory. Blocks (canonicalizes the path). */
         fun open(root: String) = RustWorkspaceBackend(WorkspaceHandle.open(root))
+
+        /** A system-picker folder; [uri] (the tree URI) prefixes every path. Blocks (queries the provider). */
+        fun openSaf(uri: String, tree: SafTree) = RustWorkspaceBackend(WorkspaceHandle.openSaf(uri, tree))
     }
 }
 
@@ -61,8 +79,10 @@ class FakeWorkspaceBackend(
     private val branch: String? = "main",
     /** Called inside [writeFile] (tests use it to simulate edits during a save). */
     private val onWrite: (String) -> Unit = {},
+    override val kind: WorkspaceKind = WorkspaceKind.LOCAL,
+    override val root: String = if (kind == WorkspaceKind.SAF) "content://sample.documents/tree/$name" else "/sample/$name",
 ) : WorkspaceBackend {
-    override val root: String = "/sample/$name"
+    override val supportsTextSearch: Boolean get() = kind != WorkspaceKind.SAF
 
     private fun rel(path: String) = path.removePrefix(root).trimStart('/')
 
@@ -107,4 +127,5 @@ class FakeWorkspaceBackend(
     override fun createModel(text: String, fileName: String): EditorModel = FakeEditorModel(text, fileName)
     override fun ferrux(): FerruxStatus = FerruxStatus.NotInstalled
     override fun gitBranch(): String? = branch
+    override fun copyInto(dest: String): String = dest
 }

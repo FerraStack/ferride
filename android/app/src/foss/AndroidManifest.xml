@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- foss build (F-Droid, GitHub releases) only: all-files access lets folders in device
+     storage open with real paths, so ripgrep search and Git work on them. The Play build
+     uses the system folder picker (SAF) instead; see docs/ARCHITECTURE.md "Storage". -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+</manifest>

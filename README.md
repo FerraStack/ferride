@@ -53,8 +53,8 @@ export ANDROID_HOME=~/Android/Sdk
 export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<version>
 export JAVA_HOME=/path/to/jdk-21   # if your default JDK is newer than 25
 cd android
-./gradlew assembleDebug            # runs cargo ndk + uniffi-bindgen first
-./gradlew testDebugUnitTest -Proborazzi.test.record=true   # unit + screenshot tests
+./gradlew assemblePlayDebug        # runs cargo ndk + uniffi-bindgen first (assembleFossDebug for the foss build)
+./gradlew testPlayDebugUnitTest -Proborazzi.test.record=true   # unit + screenshot tests
 ```
 
 The Gradle task `cargoNdkBuild` builds `libferride_ffi.so` for `arm64-v8a` and `x86_64`, and `uniffiBindgen` generates the Kotlin bindings from it; both are wired into every variant automatically.

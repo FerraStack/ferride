@@ -133,6 +133,22 @@ Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already 
 - Text search: ripgrep's `grep-searcher`/`grep-regex` (literal or regex, case, whole word), binary files and ignored paths skipped, results capped, match ranges as UTF-16 columns.
 - File watching (`notify`, inotify) is optional and off for now; the tree refreshes on demand. It's unreliable on FUSE shared storage anyway.
 
+### Storage: where workspaces live
+
+Decision (2026-11-08). Google Play's All files access policy (`MANAGE_EXTERNAL_STORAGE`) lists file managers, backup, antivirus and "document management" apps that justify why SAF is insufficient; code editors aren't named and the review outcome is uncertain, while the policy steers user-picked folders to the Storage Access Framework. The core therefore reads files through a **VFS** (`ferride_workspace::vfs::Vfs`: list / stat / read / write / create / rename / delete, watch to come) with three backends, all addressed by workspace-relative paths:
+
+| Backend | What | Real path? | Text search, Git |
+|---|---|---|---|
+| `LocalVfs` | App-private `files/projects/` (default home of new, copied and cloned projects); in the **foss** build also any device folder once the user grants all-files access (the picked tree URI on `com.android.externalstorage.documents` is mapped to `/storage/...`) | yes | yes (ripgrep, gix) |
+| `SafVfs` | A folder from the system picker (`ACTION_OPEN_DOCUMENT_TREE`, persisted grant), served by the Kotlin `SafDocumentTree` (`DocumentsContract`) through the UniFFI callback `SafTree` | no | no: Search and Source Control show "Copy into Ferride Projects", which copies the tree into `files/projects/<name>` and opens the copy |
+| `FerruxVfs` | Ferrux's home, the intended "real" dev workspace | via Ferrux | yes, once Ferrux ships its file API (stub today: every call says it isn't available) |
+
+- SAF is slow (each query is a Binder round trip), so a directory is listed with **one** `query()` and the core caches listings per directory; lookups walk the cache, mutations drop the affected entries, Explorer refresh drops a subtree. Quick Open on SAF walks the cached tree (capped at 20k files, skipping `node_modules`/`target`).
+- Moves across folders aren't offered on SAF (providers differ); rename in place is.
+- The same text rules apply on every backend (8 MiB limit, binary sniffing, UTF-8 only until #15).
+- The last folder is remembered (`path:` or `saf:` + URI) and reopened on launch if its grant is still held.
+- `File: Open Folder…` (`workbench.action.files.openFolder`) opens the picker in both flavors; in foss, `Ferride: Allow Access to All Files` opens the system setting, after which picked device folders open as local paths.
+
 ## Git
 
 Planned crate `ferride-git` on **gix** (pure Rust, builds with the NDK; use the `ring`/rustls backend, aws-lc-rs is harder to cross-compile). Scope for the MVP: status (gutter markers, tree decorations), diff against HEAD, stage/unstage, commit, branch switch. Network operations (clone/fetch/push with credentials) either via gix with HTTPS or by running `git` inside Ferrux, whichever is more robust on device.
@@ -147,7 +163,8 @@ Planned crate `ferride-git` on **gix** (pure Rust, builds with the NDK; use the 
 ## Build
 
 - `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` on Linux.
-- Android: Gradle task `cargoNdkBuild` runs `cargo ndk -t arm64-v8a -t x86_64 build --release -p ferride-ffi` into a build directory registered as generated `jniLibs`; `uniffiBindgen` builds the host `uniffi-bindgen` and generates Kotlin from the arm64 `.so` (library mode) into a generated source dir. Both are wired through the AGP Variant API, so `assembleDebug` triggers them.
+- Android: Gradle task `cargoNdkBuild` runs `cargo ndk -t arm64-v8a -t x86_64 build --release -p ferride-ffi` into a build directory registered as generated `jniLibs`; `uniffiBindgen` builds the host `uniffi-bindgen` and generates Kotlin from the arm64 `.so` (library mode) into a generated source dir. Both are wired through the AGP Variant API, so `assemblePlayDebug` / `assembleFossDebug` trigger them.
+- Product flavors (dimension `distribution`): **`play`** (Google Play) and **`foss`** (F-Droid, GitHub releases; adds `MANAGE_EXTERNAL_STORAGE`, see Storage). `BuildConfig.ALL_FILES_ACCESS` tells them apart. CI builds both; unit tests, screenshots and the emulator run use `play`.
 - Toolchains are pinned: Rust in `rust-toolchain.toml`, NDK r30 (`30.0.16248370`) in CI, third-party actions by commit SHA; cargo runs with `--locked`.
 - 16 KB page alignment: NDK r28+ links with 16 KB max page size by default; CI checks `zipalign -c -P 16`.
 - Heavy builds run in GitHub Actions (see `.github/workflows/ci.yml`); local work is limited to fmt/clippy/tests of single crates.

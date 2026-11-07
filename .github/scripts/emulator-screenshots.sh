@@ -106,6 +106,24 @@ alive "open lib.rs"
 quick_open app
 alive "replace preview tab with app.ts"
 adb exec-out screencap -p > "$out/emulator_quickopen_dark.png"
+
+# File: Open Folder… launches the system folder picker (SAF); Back returns.
+adb shell input keycombination 113 59 44   # Ctrl+Shift+P (SHIFT_LEFT=59)
+sleep 1
+adb shell input text "openfolder"
+sleep 1
+adb shell input keyevent 66
+sleep 4
+if ! adb shell dumpsys activity activities | grep -iE "(topResumedActivity|mResumedActivity).*documentsui" >/dev/null; then
+  echo "::error::Open Folder did not show the system folder picker"
+  adb exec-out screencap -p > "$out/failure.png" || true
+  exit 1
+fi
+adb exec-out screencap -p > "$out/emulator_open_folder_picker.png"
+adb shell input keyevent 4   # BACK
+sleep 2
+alive "cancel the folder picker"
+echo "open folder picker: OK"
 adb shell input keycombination 113 51
 sleep 1
 adb shell input keycombination 113 51
