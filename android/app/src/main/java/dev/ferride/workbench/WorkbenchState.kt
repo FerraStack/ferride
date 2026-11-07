@@ -66,7 +66,7 @@ data class PaletteItem(
     val label: String,
     val category: String? = null,
     val detail: String? = null,
-    val keybinding: String? = null,
+    val keybinding: KeyChord? = null,
     val matches: List<Int> = emptyList(),
     val section: String? = null,
     val run: () -> Unit,
@@ -542,7 +542,7 @@ class WorkbenchState(
                         label = c.title,
                         category = c.category,
                         detail = c.id,
-                        keybinding = c.keybinding?.label,
+                        keybinding = c.keybinding,
                         matches = fuzzyPositions(q, c.label).map { it - (c.label.length - c.title.length) }
                             .filter { it >= 0 },
                         section = when {

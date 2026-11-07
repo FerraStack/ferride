@@ -9,14 +9,17 @@ data class KeyChord(
     val shift: Boolean = false,
     val alt: Boolean = false,
 ) {
-    /** Human-readable label, e.g. `Ctrl+Shift+P`. */
-    val label: String
+    /** The keys in order (`Ctrl`, `Shift`, `P`): one keycap each in the UI. */
+    val parts: List<String>
         get() = buildList {
             if (ctrl) add("Ctrl")
             if (shift) add("Shift")
             if (alt) add("Alt")
             add(keyName(keyCode))
-        }.joinToString("+")
+        }
+
+    /** Human-readable label, e.g. `Ctrl+Shift+P` (menus show it as plain text, like VS Code). */
+    val label: String get() = parts.joinToString("+")
 
     fun matches(event: KeyEvent): Boolean =
         event.keyCode == keyCode && event.isCtrlPressed == ctrl && event.isShiftPressed == shift &&

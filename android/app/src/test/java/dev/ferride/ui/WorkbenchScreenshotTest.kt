@@ -250,6 +250,12 @@ class WorkbenchScreenshotTest {
     fun tabletProblemsLight() = shoot("tablet_problems", dark = false, setup = ::problems)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletPaletteDark() = shoot("tablet_palette", dark = true, setup = ::palette)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletPaletteLight() = shoot("tablet_palette", dark = false, setup = ::palette)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
     fun tabletSettingsDark() = shoot("tablet_settings", dark = true) { it.openSettings() }
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)

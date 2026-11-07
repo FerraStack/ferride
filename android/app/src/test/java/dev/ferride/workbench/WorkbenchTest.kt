@@ -41,6 +41,19 @@ class WorkbenchTest {
     }
 
     @Test
+    fun keybindingPartsAreOneKeycapEach() {
+        assertEquals(listOf("Ctrl", "Shift", "P"), KeyChord.ctrl(KeyEvent.KEYCODE_P, shift = true).parts)
+        // Punctuation keys keep their glyph (these used to render as a truncated "Ctrl+", #16).
+        assertEquals(listOf("Ctrl", "`"), KeyChord.ctrl(KeyEvent.KEYCODE_GRAVE).parts)
+        assertEquals(listOf("Ctrl", "-"), KeyChord.ctrl(KeyEvent.KEYCODE_MINUS).parts)
+        assertEquals(listOf("Ctrl", "PageDown"), KeyChord.ctrl(KeyEvent.KEYCODE_PAGE_DOWN).parts)
+        val s = state()
+        s.openPalette(PaletteMode.Commands)
+        val item = s.paletteItems(emptyList()).first { it.detail == CommandIds.TOGGLE_TERMINAL }
+        assertEquals(listOf("Ctrl", "`"), item.keybinding?.parts)
+    }
+
+    @Test
     fun paletteFiltersCommandsFuzzily() {
         val s = state()
         val labels = s.commands.search("tgl term").map { it.id }
