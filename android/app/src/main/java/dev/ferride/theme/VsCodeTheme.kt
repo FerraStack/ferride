@@ -96,6 +96,8 @@ object VsCodeTheme {
             inputBackground = col("input.background", base.inputBackground),
             inputForeground = col("input.foreground", base.inputForeground),
             inputBorder = col("input.border", base.inputBorder),
+            inputValidationErrorBackground = col("inputValidation.errorBackground", base.inputValidationErrorBackground),
+            inputValidationErrorBorder = col("inputValidation.errorBorder", base.inputValidationErrorBorder),
             quickInputBackground = col("quickInput.background", base.quickInputBackground),
             widgetShadow = col("widget.shadow", base.widgetShadow),
             badgeBackground = col("badge.background", base.badgeBackground),

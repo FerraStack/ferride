@@ -19,13 +19,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ferride.core.WorkspaceKind
 import dev.ferride.editor.CodeEditorView
 import dev.ferride.editor.Sel
@@ -54,6 +57,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 class WorkbenchScreenshotTest {
     @get:Rule
     val compose = createComposeRule()
@@ -70,6 +74,10 @@ class WorkbenchScreenshotTest {
         ime: Boolean = false,
         afterContent: (WorkbenchState) -> Unit = {},
         backend: FakeWorkspaceBackend = FakeWorkspaceBackend(),
+        /** Runs after the UI settled (outside runOnIdle): compose test actions like typing. */
+        interact: () -> Unit = {},
+        /** Capture every window (dialogs), not just the Compose root. */
+        wholeScreen: Boolean = false,
         setup: (WorkbenchState) -> Unit = {},
     ) {
         val state = WorkbenchState(
@@ -100,12 +108,15 @@ class WorkbenchScreenshotTest {
         compose.waitForIdle()
         compose.runOnIdle { afterContent(state) }
         compose.waitForIdle()
+        interact()
+        compose.waitForIdle()
         val suffix = when (dark) {
             null -> ""
             true -> "_dark"
             false -> "_light"
         }
-        compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name$suffix.png")
+        val path = "build/outputs/roborazzi/$name$suffix.png"
+        if (wholeScreen) captureScreenRoboImage(path) else compose.onRoot().captureRoboImage(path)
     }
 
     // ----- phone, portrait ------------------------------------------------------
@@ -232,6 +243,44 @@ class WorkbenchScreenshotTest {
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
     fun tabletSearchSafLight() = shoot("tablet_search_saf", dark = false, backend = safBackend) { it.showView(SideView.Search) }
+
+    // ----- Explorer actions --------------------------------------------------------
+
+    private fun srcNode(s: WorkbenchState) = s.tree[s.backend.root]!!.first { it.name == "src" }
+
+    /** Long press on the `src` folder: VS Code's Explorer context menu. */
+    private fun explorerMenu(s: WorkbenchState) {
+        s.showView(SideView.Explorer)
+        s.openExplorerMenu(srcNode(s), 180f, 520f)
+    }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneExplorerMenuDark() = shoot("phone_explorer_menu", dark = true, afterContent = ::explorerMenu)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneExplorerMenuLight() = shoot("phone_explorer_menu", dark = false, afterContent = ::explorerMenu)
+
+    /** New File in `src` with a name that already exists: the inline box shows VS Code's error. */
+    private fun newFileTaken(dark: Boolean) = shoot(
+        "tablet_explorer_new_file",
+        dark = dark,
+        afterContent = { it.startNewFile("${it.backend.root}/src") },
+        interact = { compose.onNodeWithTag("explorer-name-box").performTextInput("lib.rs") },
+    )
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletExplorerNewFileDark() = newFileTaken(dark = true)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletExplorerNewFileLight() = newFileTaken(dark = false)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneDeleteConfirmDark() = shoot(
+        "phone_delete_confirm",
+        dark = true,
+        wholeScreen = true,
+        afterContent = { it.requestDelete(srcNode(it)) },
+    )
 
     // ----- tablet, landscape: desktop-like layout -----------------------------------
 

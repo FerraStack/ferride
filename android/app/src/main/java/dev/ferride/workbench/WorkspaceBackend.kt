@@ -30,6 +30,14 @@ interface WorkspaceBackend {
     fun listDir(path: String): List<FileNode>
     fun readFile(path: String): String
     fun writeFile(path: String, contents: String)
+    /** Creates an empty file (and missing parents); returns its path. Fails if it exists. */
+    fun createFile(path: String): String
+    /** Creates a folder (and missing parents); returns its path. Fails if it exists. */
+    fun createDir(path: String): String
+    /** Renames/moves [from] to [to] (must not exist); returns the new path. */
+    fun rename(from: String, to: String): String
+    /** Deletes a file or a folder with everything in it. */
+    fun delete(path: String)
     fun findFiles(query: String, limit: Int): List<FileHit>
     fun searchText(query: String, regex: Boolean, caseSensitive: Boolean, wholeWord: Boolean): SearchReport
     fun createModel(text: String, fileName: String): EditorModel
@@ -50,6 +58,10 @@ class RustWorkspaceBackend(private val handle: WorkspaceHandle) : WorkspaceBacke
     override fun listDir(path: String) = handle.listDir(path)
     override fun readFile(path: String) = handle.readFile(path)
     override fun writeFile(path: String, contents: String) = handle.writeFile(path, contents)
+    override fun createFile(path: String): String = handle.createFile(path)
+    override fun createDir(path: String): String = handle.createDir(path)
+    override fun rename(from: String, to: String): String = handle.rename(from, to)
+    override fun delete(path: String) = handle.delete(path)
     override fun findFiles(query: String, limit: Int) = handle.findFiles(query, limit)
     override fun searchText(query: String, regex: Boolean, caseSensitive: Boolean, wholeWord: Boolean) =
         handle.searchText(query, regex, caseSensitive, wholeWord, 2000)
@@ -74,7 +86,7 @@ fun readBranch(head: File): String? = runCatching {
 
 /** In-memory workspace for previews and screenshot tests. */
 class FakeWorkspaceBackend(
-    private val files: Map<String, String> = SampleProject.files,
+    initialFiles: Map<String, String> = SampleProject.files,
     override val name: String = SampleProject.NAME,
     private val branch: String? = "main",
     /** Called inside [writeFile] (tests use it to simulate edits during a save). */
@@ -84,12 +96,20 @@ class FakeWorkspaceBackend(
 ) : WorkspaceBackend {
     override val supportsTextSearch: Boolean get() = kind != WorkspaceKind.SAF
 
+    /** Relative path → content; mutated by create/rename/delete. */
+    private val files: MutableMap<String, String> = initialFiles.toMutableMap()
+    /** Folders that exist without files in them. */
+    private val emptyDirs = mutableSetOf<String>()
+
     private fun rel(path: String) = path.removePrefix(root).trimStart('/')
+
+    private fun exists(rel: String) =
+        rel in files || rel in emptyDirs || files.keys.any { it.startsWith("$rel/") } || emptyDirs.any { it.startsWith("$rel/") }
 
     override fun listDir(path: String): List<FileNode> {
         val dir = rel(path)
         val prefix = if (dir.isEmpty()) "" else "$dir/"
-        val children = files.keys.filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }
+        val children = (files.keys + emptyDirs.map { "$it/" }).filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }
         val dirs = children.filter { '/' in it }.map { it.substringBefore('/') }.distinct().sorted()
         val plain = children.filter { '/' !in it }.sortedBy { it.lowercase() }
         return dirs.map { node(prefix + it, true) } + plain.map { node(prefix + it, false) }
@@ -106,6 +126,43 @@ class FakeWorkspaceBackend(
     override fun readFile(path: String) = files[rel(path)] ?: error("no such file: $path")
     override fun writeFile(path: String, contents: String) {
         onWrite(path)
+    }
+
+    override fun createFile(path: String): String {
+        val r = rel(path)
+        check(!exists(r)) { "$r already exists" }
+        files[r] = ""
+        emptyDirs.removeAll { r.startsWith("$it/") }
+        return "$root/$r"
+    }
+
+    override fun createDir(path: String): String {
+        val r = rel(path)
+        check(!exists(r)) { "$r already exists" }
+        emptyDirs += r
+        return "$root/$r"
+    }
+
+    override fun rename(from: String, to: String): String {
+        val a = rel(from)
+        val b = rel(to)
+        check(exists(a)) { "$a doesn't exist" }
+        check(!exists(b)) { "$b already exists" }
+        fun move(p: String) = if (p == a) b else b + p.removePrefix(a)
+        val moved = files.filterKeys { it == a || it.startsWith("$a/") }
+        moved.keys.forEach(files::remove)
+        moved.forEach { (k, v) -> files[move(k)] = v }
+        val dirs = emptyDirs.filter { it == a || it.startsWith("$a/") }
+        emptyDirs.removeAll(dirs.toSet())
+        emptyDirs.addAll(dirs.map(::move))
+        return "$root/$b"
+    }
+
+    override fun delete(path: String) {
+        val r = rel(path)
+        check(r.isNotEmpty()) { "can't delete the workspace root" }
+        files.keys.removeAll { it == r || it.startsWith("$r/") }
+        emptyDirs.removeAll { it == r || it.startsWith("$r/") }
     }
 
     override fun findFiles(query: String, limit: Int) = files.keys

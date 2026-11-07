@@ -152,6 +152,24 @@ adb shell input keyevent 4   # BACK
 sleep 2
 alive "cancel the folder picker"
 echo "open folder picker: OK"
+
+# Explorer: File: New File… opens the inline name box; typing a name creates
+# the file in the sample project (real VFS) and opens it in a tab.
+dismiss_system_dialogs
+adb shell input keycombination 113 59 44
+sleep 1
+adb shell input keyevent 123
+adb shell input text "newfile"
+sleep 1
+adb shell input keyevent 66
+sleep 2
+adb shell input text "notes.md"
+adb shell input keyevent 66
+sleep 3
+alive "create a file from the Explorer"
+expect_text "notes.md" "new file appears in the Explorer and opens in a tab"
+adb exec-out screencap -p > "$out/emulator_explorer_new_file.png"
+echo "explorer new file: OK"
 adb shell input keycombination 113 51
 sleep 1
 adb shell input keycombination 113 51
