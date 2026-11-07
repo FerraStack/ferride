@@ -192,4 +192,23 @@ class ImeTest {
         assertEquals(a.top, b.top, 0.01f)
         assertEquals(8, info.selectionStart)
     }
+
+    @Test
+    fun replaceTextAppliesAGrammarSuggestion() {
+        editor("their is a cat", caret = 14)
+        ic.setComposingRegion(11, 14)
+        ic.setComposingText("cats", 1)
+        // Android 14 keyboards fix an earlier word with replaceText.
+        assertTrue(ic.replaceText(0, 5, "there", 1, null))
+        assertEquals("there is a cats", model.text())
+        assertEquals("composition is finished", -1, last.composingStart)
+        assertEquals(5, model.selection.head)
+        // newCursorPosition <= 0 is relative to the start of the replaced range.
+        ic.replaceText(9, 15, "dog", 0, null)
+        assertEquals("there is dog", model.text())
+        assertEquals(9, model.selection.head)
+        // Out-of-range offsets are clamped, never thrown.
+        ic.replaceText(100, 200, "!", 1, null)
+        assertEquals("there is dog!", model.text())
+    }
 }

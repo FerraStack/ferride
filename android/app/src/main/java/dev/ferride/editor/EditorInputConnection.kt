@@ -5,6 +5,7 @@ import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.ExtractedText
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
+import android.view.inputmethod.TextAttribute
 
 /**
  * IME bridge for [CodeEditorView]. Works directly against the [EditorModel]
@@ -51,6 +52,30 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
 
     override fun commitText(text: CharSequence, newCursorPosition: Int) =
         replaceForIme(text, newCursorPosition, composing = false)
+
+    /**
+     * API 34: replace an arbitrary range (autocorrect and grammar suggestions
+     * on Android 14+). Like the platform's default it finishes any composition
+     * first, then replaces [start]..[end] as typing and places the cursor
+     * relative to the new text with [commitText]'s rules.
+     */
+    override fun replaceText(
+        start: Int,
+        end: Int,
+        text: CharSequence,
+        newCursorPosition: Int,
+        textAttribute: TextAttribute?,
+    ): Boolean {
+        val m = view.liveModel ?: return false
+        val a = minOf(start, end).coerceIn(0, m.length)
+        val b = maxOf(start, end).coerceIn(0, m.length)
+        view.clearComposing()
+        val newEnd = m.replace(a, b, text.toString(), true)
+        val cursor = if (newCursorPosition > 0) newEnd + newCursorPosition - 1 else a + newCursorPosition
+        m.selection = Sel.caret(cursor.coerceIn(0, m.length))
+        view.afterEdit(fromIme = true)
+        return true
+    }
 
     override fun setComposingText(text: CharSequence, newCursorPosition: Int) =
         replaceForIme(text, newCursorPosition, composing = true)
