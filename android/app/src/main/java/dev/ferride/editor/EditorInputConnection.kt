@@ -4,6 +4,7 @@ import android.view.KeyEvent
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.ExtractedText
 import android.view.inputmethod.ExtractedTextRequest
+import android.view.inputmethod.InputConnection
 
 /**
  * IME bridge for [CodeEditorView]. Works directly against the [EditorModel]
@@ -132,7 +133,9 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
         return true
     }
 
-    override fun getExtractedText(request: ExtractedTextRequest?, flags: Int): ExtractedText? = null
+    /** A window of text around the selection; with `GET_EXTRACTED_TEXT_MONITOR` the view keeps it updated. */
+    override fun getExtractedText(request: ExtractedTextRequest?, flags: Int): ExtractedText? =
+        view.extractedText(request, monitor = flags and InputConnection.GET_EXTRACTED_TEXT_MONITOR != 0)
 
     override fun getCursorCapsMode(reqModes: Int): Int = 0
 
@@ -160,6 +163,7 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
 
     override fun closeConnection() {
         view.clearComposing()
+        view.stopExtractedTextMonitor()
         batchDepth = 0
         super.closeConnection()
     }

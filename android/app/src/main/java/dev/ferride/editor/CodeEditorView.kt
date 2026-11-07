@@ -17,6 +17,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedText
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.Magnifier
@@ -149,6 +151,9 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     private val imm get() = context.getSystemService(InputMethodManager::class.java)
 
+    /** Where selection/extracted-text/cursor-anchor updates go (a recorder in tests). */
+    var imeSink: ImeSink = ImmSink { imm }
+
     init {
         isFocusable = true
         isFocusableInTouchMode = true
@@ -171,7 +176,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         wrap = null
         clearComposing()
         invalidateLines()
-        if (hasFocus()) imm?.restartInput(this)
+        if (hasFocus()) imeSink.restartInput(this)
     }
 
     private fun updateMetrics() {
@@ -697,7 +702,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
             m.selection = Sel.caret(offset)
             preferredX = -1f
             requestFocus()
-            if (hadComposing) imm?.restartInput(this@CodeEditorView)
+            if (hadComposing) imeSink.restartInput(this@CodeEditorView)
             showKeyboard()
             afterSelectionChange(fromIme = false)
             restoreToolbar = false
@@ -757,7 +762,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         m.sealUndoGroup()
         m.selection = m.wordAt(offsetAt(e.x, e.y))
         requestFocus()
-        if (hadComposing) imm?.restartInput(this)
+        if (hadComposing) imeSink.restartInput(this)
         restoreToolbar = false
         afterSelectionChange(fromIme = false)
     }
@@ -975,7 +980,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         scroller.forceFinished(true)
         if (composingRange() != null) {
             clearComposing()
-            imm?.restartInput(this)
+            imeSink.restartInput(this)
         }
         m.sealUndoGroup()
         val s = m.selection
@@ -1134,7 +1139,68 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
             outAttrs.initialSelStart = it.start
             outAttrs.initialSelEnd = it.end
         }
+        // A new connection starts without monitors; the keyboard asks again.
+        extractMonitor = null
         return EditorInputConnection(this).also { inputConnection = it }
+    }
+
+    // ----- extracted text (#3) ------------------------------------------------------------------
+    // Samsung Keyboard and older SwiftKey read "extracted text" for cursor
+    // gestures and replacements. We hand out a window around the selection
+    // (the whole document can be megabytes) and, when the keyboard asked to
+    // monitor it, push updates after edits and when the selection leaves the
+    // window it has.
+
+    private var extractMonitor: ExtractedTextRequest? = null
+    private var extractedStart = -1
+    private var extractedEnd = -1
+    private var extractedStale = false
+
+    internal fun extractedText(request: ExtractedTextRequest?, monitor: Boolean): ExtractedText? {
+        val m = liveModel ?: return null
+        if (monitor) extractMonitor = request
+        return buildExtractedText(m, request).also(::rememberExtracted)
+    }
+
+    internal fun stopExtractedTextMonitor() {
+        extractMonitor = null
+    }
+
+    private fun rememberExtracted(et: ExtractedText) {
+        extractedStart = et.startOffset
+        extractedEnd = et.startOffset + (et.text?.length ?: 0)
+        extractedStale = false
+    }
+
+    private fun buildExtractedText(m: EditorModel, request: ExtractedTextRequest?): ExtractedText {
+        val s = m.selection
+        val hint = request?.hintMaxChars ?: 0
+        val half = if (hint > 0) min(EXTRACT_WINDOW, max(1, hint / 2)) else EXTRACT_WINDOW
+        var start = max(0, s.start - half)
+        var end = min(m.length, s.end + half)
+        // Never cut a surrogate pair at either edge.
+        if (start > 0 && m.textRange(start, start + 1).firstOrNull()?.isLowSurrogate() == true) start--
+        if (end < m.length && m.textRange(end, end + 1).firstOrNull()?.isLowSurrogate() == true) end++
+        return ExtractedText().apply {
+            text = m.textRange(start, end)
+            startOffset = start
+            partialStartOffset = -1
+            partialEndOffset = -1
+            selectionStart = s.start - start
+            selectionEnd = s.end - start
+            flags = 0
+        }
+    }
+
+    /** Pushes extracted text to a monitoring keyboard (after edits, or when the selection left its window). */
+    private fun updateExtractedText() {
+        val request = extractMonitor ?: return
+        val m = liveModel ?: return
+        val s = m.selection
+        if (!extractedStale && s.start >= extractedStart && s.end <= extractedEnd) return
+        val et = buildExtractedText(m, request)
+        rememberExtracted(et)
+        imeSink.updateExtractedText(this, request.token, et)
     }
 
     fun composingRange(): Pair<Int, Int>? =
@@ -1158,12 +1224,14 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         val m = liveModel ?: return
         val s = m.selection
         val (cs, ce) = composingRange() ?: (-1 to -1)
-        imm?.updateSelection(this, s.start, s.end, cs, ce)
+        imeSink.updateSelection(this, s.start, s.end, cs, ce)
+        updateExtractedText()
     }
 
     /** After any content change: refresh, keep the caret visible, notify. */
     internal fun afterEdit(fromIme: Boolean) {
         hideSelectionControls()
+        extractedStale = true
         invalidateLines()
         preferredX = -1f
         ensureCaretVisible()
@@ -1184,7 +1252,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     private fun afterExternalEdit() {
         clearComposing()
         afterEdit(fromIme = false)
-        imm?.restartInput(this)
+        imeSink.restartInput(this)
     }
 
     // ----- hardware keys -----------------------------------------------------------------------
@@ -1398,6 +1466,8 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         /** Android hides an idle insertion (caret) handle after a few seconds. */
         private const val CARET_HANDLE_MS = 4000L
         private const val SQRT2 = 1.4142135f
+        /** Chars of context on each side of the selection in extracted text. */
+        internal const val EXTRACT_WINDOW = 2000
         private const val MAX_WRAP_CHARS = 2_000_000
         private val NO_BREAKS = intArrayOf(0)
         private val VERTICAL = setOf(
