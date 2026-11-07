@@ -8,9 +8,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.GraphicsMode
 
 /** Cursor keys and Delete step over whole grapheme clusters (#6). */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GraphemeCursorTest {
     private val family = "👨‍👩‍👧" // 👨‍👩‍👧, 8 UTF-16 units
     private val flag = "🇺🇦" // 🇺🇦
