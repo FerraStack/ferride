@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -125,17 +124,17 @@ private fun RecentSection(state: WorkbenchState) {
 @Composable
 private fun RecentRow(state: WorkbenchState, recent: RecentFolder) {
     val c = LocalWorkbenchColors.current
-    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val coords = remember { CoordsHolder() }
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 36.dp)
-            .onGloballyPositioned { coords = it }
+            .onGloballyPositioned { coords.value = it }
             .pointerInput(recent) {
                 detectTapGestures(
                     onTap = { state.openRecent(recent) },
                     onLongPress = { at ->
-                        val p = coords?.localToRoot(at) ?: at
+                        val p = coords.value?.localToRoot(at) ?: at
                         state.contextMenu = ContextMenuRequest(
                             p.x,
                             p.y,
