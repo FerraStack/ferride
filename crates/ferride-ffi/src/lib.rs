@@ -14,7 +14,10 @@ mod workspace;
 
 pub use document::{Document, EditOutcome, SelectionRange, StyleKind, StyleSpan, ViewLine};
 pub use lsp::{LspCompletion, LspDiagnostic, LspListener, LspSession};
-pub use workspace::{FileHit, FileNode, MatchRange, SearchHit, SearchReport, WorkspaceHandle};
+pub use workspace::{
+    FileHit, FileNode, MatchRange, SafDoc, SafError, SafTree, SearchHit, SearchReport, WorkspaceHandle,
+    WorkspaceKind,
+};
 
 use ferride_host::{HostStatus, ProcessHost, UnavailableHost};
 
