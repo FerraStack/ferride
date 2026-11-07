@@ -54,6 +54,8 @@ data class Command(
     val category: String? = null,
     val keybinding: KeyChord? = null,
     val enabled: () -> Boolean = { true },
+    /** False for alternate bindings of another command (kept out of the palette). */
+    val inPalette: Boolean = true,
     val run: () -> Unit,
 ) {
     /** What the palette shows: `File: Save`. */
@@ -87,8 +89,9 @@ class CommandRegistry {
     /** Palette filtering: fuzzy match on the label, best first. */
     fun search(query: String): List<Command> {
         val q = query.trim()
-        if (q.isEmpty()) return all.sortedBy { it.label }
-        return all.mapNotNull { c -> fuzzyScore(q, c.label)?.let { c to it } }
+        val candidates = all.filter { it.inPalette }
+        if (q.isEmpty()) return candidates.sortedBy { it.label }
+        return candidates.mapNotNull { c -> fuzzyScore(q, c.label)?.let { c to it } }
             .sortedWith(compareByDescending<Pair<Command, Int>> { it.second }.thenBy { it.first.label })
             .map { it.first }
     }

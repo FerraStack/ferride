@@ -374,7 +374,11 @@ class WorkbenchState(
         }
         cmd(CommandIds.UNDO, "Undo", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_Z), hasEditor) { editor?.undo() }
         cmd(CommandIds.REDO, "Redo", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_Y), hasEditor) { editor?.redo() }
-        cmd("redo.alt", "Redo", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_Z, shift = true), hasEditor) { editor?.redo() }
+        r.register(
+            Command("redo.alt", "Redo", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_Z, shift = true), hasEditor, inPalette = false) {
+                editor?.redo()
+            },
+        )
         cmd(CommandIds.SELECT_ALL, "Select All", "Selection", KeyChord.ctrl(KeyEvent.KEYCODE_A), hasEditor) {
             editor?.selectAll()
         }

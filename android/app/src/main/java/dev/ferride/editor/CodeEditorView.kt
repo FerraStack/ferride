@@ -221,7 +221,9 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun onDraw(canvas: Canvas) {
         computeGutter()
-        canvas.drawColor(style.background)
+        // Fill our bounds only (drawColor ignores view bounds on unclipped canvases).
+        fillPaint.color = style.background
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fillPaint)
         val m = model ?: return
         val (first, count) = visibleLines()
         val lines = lines(first, count)
