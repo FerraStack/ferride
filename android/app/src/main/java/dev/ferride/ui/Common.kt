@@ -104,6 +104,7 @@ fun editorStyle(colors: WorkbenchColors, settings: Settings, wordWrap: Boolean =
     warning = colors.warningSquiggle.toArgb(),
     info = colors.infoSquiggle.toArgb(),
     scrollbar = colors.scrollbarSlider.toArgb(),
+    handle = colors.focusBorder.toArgb(),
     wordWrap = wordWrap,
     fontSizeSp = settings.fontSize.toFloat(),
     tabSize = settings.tabSize,

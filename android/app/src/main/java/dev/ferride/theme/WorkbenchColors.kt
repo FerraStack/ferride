@@ -71,6 +71,13 @@ data class WorkbenchColors(
     val descriptionForeground: Color,
     val errorForeground: Color,
     val warningForeground: Color,
+    // Menus (context menu, the selection toolbar)
+    val menuBackground: Color,
+    val menuForeground: Color,
+    val menuBorder: Color,
+    val menuSelectionBackground: Color,
+    val menuSelectionForeground: Color,
+    val menuSeparator: Color,
     /** Syntax colors per highlight class (from `tokenColors`). */
     val tokens: Map<StyleKind, Color>,
 ) {
@@ -138,6 +145,12 @@ val DarkModern = WorkbenchColors(
     descriptionForeground = c(0xFF9D9D9D),
     errorForeground = c(0xFFF48771),
     warningForeground = c(0xFFCCA700),
+    menuBackground = c(0xFF1F1F1F),
+    menuForeground = c(0xFFCCCCCC),
+    menuBorder = c(0xFF454545),
+    menuSelectionBackground = c(0xFF0078D4),
+    menuSelectionForeground = c(0xFFFFFFFF),
+    menuSeparator = c(0xFF454545),
     tokens = mapOf(
         StyleKind.KEYWORD to c(0xFFD08AE0),
         StyleKind.FUNCTION to c(0xFFE5D78F),
@@ -218,6 +231,12 @@ val LightModern = WorkbenchColors(
     descriptionForeground = c(0xFF6A6A6A),
     errorForeground = c(0xFFD32F2F),
     warningForeground = c(0xFFB27C00),
+    menuBackground = c(0xFFFFFFFF),
+    menuForeground = c(0xFF3B3B3B),
+    menuBorder = c(0xFFCECECE),
+    menuSelectionBackground = c(0xFF005FB8),
+    menuSelectionForeground = c(0xFFFFFFFF),
+    menuSeparator = c(0xFFD4D4D4),
     tokens = mapOf(
         StyleKind.KEYWORD to c(0xFFA0259E),
         StyleKind.FUNCTION to c(0xFF7A5C1E),

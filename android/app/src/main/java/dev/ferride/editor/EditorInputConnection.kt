@@ -124,7 +124,10 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
 
     override fun setSelection(start: Int, end: Int): Boolean {
         val m = view.liveModel ?: return false
-        m.selection = Sel(start.coerceIn(0, m.length), end.coerceIn(0, m.length))
+        val next = Sel(start.coerceIn(0, m.length), end.coerceIn(0, m.length))
+        // The keyboard moved the cursor (e.g. Gboard's space-bar swipe): touch handles go away.
+        if (next != m.selection) view.hideSelectionControls()
+        m.selection = next
         view.afterSelectionChange(fromIme = true)
         return true
     }

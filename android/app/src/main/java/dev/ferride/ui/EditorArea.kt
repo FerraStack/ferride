@@ -1,5 +1,6 @@
 package dev.ferride.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +30,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
@@ -38,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.ferride.editor.CodeEditorView
 import dev.ferride.editor.EditorModel
+import dev.ferride.editor.SelectionUi
 import dev.ferride.editor.Squiggle
 import dev.ferride.theme.LocalWorkbenchColors
 import dev.ferride.workbench.CommandIds
@@ -79,9 +85,11 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
         Squiggle(model.offsetAt(d.line, d.startColumn), model.offsetAt(d.endLine, d.endColumn), d.severity)
     }
     val style = editorStyle(c, state.settings, state.wordWrap)
+    var selectionUi by remember { mutableStateOf<SelectionUi?>(null) }
+    val viewRef = remember { arrayOfNulls<CodeEditorView>(1) }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         AndroidView(
-            factory = { ctx -> CodeEditorView(ctx) },
+            factory = { ctx -> CodeEditorView(ctx).also { viewRef[0] = it } },
             modifier = Modifier.fillMaxSize(),
             update = { view ->
                 view.style = style
@@ -93,9 +101,13 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
                 view.findMatches = matches
                 view.currentMatch = state.find.current
                 view.squiggles = squiggles
+                view.onSelectionUi = { selectionUi = it }
                 state.editor = view
             },
             onRelease = { view ->
+                view.onSelectionUi = null
+                selectionUi = null
+                if (viewRef[0] === view) viewRef[0] = null
                 if (state.editor === view) state.editor = null
                 view.setModel(null)
                 state.disposeRetired(null)
@@ -104,6 +116,10 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
         )
         if (state.find.visible) {
             FindWidget(state, matches.size, maxWidth, Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 14.dp))
+        }
+        selectionUi?.let { ui ->
+            SelectionToolbar(ui, onAction = { viewRef[0]?.onSelectionToolbarAction(it) })
+            BackHandler { viewRef[0]?.hideSelectionControls() }
         }
     }
 }
