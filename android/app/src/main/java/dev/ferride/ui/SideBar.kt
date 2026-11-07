@@ -86,6 +86,11 @@ fun SideBar(state: WorkbenchState, modifier: Modifier = Modifier) {
 
 // ----- Explorer ----------------------------------------------------------------
 
+/** Where a row is on screen, for anchoring its long-press menu (not state: no recomposition). */
+class CoordsHolder {
+    var value: LayoutCoordinates? = null
+}
+
 /** A flattened Explorer row: a file/folder, or the inline name box. */
 private sealed interface ExplorerRow {
     val key: String
@@ -121,16 +126,16 @@ private fun explorerRows(state: WorkbenchState): List<ExplorerRow> {
 @Composable
 private fun Explorer(state: WorkbenchState) {
     val c = LocalWorkbenchColors.current
-    var headerCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val headerCoords = remember { CoordsHolder() }
     // Section header with VS Code's title actions (always visible on touch).
     Row(
         Modifier
             .fillMaxWidth()
             .height(28.dp)
-            .onGloballyPositioned { headerCoords = it }
+            .onGloballyPositioned { headerCoords.value = it }
             .pointerInput(state.backend.root) {
                 detectTapGestures(onLongPress = { at ->
-                    val p = headerCoords?.localToRoot(at) ?: at
+                    val p = headerCoords.value?.localToRoot(at) ?: at
                     state.openExplorerMenu(FileNode(state.backend.name, state.backend.root, "", true, false), p.x, p.y)
                 })
             }
@@ -188,13 +193,13 @@ private fun ExplorerAction(glyph: Char, description: String, onClick: () -> Unit
 @Composable
 private fun TreeRow(state: WorkbenchState, node: FileNode, depth: Int, active: Boolean) {
     val c = LocalWorkbenchColors.current
-    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val coords = remember { CoordsHolder() }
     Row(
         Modifier
             .fillMaxWidth()
             .height(30.dp)
             .background(if (active) c.listActiveSelectionBackground else c.sideBarBackground)
-            .onGloballyPositioned { coords = it }
+            .onGloballyPositioned { coords.value = it }
             .pointerInput(node.path) {
                 detectTapGestures(
                     onTap = {
@@ -206,7 +211,7 @@ private fun TreeRow(state: WorkbenchState, node: FileNode, depth: Int, active: B
                         }
                     },
                     onLongPress = { at ->
-                        val p = coords?.localToRoot(at) ?: at
+                        val p = coords.value?.localToRoot(at) ?: at
                         state.openExplorerMenu(node, p.x, p.y)
                     },
                 )
@@ -215,7 +220,7 @@ private fun TreeRow(state: WorkbenchState, node: FileNode, depth: Int, active: B
                 role = Role.Button
                 // TalkBack's long-press action opens the same menu at the row.
                 onLongClick(label = "Show actions") {
-                    val box = coords ?: return@onLongClick false
+                    val box = coords.value ?: return@onLongClick false
                     val p = box.localToRoot(Offset(box.size.width / 2f, box.size.height / 2f))
                     state.openExplorerMenu(node, p.x, p.y)
                     true
