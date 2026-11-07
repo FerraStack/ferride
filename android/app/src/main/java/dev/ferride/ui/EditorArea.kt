@@ -225,13 +225,13 @@ private fun Welcome(state: WorkbenchState, modifier: Modifier) {
             "Open Explorer" to CommandIds.VIEW_EXPLORER,
             "Open Settings" to CommandIds.OPEN_SETTINGS,
         ).forEach { (label, id) ->
-            val key = state.commands.get(id)?.keybinding?.label
+            val key = state.commands.get(id)?.keybinding
             Row(
                 Modifier.fillMaxWidth().clickable { state.commands.execute(id) }.padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(label, color = c.focusBorder, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                if (key != null) Text(key, color = c.descriptionForeground, fontSize = 12.sp)
+                if (key != null) KeybindingLabel(key)
             }
         }
     }

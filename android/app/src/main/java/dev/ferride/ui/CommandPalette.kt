@@ -170,18 +170,9 @@ private fun PaletteRow(item: PaletteItem, selected: Boolean, files: Boolean, c: 
             }
         }
         item.section?.let {
-            Text(it, color = c.descriptionForeground, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 6.dp))
+            Text(it, color = c.descriptionForeground, fontSize = 11.sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 6.dp))
         }
-        item.keybinding?.let {
-            Text(
-                it,
-                color = c.descriptionForeground,
-                fontSize = 11.sp,
-                modifier = Modifier.background(c.inputBackground, RoundedCornerShape(3.dp))
-                    .border(1.dp, c.inputBorder, RoundedCornerShape(3.dp))
-                    .padding(horizontal = 5.dp, vertical = 1.dp),
-            )
-        }
+        item.keybinding?.let { KeybindingLabel(it, Modifier.padding(start = 6.dp)) }
     }
 }
 
