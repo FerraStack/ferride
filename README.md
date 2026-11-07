@@ -44,7 +44,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-**Android app** needs JDK 17–25 (Gradle 9.8 doesn't run on JDK 26+; JDK 21 or 25 recommended), the Android SDK (platform 36), an NDK r28+ (16 KB page alignment), Rust Android targets and `cargo-ndk`:
+**Android app** needs JDK 17–25 (Gradle 9.8 doesn't run on JDK 26+; JDK 21 or 25 recommended), the Android SDK (platform 37), an NDK r28+ (16 KB page alignment), Rust Android targets and `cargo-ndk`:
 
 ```sh
 rustup target add aarch64-linux-android x86_64-linux-android

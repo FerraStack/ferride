@@ -103,7 +103,7 @@ val uniffiBindgen = tasks.register<UniffiBindgen>("uniffiBindgen") {
 
 android {
     namespace = "dev.ferride"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.ferride"
