@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  rust:
+    name: Rust · fmt, clippy, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: host
+      - run: cargo fmt --all --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+
+  android:
+    name: Android · APK + screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NDK_VERSION: 30.0.16248370
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: android
+      - uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2.90.2
+        with:
+          tool: cargo-ndk@4.1.2
+      - name: Install pinned NDK (r30; links 16 KB-aligned ELFs)
+        run: |
+          if [ ! -d "$ANDROID_HOME/ndk/$NDK_VERSION" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          fi
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          grep Pkg.Revision "$ANDROID_HOME/ndk/$NDK_VERSION/source.properties"
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Build Rust core, unit + screenshot tests, debug APK
+        working-directory: android
+        run: ./gradlew --max-workers=4 testDebugUnitTest -Proborazzi.test.record=true assembleDebug
+      - name: Check 16 KB alignment
+        run: |
+          zipalign="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/zipalign"
+          "$zipalign" -c -P 16 -v 4 android/app/build/outputs/apk/debug/app-debug.apk | tail -n 3
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ferride-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: screenshots-roborazzi
+          path: android/app/build/outputs/roborazzi/*.png
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: android-test-reports
+          path: android/app/build/reports/tests/
+
+  emulator:
+    name: Emulator · smoke test + screenshots
+    needs: android
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: ferride-debug-apk
+          path: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash .github/scripts/emulator-screenshots.sh apk/app-debug.apk screenshots-emulator
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: screenshots-emulator
+          path: screenshots-emulator/
+          if-no-files-found: warn
+
+  screenshots-comment:
+    name: Post screenshots to the PR
+    needs: [android, emulator]
+    # Fork PRs get a read-only token: only post for branches of this repository.
+    if: >-
+      always() && github.event_name == 'pull_request' && needs.android.result == 'success' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: screenshots-*
+          path: shots
+          merge-multiple: true
+      - name: Publish to ci-screenshots and comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_ID: ${{ github.run_id }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash .github/scripts/post-screenshots.sh shots

@@ -1,0 +1,5 @@
+[bindings.kotlin]
+package_name = "dev.ferride.core"
+cdylib_name = "ferride_ffi"
+android = true
+kotlin_target_version = "2.0.0"

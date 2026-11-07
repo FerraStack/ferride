@@ -1,0 +1,56 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/ferride-buffer",
+    "crates/ferride-syntax",
+    "crates/ferride-lsp",
+    "crates/ferride-workspace",
+    "crates/ferride-host",
+    "crates/ferride-ffi",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+repository = "https://github.com/FerraStack/ferride"
+authors = ["FerraStack contributors"]
+
+[workspace.dependencies]
+ferride-buffer = { path = "crates/ferride-buffer" }
+ferride-syntax = { path = "crates/ferride-syntax" }
+ferride-lsp = { path = "crates/ferride-lsp" }
+ferride-workspace = { path = "crates/ferride-workspace" }
+ferride-host = { path = "crates/ferride-host" }
+
+ropey = { version = "1.6.1", default-features = false, features = ["simd"] }
+tree-sitter = "0.27.2"
+tree-sitter-rust = "0.24.2"
+tree-sitter-python = "0.25.0"
+tree-sitter-javascript = "0.25.0"
+tree-sitter-typescript = "0.23.2"
+tree-sitter-json = "0.24.8"
+tree-sitter-md = "0.5.4"
+lsp-types = "0.97.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+ignore = "0.4.34"
+grep-searcher = "0.1.17"
+grep-regex = "0.1.14"
+grep-matcher = "0.1.9"
+uniffi = "0.32.2"
+thiserror = "2.0.21"
+log = "0.4.35"
+tempfile = "3.27.0"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = "debuginfo"
