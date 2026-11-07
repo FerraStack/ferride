@@ -88,7 +88,7 @@ fun languageDisplayName(id: String?): String = when (id) {
 }
 
 /** Workbench colors + settings → what the editor view draws with. */
-fun editorStyle(colors: WorkbenchColors, settings: Settings) = EditorStyle(
+fun editorStyle(colors: WorkbenchColors, settings: Settings, wordWrap: Boolean = settings.wordWrap ?: false) = EditorStyle(
     background = colors.editorBackground.toArgb(),
     foreground = colors.editorForeground.toArgb(),
     lineHighlight = colors.editorLineHighlight.toArgb(),
@@ -98,6 +98,13 @@ fun editorStyle(colors: WorkbenchColors, settings: Settings) = EditorStyle(
     lineNumberActive = colors.editorLineNumberActive.toArgb(),
     indentGuide = colors.editorIndentGuide.toArgb(),
     tokens = StyleKind.entries.associateWith { colors.token(it).toArgb() },
+    findMatch = colors.findMatchBackground.toArgb(),
+    findMatchCurrent = colors.findMatchCurrentBackground.toArgb(),
+    error = colors.errorSquiggle.toArgb(),
+    warning = colors.warningSquiggle.toArgb(),
+    info = colors.infoSquiggle.toArgb(),
+    scrollbar = colors.scrollbarSlider.toArgb(),
+    wordWrap = wordWrap,
     fontSizeSp = settings.fontSize.toFloat(),
     tabSize = settings.tabSize,
     insertSpaces = settings.insertSpaces,

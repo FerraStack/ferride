@@ -44,7 +44,7 @@ abstract class CargoNdkBuild : DefaultTask() {
         out.mkdirs()
         val args = mutableListOf("cargo", "ndk")
         abis.get().forEach { args += listOf("-t", it) }
-        args += listOf("-P", minApi.get().toString(), "-o", out.absolutePath, "build", "--release", "-p", "ferride-ffi")
+        args += listOf("-P", minApi.get().toString(), "-o", out.absolutePath, "build", "--locked", "--release", "-p", "ferride-ffi")
         exec.exec {
             workingDir = workspace.get().asFile
             commandLine(args)
@@ -74,7 +74,7 @@ abstract class UniffiBindgen : DefaultTask() {
         exec.exec {
             workingDir = workspace.get().asFile
             commandLine(
-                "cargo", "run", "-p", "ferride-ffi", "--features", "bindgen", "--bin", "uniffi-bindgen", "--",
+                "cargo", "run", "--locked", "-p", "ferride-ffi", "--features", "bindgen", "--bin", "uniffi-bindgen", "--",
                 "generate", "--library", library.absolutePath, "--language", "kotlin", "--no-format",
                 "--out-dir", out.absolutePath,
             )

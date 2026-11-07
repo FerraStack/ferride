@@ -15,7 +15,7 @@ import dev.ferride.theme.VsCodeTheme
 import dev.ferride.ui.FerrideWorkbench
 import dev.ferride.workbench.RustWorkspaceBackend
 import dev.ferride.workbench.SampleProject
-import dev.ferride.workbench.Settings
+import dev.ferride.workbench.SettingsStore
 import dev.ferride.workbench.WorkbenchState
 import kotlinx.coroutines.Dispatchers
 import java.io.File
@@ -28,12 +28,21 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
         .sortedBy { it.name }
         .mapNotNull { f -> runCatching { VsCodeTheme.parse(f.readText(), f.nameWithoutExtension) }.getOrNull() }
 
+    private val settingsStore = object : SettingsStore {
+        override fun read(): String? = settingsFile.takeIf { it.exists() }?.readText()
+        override fun write(text: String) {
+            // Atomic replace so a crash mid-write can't truncate the user's settings.
+            val tmp = File(settingsFile.parentFile, "settings.json.tmp")
+            tmp.writeText(text)
+            if (!tmp.renameTo(settingsFile)) error("couldn't replace settings.json")
+        }
+    }
+
     val state: WorkbenchState = WorkbenchState(
         backend = RustWorkspaceBackend.open(SampleProject.seed(File(app.filesDir, "projects")).absolutePath),
         scope = viewModelScope,
         io = Dispatchers.IO,
-        initialSettings = Settings.load(settingsFile),
-        saveSettings = { s -> runCatching { settingsFile.writeText(s.toJson()) } },
+        settingsStore = settingsStore,
         extraThemes = userThemes,
     ).also { it.start() }
 }
@@ -53,7 +62,7 @@ class MainActivity : ComponentActivity() {
 
     /** VS Code keybindings for hardware keyboards go through the command registry first. */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val chord = event.isCtrlPressed || event.isAltPressed ||
+        val chord = event.isCtrlPressed || event.isAltPressed || event.keyCode == KeyEvent.KEYCODE_ESCAPE ||
             event.keyCode in KeyEvent.KEYCODE_F1..KeyEvent.KEYCODE_F12
         if (chord && vm.state.onKeyEvent(event)) return true
         return super.dispatchKeyEvent(event)

@@ -11,7 +11,8 @@ data class Settings(
     val fontSize: Int = 14,
     val tabSize: Int = 4,
     val insertSpaces: Boolean = true,
-    val wordWrap: Boolean = false,
+    /** `null` = default: on for compact (phone) windows, off otherwise. */
+    val wordWrap: Boolean? = null,
     val lineNumbers: Boolean = true,
     val minimap: Boolean = false,
     val renderIndentGuides: Boolean = true,
@@ -24,13 +25,43 @@ data class Settings(
     val extraKeys: Boolean = true,
     private val unknown: Map<String, Any?> = emptyMap(),
 ) {
+    /** Known keys → JSON-ready values (`null` = leave the key out). */
+    fun values(): Map<String, Any?> = mapOf(
+        EDITOR_FONT_SIZE to fontSize,
+        EDITOR_TAB_SIZE to tabSize,
+        EDITOR_INSERT_SPACES to insertSpaces,
+        EDITOR_WORD_WRAP to wordWrap?.let { if (it) "on" else "off" },
+        EDITOR_LINE_NUMBERS to if (lineNumbers) "on" else "off",
+        EDITOR_MINIMAP to minimap,
+        EDITOR_INDENT_GUIDES to renderIndentGuides,
+        EDITOR_LINE_HIGHLIGHT to if (highlightActiveLine) "line" else "none",
+        EDITOR_BRACKET_PAIRS to bracketPairColorization,
+        FILES_AUTO_SAVE to autoSave,
+        WORKBENCH_COLOR_THEME to colorTheme.ifEmpty { null },
+        WINDOW_AUTO_DETECT to autoDetectColorScheme,
+        FERRIDE_EXTRA_KEYS to extraKeys,
+    )
+
+    /**
+     * Applies the keys that differ from [old] to the existing JSONC [text] as
+     * minimal edits, preserving comments, ordering and unknown keys.
+     */
+    fun applyTo(text: String, old: Settings): String {
+        var out = text.ifBlank { "{\n}\n" }
+        val before = old.values()
+        values().forEach { (k, v) ->
+            if (before[k] != v) out = Jsonc.setProperty(out, k, jsonValue(v))
+        }
+        return out
+    }
+
     fun toJson(): String {
         val o = JSONObject()
         unknown.forEach { (k, v) -> o.put(k, v) }
         o.put(EDITOR_FONT_SIZE, fontSize)
         o.put(EDITOR_TAB_SIZE, tabSize)
         o.put(EDITOR_INSERT_SPACES, insertSpaces)
-        o.put(EDITOR_WORD_WRAP, if (wordWrap) "on" else "off")
+        wordWrap?.let { o.put(EDITOR_WORD_WRAP, if (it) "on" else "off") }
         o.put(EDITOR_LINE_NUMBERS, if (lineNumbers) "on" else "off")
         o.put(EDITOR_MINIMAP, minimap)
         o.put(EDITOR_INDENT_GUIDES, renderIndentGuides)
@@ -64,15 +95,24 @@ data class Settings(
             WORKBENCH_COLOR_THEME, WINDOW_AUTO_DETECT, FERRIDE_EXTRA_KEYS,
         )
 
-        fun parse(json: String): Settings {
-            val o = runCatching { JSONObject(dev.ferride.theme.VsCodeTheme.stripJsonc(json)) }.getOrElse { JSONObject() }
+        /** Parses settings; malformed input falls back to defaults (use [parseResult] to detect it). */
+        fun parse(json: String): Settings = parseResult(json).getOrElse { Settings() }
+
+        /** Parses settings, failing on malformed JSONC instead of silently resetting. */
+        fun parseResult(json: String): Result<Settings> = runCatching {
+            if (json.isBlank()) return@runCatching Settings()
+            val o = JSONObject(Jsonc.strip(json))
+            fromJson(o)
+        }
+
+        private fun fromJson(o: JSONObject): Settings {
             val d = Settings()
             val unknown = o.keys().asSequence().filter { it !in KNOWN }.associateWith { o.opt(it) }
             return Settings(
                 fontSize = o.optInt(EDITOR_FONT_SIZE, d.fontSize).coerceIn(6, 48),
                 tabSize = o.optInt(EDITOR_TAB_SIZE, d.tabSize).coerceIn(1, 16),
                 insertSpaces = o.optBoolean(EDITOR_INSERT_SPACES, d.insertSpaces),
-                wordWrap = o.optString(EDITOR_WORD_WRAP, "off") != "off",
+                wordWrap = if (o.has(EDITOR_WORD_WRAP)) o.optString(EDITOR_WORD_WRAP) != "off" else null,
                 lineNumbers = o.optString(EDITOR_LINE_NUMBERS, "on") != "off",
                 minimap = o.optBoolean(EDITOR_MINIMAP, d.minimap),
                 renderIndentGuides = o.optBoolean(EDITOR_INDENT_GUIDES, d.renderIndentGuides),
@@ -87,5 +127,11 @@ data class Settings(
         }
 
         fun load(file: File): Settings = if (file.exists()) parse(file.readText()) else Settings()
+
+        fun jsonValue(v: Any?): String? = when (v) {
+            null -> null
+            is String -> Jsonc.quote(v)
+            else -> v.toString()
+        }
     }
 }

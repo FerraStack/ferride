@@ -24,8 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,7 +43,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ferride.core.FileNode
-import dev.ferride.theme.BuiltInThemes
 import dev.ferride.theme.LocalWorkbenchColors
 import dev.ferride.workbench.SideView
 import dev.ferride.workbench.WorkbenchState
@@ -63,7 +60,6 @@ fun SideBar(state: WorkbenchState, modifier: Modifier = Modifier) {
             SideView.Search -> SearchView(state)
             SideView.SourceControl -> SourceControlView(state)
             SideView.Languages -> LanguagesView()
-            SideView.Settings -> SettingsView(state)
         }
     }
 }
@@ -281,142 +277,5 @@ private fun LanguagesView() {
                 }
             }
         }
-    }
-}
-
-// ----- Settings --------------------------------------------------------------------
-
-@Composable
-private fun SettingsView(state: WorkbenchState) {
-    val c = LocalWorkbenchColors.current
-    val s = state.settings
-    var filter by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        Box(
-            Modifier.fillMaxWidth().height(32.dp)
-                .background(c.inputBackground, RoundedCornerShape(3.dp))
-                .border(1.dp, c.inputBorder, RoundedCornerShape(3.dp))
-                .padding(horizontal = 8.dp),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            if (filter.isEmpty()) Text("Search settings", color = c.descriptionForeground, fontSize = 13.sp)
-            BasicTextField(
-                value = filter,
-                onValueChange = { filter = it },
-                singleLine = true,
-                textStyle = TextStyle(color = c.inputForeground, fontSize = 13.sp),
-                cursorBrush = SolidColor(c.editorCursor),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        LazyColumn(Modifier.fillMaxSize()) {
-            fun visible(vararg words: String) = filter.isBlank() || words.any { it.contains(filter, ignoreCase = true) }
-            if (visible("theme", "color", "workbench")) item {
-                SettingRow("Workbench › Color Theme", "workbench.colorTheme") {
-                    Column {
-                        ThemeChoice("Follow system (light/dark)", s.autoDetectColorScheme) {
-                            state.updateSettings { it.copy(autoDetectColorScheme = true, colorTheme = "") }
-                        }
-                        (BuiltInThemes + state.extraThemes).forEach { t ->
-                            ThemeChoice(t.name, !s.autoDetectColorScheme && s.colorTheme == t.name) {
-                                state.updateSettings { it.copy(autoDetectColorScheme = false, colorTheme = t.name) }
-                            }
-                        }
-                    }
-                }
-            }
-            if (visible("font", "size", "editor")) item {
-                SettingRow("Editor › Font Size", "editor.fontSize") {
-                    Stepper(s.fontSize) { v -> state.updateSettings { it.copy(fontSize = v.coerceIn(6, 48)) } }
-                }
-            }
-            if (visible("tab", "size", "editor")) item {
-                SettingRow("Editor › Tab Size", "editor.tabSize") {
-                    Stepper(s.tabSize) { v -> state.updateSettings { it.copy(tabSize = v.coerceIn(1, 16)) } }
-                }
-            }
-            val switches = listOf(
-                Triple("Editor › Insert Spaces", "editor.insertSpaces", s.insertSpaces) to { v: Boolean -> state.updateSettings { it.copy(insertSpaces = v) } },
-                Triple("Editor › Line Numbers", "editor.lineNumbers", s.lineNumbers) to { v: Boolean -> state.updateSettings { it.copy(lineNumbers = v) } },
-                Triple("Editor › Guides: Indentation", "editor.guides.indentation", s.renderIndentGuides) to { v: Boolean -> state.updateSettings { it.copy(renderIndentGuides = v) } },
-                Triple("Editor › Bracket Pair Colorization", "editor.bracketPairColorization.enabled", s.bracketPairColorization) to { v: Boolean -> state.updateSettings { it.copy(bracketPairColorization = v) } },
-                Triple("Editor › Render Line Highlight", "editor.renderLineHighlight", s.highlightActiveLine) to { v: Boolean -> state.updateSettings { it.copy(highlightActiveLine = v) } },
-                Triple("Editor › Word Wrap (coming in M1)", "editor.wordWrap", s.wordWrap) to { v: Boolean -> state.updateSettings { it.copy(wordWrap = v) } },
-                Triple("Editor › Minimap (coming later)", "editor.minimap.enabled", s.minimap) to { v: Boolean -> state.updateSettings { it.copy(minimap = v) } },
-                Triple("Ferride › Extra Keys Row", "ferride.extraKeys.enabled", s.extraKeys) to { v: Boolean -> state.updateSettings { it.copy(extraKeys = v) } },
-            )
-            switches.forEach { (meta, set) ->
-                val (title, key, value) = meta
-                if (visible(title, key)) item(key = key) {
-                    SettingRow(title, key) {
-                        Switch(
-                            checked = value,
-                            onCheckedChange = set,
-                            colors = SwitchDefaults.colors(checkedTrackColor = c.buttonBackground),
-                        )
-                    }
-                }
-            }
-            item {
-                Text(
-                    "Stored as settings.json with VS Code key names.",
-                    color = c.descriptionForeground,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(vertical = 12.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingRow(title: String, key: String, control: @Composable () -> Unit) {
-    val c = LocalWorkbenchColors.current
-    Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-        Text(
-            buildAnnotatedString {
-                val parts = title.split(" › ")
-                parts.dropLast(1).forEach { append("$it: ") }
-                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(parts.last()) }
-            },
-            color = c.sideBarForeground,
-            fontSize = 13.sp,
-        )
-        Text(key, color = c.descriptionForeground, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-        Spacer(Modifier.height(4.dp))
-        control()
-    }
-}
-
-@Composable
-private fun Stepper(value: Int, onChange: (Int) -> Unit) {
-    val c = LocalWorkbenchColors.current
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        listOf("−" to -1, null, "+" to 1).forEach { entry ->
-            if (entry == null) {
-                Text(value.toString(), color = c.inputForeground, fontSize = 14.sp, modifier = Modifier.width(44.dp).padding(horizontal = 12.dp))
-            } else {
-                Box(
-                    Modifier.size(32.dp).background(c.inputBackground, RoundedCornerShape(3.dp))
-                        .border(1.dp, c.inputBorder, RoundedCornerShape(3.dp))
-                        .clickable { onChange(value + entry.second) },
-                    contentAlignment = Alignment.Center,
-                ) { Text(entry.first, color = c.inputForeground, fontSize = 16.sp) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThemeChoice(name: String, selected: Boolean, onClick: () -> Unit) {
-    val c = LocalWorkbenchColors.current
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(14.dp).border(1.dp, c.inputBorder, RoundedCornerShape(50))
-                .padding(3.dp)
-                .background(if (selected) c.focusBorder else c.sideBarBackground, RoundedCornerShape(50)),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(name, color = c.sideBarForeground, fontSize = 13.sp)
     }
 }

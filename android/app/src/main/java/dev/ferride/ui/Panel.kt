@@ -19,7 +19,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,12 +53,19 @@ fun Panel(state: WorkbenchState, modifier: Modifier = Modifier) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Spacer(Modifier.weight(1f))
-                    Text(
-                        tab.title.uppercase(),
-                        color = if (active) c.panelTitleActiveForeground else c.panelTitleInactiveForeground,
-                        fontSize = 11.sp,
-                        letterSpacing = 0.5.sp,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            tab.title.uppercase(),
+                            color = if (active) c.panelTitleActiveForeground else c.panelTitleInactiveForeground,
+                            fontSize = 11.sp,
+                            letterSpacing = 0.5.sp,
+                        )
+                        val count = state.diagnostics.values.sumOf { it.size }
+                        if (tab == PanelTab.Problems && count > 0) {
+                            Spacer(Modifier.width(6.dp))
+                            CountBadge(count)
+                        }
+                    }
                     Spacer(Modifier.weight(1f))
                     Box(Modifier.width(28.dp).height(1.dp).background(if (active) c.panelTitleActiveBorder else c.panelBackground))
                 }
@@ -67,11 +77,7 @@ fun Panel(state: WorkbenchState, modifier: Modifier = Modifier) {
         }
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
             when (state.panelTab) {
-                PanelTab.Problems -> Text(
-                    "No problems have been detected in the workspace.",
-                    color = c.descriptionForeground,
-                    fontSize = 13.sp,
-                )
+                PanelTab.Problems -> ProblemsList(state)
                 PanelTab.Output -> LazyColumn(Modifier.fillMaxSize()) {
                     items(state.output) { line ->
                         Text(line, color = c.editorForeground, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
@@ -111,5 +117,61 @@ fun TerminalPlaceholder(status: FerruxStatus) {
                 .clickable { uri.openUri("https://github.com/FerraStack/ferrux") }
                 .padding(horizontal = 14.dp, vertical = 6.dp),
         )
+    }
+}
+
+/** Problems grouped by file, VS Code style: icon, message, source(code), [Ln, Col]. */
+@Composable
+private fun ProblemsList(state: WorkbenchState) {
+    val c = LocalWorkbenchColors.current
+    val byFile = state.diagnostics.filterValues { it.isNotEmpty() }.toSortedMap()
+    if (byFile.isEmpty()) {
+        Text("No problems have been detected in the workspace.", color = c.descriptionForeground, fontSize = 13.sp)
+        return
+    }
+    LazyColumn(Modifier.fillMaxSize()) {
+        byFile.forEach { (path, list) ->
+            val rel = path.removePrefix(state.backend.root).trimStart('/')
+            item(key = "f:$path") {
+                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                    FileIcon(rel.substringAfterLast('/'))
+                    Spacer(Modifier.width(4.dp))
+                    Text(rel.substringAfterLast('/'), color = c.editorForeground, fontSize = 13.sp)
+                    Spacer(Modifier.width(6.dp))
+                    Text(rel.substringBeforeLast('/', ""), color = c.descriptionForeground, fontSize = 12.sp, modifier = Modifier.weight(1f, fill = false))
+                    Spacer(Modifier.width(6.dp))
+                    CountBadge(list.size)
+                }
+            }
+            items(list.sortedWith(compareBy({ it.line }, { it.startColumn })), key = { "d:$path:${it.line}:${it.startColumn}:${it.message}" }) { d ->
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clickable { state.openFile(path, preview = true, line = d.line) }
+                        .padding(start = 22.dp, top = 3.dp, bottom = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        when (d.severity) { 1 -> Icons.Outlined.ErrorOutline; 2 -> Icons.Outlined.WarningAmber; else -> Icons.Outlined.Info },
+                        null,
+                        tint = when (d.severity) { 1 -> c.errorSquiggle; 2 -> c.warningSquiggle; else -> c.infoSquiggle },
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        buildString {
+                            append(d.message)
+                            d.source?.let { append("  $it") }
+                            d.code?.let { append("($it)") }
+                        },
+                        color = c.editorForeground,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("[Ln ${d.line + 1}, Col ${d.startColumn + 1}]", color = c.descriptionForeground, fontSize = 12.sp)
+                }
+            }
+        }
     }
 }

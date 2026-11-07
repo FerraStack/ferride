@@ -28,7 +28,7 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
     }
 
     private fun replaceForIme(text: CharSequence, newCursorPosition: Int, composing: Boolean): Boolean {
-        val m = view.model ?: return false
+        val m = view.liveModel ?: return false
         val sel = m.selection
         val (start, end) = view.composingRange() ?: (sel.start to sel.end)
         val s = text.toString()
@@ -39,8 +39,8 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
             view.afterEdit(fromIme = true)
             return true
         }
-        m.replace(start, end, s, true)
-        val newEnd = start + s.length
+        // The core may normalize line endings, so use the end it reports.
+        val newEnd = m.replace(start, end, s, true)
         if (composing && s.isNotEmpty()) view.setComposing(start, newEnd) else view.clearComposing()
         val cursor = if (newCursorPosition > 0) newEnd + newCursorPosition - 1 else start + newCursorPosition
         m.selection = Sel.caret(cursor.coerceIn(0, m.length))
@@ -55,7 +55,7 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
         replaceForIme(text, newCursorPosition, composing = true)
 
     override fun setComposingRegion(start: Int, end: Int): Boolean {
-        val m = view.model ?: return false
+        val m = view.liveModel ?: return false
         val a = minOf(start, end).coerceIn(0, m.length)
         val b = maxOf(start, end).coerceIn(0, m.length)
         if (a == b) view.clearComposing() else view.setComposing(a, b)
@@ -70,7 +70,7 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
     }
 
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-        val m = view.model ?: return false
+        val m = view.liveModel ?: return false
         val sel = m.selection
         // After first, so the "before" offsets stay valid.
         if (afterLength > 0) m.replace(sel.end, minOf(m.length, sel.end + afterLength), "", true)
@@ -81,7 +81,7 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
     }
 
     override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean {
-        val m = view.model ?: return false
+        val m = view.liveModel ?: return false
         val sel = m.selection
         val before = m.textRange(maxOf(0, sel.start - beforeLength * 2), sel.start)
         val after = m.textRange(sel.end, minOf(m.length, sel.end + afterLength * 2))
@@ -105,25 +105,25 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
     }
 
     override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence {
-        val m = view.model ?: return ""
+        val m = view.liveModel ?: return ""
         val s = m.selection.start
         return m.textRange(maxOf(0, s - n), s)
     }
 
     override fun getTextAfterCursor(n: Int, flags: Int): CharSequence {
-        val m = view.model ?: return ""
+        val m = view.liveModel ?: return ""
         val e = m.selection.end
         return m.textRange(e, minOf(m.length, e + n))
     }
 
     override fun getSelectedText(flags: Int): CharSequence? {
-        val m = view.model ?: return null
+        val m = view.liveModel ?: return null
         val s = m.selection
         return if (s.isEmpty) null else m.textRange(s.start, s.end)
     }
 
     override fun setSelection(start: Int, end: Int): Boolean {
-        val m = view.model ?: return false
+        val m = view.liveModel ?: return false
         m.selection = Sel(start.coerceIn(0, m.length), end.coerceIn(0, m.length))
         view.afterSelectionChange(fromIme = true)
         return true
@@ -139,7 +139,7 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
     }
 
     override fun performEditorAction(actionCode: Int): Boolean {
-        view.model?.newline() ?: return false
+        view.liveModel?.newline() ?: return false
         view.afterEdit(fromIme = true)
         return true
     }

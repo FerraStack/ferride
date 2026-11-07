@@ -44,8 +44,12 @@ interface EditorModel {
     fun textRange(start: Int, end: Int): String
     fun wordAt(offset: Int): Sel
 
-    /** Replaces [start]..[end]; `typing` edits are coalesced for undo. */
-    fun replace(start: Int, end: Int, text: String, typing: Boolean)
+    /**
+     * Replaces [start]..[end]; `typing` edits are coalesced for undo. Returns
+     * where the inserted text ends (it may differ from `start + text.length`:
+     * line endings are normalized to the file's and CRLF pairs are never split).
+     */
+    fun replace(start: Int, end: Int, text: String, typing: Boolean): Int
     /** Types at every selection (multi-cursor ready). */
     fun insert(text: String, typing: Boolean)
     /** Newline with auto-indent. */
@@ -55,8 +59,12 @@ interface EditorModel {
     fun undo(): Boolean
     fun redo(): Boolean
     fun sealUndoGroup()
-    fun markSaved()
-    fun close() {}
+    /** Marks [version] (captured before an async write) as saved. */
+    fun markSaved(version: Long = this.version)
+    /** True after [close]; a closed model must not be touched. */
+    val isClosed: Boolean
+    /** Frees the underlying document. Idempotent. */
+    fun close()
 }
 
 class RustEditorModel(private val doc: Document, override val fileName: String) : EditorModel {
@@ -81,9 +89,8 @@ class RustEditorModel(private val doc: Document, override val fileName: String) 
     override fun textRange(start: Int, end: Int): String = doc.textRange(start, end)
     override fun wordAt(offset: Int): Sel = doc.wordAt(offset).let { Sel(it.anchor, it.head) }
 
-    override fun replace(start: Int, end: Int, text: String, typing: Boolean) {
-        doc.replace(start, end, text, typing)
-    }
+    override fun replace(start: Int, end: Int, text: String, typing: Boolean): Int =
+        doc.replace(start, end, text, typing).end
 
     override fun insert(text: String, typing: Boolean) {
         doc.insert(text, typing)
@@ -104,8 +111,16 @@ class RustEditorModel(private val doc: Document, override val fileName: String) 
     override fun undo(): Boolean = doc.undo().changed
     override fun redo(): Boolean = doc.redo().changed
     override fun sealUndoGroup() = doc.sealUndoGroup()
-    override fun markSaved() = doc.markSaved()
-    override fun close() = doc.close()
+    override fun markSaved(version: Long) = doc.markSavedVersion(version)
+
+    override var isClosed: Boolean = false
+        private set
+
+    override fun close() {
+        if (isClosed) return
+        isClosed = true
+        doc.close()
+    }
 
     companion object {
         fun create(text: String, fileName: String): RustEditorModel =

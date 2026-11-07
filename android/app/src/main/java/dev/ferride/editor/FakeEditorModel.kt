@@ -1,5 +1,6 @@
 package dev.ferride.editor
 
+import dev.ferride.core.BracketMark
 import dev.ferride.core.StyleKind
 import dev.ferride.core.StyleSpan
 import dev.ferride.core.ViewLine
@@ -11,6 +12,19 @@ import dev.ferride.core.ViewLine
  */
 class FakeEditorModel(text: String, override val fileName: String) : EditorModel {
     private val sb = StringBuilder(text)
+
+    override var isClosed: Boolean = false
+        private set
+
+    /** Like a freed native document: any use after [close] is a bug. */
+    private fun live(): StringBuilder {
+        check(!isClosed) { "FakeEditorModel($fileName) used after close()" }
+        return sb
+    }
+
+    override fun close() {
+        isClosed = true
+    }
     private val undoStack = ArrayDeque<Pair<String, Sel>>()
     private val redoStack = ArrayDeque<Pair<String, Sel>>()
     private var savedVersion = 0L
@@ -23,15 +37,16 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
             field = Sel(value.anchor.coerceIn(0, length), value.head.coerceIn(0, length))
         }
 
-    override val lineCount: Int get() = sb.count { it == '\n' } + 1
-    override val length: Int get() = sb.length
+    override val lineCount: Int get() = live().count { it == '\n' } + 1
+    override val length: Int get() = live().length
     override val isDirty: Boolean get() = version != savedVersion
     override val canUndo: Boolean get() = undoStack.isNotEmpty()
     override val canRedo: Boolean get() = redoStack.isNotEmpty()
 
-    override fun text(): String = sb.toString()
+    override fun text(): String = live().toString()
 
     override fun lineStart(line: Int): Int {
+        live()
         if (line <= 0) return 0
         var l = 0
         for (i in sb.indices) {
@@ -50,6 +65,7 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
     }
 
     override fun lineOfOffset(offset: Int): Int {
+        live()
         val o = offset.coerceIn(0, sb.length)
         var line = 0
         for (i in 0 until o) if (sb[i] == '\n') line++
@@ -77,14 +93,33 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
     }
 
     override fun viewport(firstLine: Int, count: Int): List<ViewLine> {
-        val lines = sb.toString().split('\n')
+        val lines = live().toString().split('\n')
         val end = minOf(lines.size, firstLine + count)
         if (firstLine >= end) return emptyList()
         var offset = lines.take(firstLine).sumOf { it.length + 1 }
+        // Bracket depth: naive count from the top (fine for previews/tests).
+        var depth = 0
+        lines.take(firstLine).forEach { l -> depth = bracketsOf(l, highlight(l), depth).second }
         return (firstLine until end).map { i ->
             val text = lines[i]
-            ViewLine(i, text, offset, highlight(text)).also { offset += text.length + 1 }
+            val spans = highlight(text)
+            val (marks, after) = bracketsOf(text, spans, depth)
+            depth = after
+            ViewLine(i, text, offset, spans, marks).also { offset += text.length + 1 }
         }
+    }
+
+    private fun bracketsOf(text: String, spans: List<StyleSpan>, depthIn: Int): Pair<List<BracketMark>, Int> {
+        var depth = depthIn
+        val marks = mutableListOf<BracketMark>()
+        text.forEachIndexed { i, c ->
+            if (spans.any { (it.kind == StyleKind.STRING || it.kind == StyleKind.COMMENT) && i >= it.start && i < it.end }) return@forEachIndexed
+            when (c) {
+                '(', '[', '{' -> { marks += BracketMark(i, depth); depth++ }
+                ')', ']', '}' -> { depth = maxOf(0, depth - 1); marks += BracketMark(i, depth) }
+            }
+        }
+        return marks to depth
     }
 
     private fun snapshot() {
@@ -92,16 +127,20 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
         redoStack.clear()
     }
 
-    override fun replace(start: Int, end: Int, text: String, typing: Boolean) {
+    override fun replace(start: Int, end: Int, text: String, typing: Boolean): Int {
+        live()
         val a = minOf(start, end).coerceIn(0, sb.length)
         val b = maxOf(start, end).coerceIn(0, sb.length)
         snapshot()
         sb.replace(a, b, text)
         version++
         selection = Sel.caret(a + text.length)
+        return a + text.length
     }
 
-    override fun insert(text: String, typing: Boolean) = replace(selection.start, selection.end, text, typing)
+    override fun insert(text: String, typing: Boolean) {
+        replace(selection.start, selection.end, text, typing)
+    }
 
     override fun newline() {
         val line = lineOfOffset(selection.start)
@@ -141,9 +180,12 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
         return true
     }
 
-    override fun sealUndoGroup() {}
+    override fun sealUndoGroup() {
+        live()
+    }
 
-    override fun markSaved() {
+    override fun markSaved(version: Long) {
+        live()
         savedVersion = version
     }
 

@@ -71,6 +71,12 @@ object VsCodeTheme {
             editorLineNumberActive = col("editorLineNumber.activeForeground", base.editorLineNumberActive),
             editorIndentGuide = col("editorIndentGuide.background1", col("editorIndentGuide.background", base.editorIndentGuide)),
             editorWhitespace = col("editorWhitespace.foreground", base.editorWhitespace),
+            findMatchBackground = col("editor.findMatchHighlightBackground", base.findMatchBackground),
+            findMatchCurrentBackground = col("editor.findMatchBackground", base.findMatchCurrentBackground),
+            errorSquiggle = col("editorError.foreground", base.errorSquiggle),
+            warningSquiggle = col("editorWarning.foreground", base.warningSquiggle),
+            infoSquiggle = col("editorInfo.foreground", base.infoSquiggle),
+            scrollbarSlider = col("scrollbarSlider.background", base.scrollbarSlider),
             editorGroupHeaderBackground = col("editorGroupHeader.tabsBackground", base.editorGroupHeaderBackground),
             tabActiveBackground = col("tab.activeBackground", base.tabActiveBackground),
             tabInactiveBackground = col("tab.inactiveBackground", base.tabInactiveBackground),
@@ -158,34 +164,6 @@ object VsCodeTheme {
         return Color((a shl 24) or rgb)
     }
 
-    /** Removes `//` and `/* */` comments and trailing commas (JSONC). */
-    fun stripJsonc(src: String): String {
-        val out = StringBuilder(src.length)
-        var i = 0
-        var inString = false
-        while (i < src.length) {
-            val c = src[i]
-            if (inString) {
-                out.append(c)
-                if (c == '\\' && i + 1 < src.length) {
-                    out.append(src[i + 1])
-                    i += 2
-                    continue
-                }
-                if (c == '"') inString = false
-                i++
-                continue
-            }
-            when {
-                c == '"' -> { inString = true; out.append(c); i++ }
-                c == '/' && src.getOrNull(i + 1) == '/' -> { while (i < src.length && src[i] != '\n') i++ }
-                c == '/' && src.getOrNull(i + 1) == '*' -> {
-                    val end = src.indexOf("*/", i + 2)
-                    i = if (end < 0) src.length else end + 2
-                }
-                else -> { out.append(c); i++ }
-            }
-        }
-        return out.toString().replace(Regex(",(\\s*[}\\]])"), "$1")
-    }
+    /** Removes comments and trailing commas (JSONC) with a real tokenizer. */
+    fun stripJsonc(src: String): String = dev.ferride.workbench.Jsonc.strip(src)
 }

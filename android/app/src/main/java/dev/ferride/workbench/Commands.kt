@@ -56,6 +56,8 @@ data class Command(
     val enabled: () -> Boolean = { true },
     /** False for alternate bindings of another command (kept out of the palette). */
     val inPalette: Boolean = true,
+    /** The keybinding only applies while the editor has focus (VS Code's `when: editorTextFocus`). */
+    val keyWhenEditorFocus: Boolean = false,
     val run: () -> Unit,
 ) {
     /** What the palette shows: `File: Save`. */
@@ -82,9 +84,11 @@ class CommandRegistry {
     }
 
     /** Finds the command bound to a key-down event (hardware keyboards). */
-    fun forKey(event: KeyEvent): Command? =
+    fun forKey(event: KeyEvent, editorFocused: Boolean = true): Command? =
         if (event.action != KeyEvent.ACTION_DOWN) null
-        else commands.values.firstOrNull { it.keybinding?.matches(event) == true }
+        else commands.values.firstOrNull {
+            it.keybinding?.matches(event) == true && (!it.keyWhenEditorFocus || editorFocused)
+        }
 
     /** Palette filtering: fuzzy match on the label, best first. */
     fun search(query: String): List<Command> {
@@ -125,6 +129,20 @@ fun fuzzyScore(query: String, text: String): Int? {
     return score - text.length / 8
 }
 
+/** Char indices of [text] matched by [query] (same greedy walk as [fuzzyScore]). */
+fun fuzzyPositions(query: String, text: String): List<Int> {
+    val out = mutableListOf<Int>()
+    var ti = 0
+    for (qc in query) {
+        if (qc == ' ') continue
+        while (ti < text.length && !text[ti].equals(qc, ignoreCase = true)) ti++
+        if (ti >= text.length) return emptyList()
+        out += ti
+        ti++
+    }
+    return out
+}
+
 /** Well-known command ids (VS Code names where one exists). */
 object CommandIds {
     const val SHOW_COMMANDS = "workbench.action.showCommands"
@@ -147,6 +165,11 @@ object CommandIds {
     const val VIEW_OUTPUT = "workbench.action.output.toggleOutput"
     const val TOGGLE_TERMINAL = "workbench.action.terminal.toggleTerminal"
     const val OPEN_SETTINGS = "workbench.action.openSettings"
+    const val OPEN_SETTINGS_JSON = "workbench.action.openSettingsJson"
+    const val REPLACE = "editor.action.startFindReplaceAction"
+    const val FIND_NEXT = "editor.action.nextMatchFindAction"
+    const val FIND_PREVIOUS = "editor.action.previousMatchFindAction"
+    const val TOGGLE_WORD_WRAP = "editor.action.toggleWordWrap"
     const val TOGGLE_THEME = "workbench.action.toggleLightDarkThemes"
     const val UNDO = "undo"
     const val REDO = "redo"

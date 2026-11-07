@@ -59,6 +59,8 @@ class FakeWorkspaceBackend(
     private val files: Map<String, String> = SampleProject.files,
     override val name: String = SampleProject.NAME,
     private val branch: String? = "main",
+    /** Called inside [writeFile] (tests use it to simulate edits during a save). */
+    private val onWrite: (String) -> Unit = {},
 ) : WorkspaceBackend {
     override val root: String = "/sample/$name"
 
@@ -82,7 +84,9 @@ class FakeWorkspaceBackend(
     )
 
     override fun readFile(path: String) = files[rel(path)] ?: error("no such file: $path")
-    override fun writeFile(path: String, contents: String) {}
+    override fun writeFile(path: String, contents: String) {
+        onWrite(path)
+    }
 
     override fun findFiles(query: String, limit: Int) = files.keys
         .mapNotNull { p -> fuzzyScore(query, p)?.let { FileHit("$root/$p", p, it.toLong(), emptyList()) } }

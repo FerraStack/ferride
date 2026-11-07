@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,11 +20,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.DataObject
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
@@ -32,33 +37,73 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.ferride.editor.CodeEditorView
+import dev.ferride.editor.EditorModel
+import dev.ferride.editor.Squiggle
 import dev.ferride.theme.LocalWorkbenchColors
 import dev.ferride.workbench.CommandIds
 import dev.ferride.workbench.EditorTab
+import dev.ferride.workbench.TabKind
 import dev.ferride.workbench.WorkbenchState
 
-/** Tabs, breadcrumbs and the editor (or the welcome page when nothing is open). */
+/** Tabs, breadcrumbs and the editor (or Settings / the welcome page). */
 @Composable
 fun EditorArea(state: WorkbenchState, modifier: Modifier = Modifier) {
     val c = LocalWorkbenchColors.current
     Column(modifier.fillMaxWidth().background(c.editorBackground)) {
         val tab = state.activeTab
         if (state.tabs.isNotEmpty()) TabStrip(state)
-        if (tab == null) {
-            Welcome(state, Modifier.weight(1f))
-        } else {
-            Breadcrumbs(state, tab)
-            AndroidView(
-                factory = { ctx -> CodeEditorView(ctx) },
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                update = { view ->
-                    view.style = editorStyle(c, state.settings)
-                    view.setModel(tab.model)
-                    view.onChange = { changed -> state.onEditorChanged(tab, changed) }
-                    state.editor = view
-                },
-                onRelease = { if (state.editor === it) state.editor = null },
-            )
+        val model = tab?.model?.takeIf { !it.isClosed }
+        when {
+            tab == null -> {
+                Welcome(state, Modifier.weight(1f))
+                SideEffect { state.disposeRetired(null) }
+            }
+            tab.kind == TabKind.Settings -> {
+                SettingsEditor(state, Modifier.weight(1f))
+                SideEffect { state.disposeRetired(null) }
+            }
+            model != null -> {
+                Breadcrumbs(state, tab)
+                CodeEditor(state, tab, model, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel, modifier: Modifier) {
+    val c = LocalWorkbenchColors.current
+    tab.revision // re-read decorations after edits
+    val matches = state.findMatchesInActive()
+    val squiggles = state.diagnostics[tab.path].orEmpty().map { d ->
+        Squiggle(model.offsetAt(d.line, d.startColumn), model.offsetAt(d.endLine, d.endColumn), d.severity)
+    }
+    val style = editorStyle(c, state.settings, state.wordWrap)
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        AndroidView(
+            factory = { ctx -> CodeEditorView(ctx) },
+            modifier = Modifier.fillMaxSize(),
+            update = { view ->
+                view.style = style
+                // Switch to the new model first, then free closed ones (never the reverse).
+                view.setModel(model)
+                state.disposeRetired(model)
+                view.onChange = { changed -> state.onEditorChanged(tab, changed) }
+                view.onFocus = { focused -> state.editorFocused = focused }
+                view.findMatches = matches
+                view.currentMatch = state.find.current
+                view.squiggles = squiggles
+                state.editor = view
+            },
+            onRelease = { view ->
+                if (state.editor === view) state.editor = null
+                view.setModel(null)
+                state.disposeRetired(null)
+                state.editorFocused = false
+            },
+        )
+        if (state.find.visible) {
+            FindWidget(state, matches.size, maxWidth, Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 14.dp))
         }
     }
 }
@@ -70,21 +115,28 @@ private fun TabStrip(state: WorkbenchState) {
     LaunchedEffect(state.activeIndex) {
         if (state.activeIndex >= 0) listState.animateScrollToItem(state.activeIndex)
     }
-    LazyRow(
-        state = listState,
-        modifier = Modifier.fillMaxWidth().height(38.dp).background(c.editorGroupHeaderBackground),
-    ) {
-        itemsIndexed(state.tabs, key = { _, t -> t.path }) { index, tab ->
-            EditorTabItem(state, tab, index == state.activeIndex, onSelect = { state.activeIndex = index }) {
-                state.closeTab(index)
+    val tab = state.activeTab
+    Row(Modifier.fillMaxWidth().height(38.dp).background(c.editorGroupHeaderBackground)) {
+        LazyRow(state = listState, modifier = Modifier.weight(1f).fillMaxHeight()) {
+            itemsIndexed(state.tabs, key = { _, t -> t.path }) { index, t ->
+                EditorTabItem(t, index == state.activeIndex, onSelect = { state.activeIndex = index }) {
+                    state.requestCloseTab(index)
+                }
+            }
+        }
+        // Editor title actions (VS Code shows these at the right of the tab bar).
+        if (tab?.kind == TabKind.Settings) {
+            BarIcon(Icons.Outlined.DataObject, "Open Settings (JSON)", c.tabActiveForeground, size = 38.dp, iconSize = 18.dp) {
+                state.commands.execute(CommandIds.OPEN_SETTINGS_JSON)
             }
         }
     }
 }
 
 @Composable
-private fun EditorTabItem(state: WorkbenchState, tab: EditorTab, active: Boolean, onSelect: () -> Unit, onClose: () -> Unit) {
+private fun EditorTabItem(tab: EditorTab, active: Boolean, onSelect: () -> Unit, onClose: () -> Unit) {
     val c = LocalWorkbenchColors.current
+    val fg = if (active) c.tabActiveForeground else c.tabInactiveForeground
     Box(
         Modifier
             .fillMaxHeight()
@@ -94,29 +146,28 @@ private fun EditorTabItem(state: WorkbenchState, tab: EditorTab, active: Boolean
                 onSelect()
             }),
     ) {
-        Row(
-            Modifier.fillMaxHeight().padding(start = 10.dp, end = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FileIcon(tab.name)
+        Row(Modifier.fillMaxHeight().padding(start = 10.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (tab.kind == TabKind.Settings) {
+                Icon(Icons.Outlined.Settings, null, tint = fg, modifier = Modifier.size(16.dp))
+            } else {
+                FileIcon(tab.name)
+            }
             Spacer(Modifier.width(4.dp))
             Text(
                 tab.name,
-                color = if (active) c.tabActiveForeground else c.tabInactiveForeground,
+                color = fg,
                 fontSize = 13.sp,
                 fontStyle = if (tab.preview) FontStyle.Italic else FontStyle.Normal,
                 maxLines = 1,
             )
-            Box(Modifier.size(32.dp).clickable(onClickLabel = "Close ${tab.name}", onClick = onClose), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(32.dp).clickable(onClickLabel = "Close ${tab.name}", onClick = onClose),
+                contentAlignment = Alignment.Center,
+            ) {
                 if (tab.dirty) {
-                    Box(Modifier.size(9.dp).background(if (active) c.tabActiveForeground else c.tabInactiveForeground, CircleShape))
+                    Box(Modifier.size(9.dp).background(fg, CircleShape))
                 } else {
-                    androidx.compose.material3.Icon(
-                        Icons.Default.Close,
-                        "Close",
-                        tint = if (active) c.tabActiveForeground else c.tabInactiveForeground,
-                        modifier = Modifier.size(15.dp),
-                    )
+                    Icon(Icons.Default.Close, "Close", tint = fg, modifier = Modifier.size(15.dp))
                 }
             }
         }
@@ -128,24 +179,16 @@ private fun EditorTabItem(state: WorkbenchState, tab: EditorTab, active: Boolean
 @Composable
 private fun Breadcrumbs(state: WorkbenchState, tab: EditorTab) {
     val c = LocalWorkbenchColors.current
-    val rel = tab.path.removePrefix(state.backend.root).trimStart('/')
-    val parts = listOf(state.backend.name) + rel.split('/')
-    Row(
-        Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    val parts = when (tab.kind) {
+        TabKind.SettingsJson -> listOf("User", "settings.json")
+        else -> listOf(state.backend.name) + tab.path.removePrefix(state.backend.root).trimStart('/').split('/')
+    }
+    Row(Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         parts.forEachIndexed { i, p ->
-            if (i == parts.lastIndex) {
-                FileIcon(p)
-            }
+            if (i == parts.lastIndex) FileIcon(p)
             Text(p, color = c.breadcrumbForeground, fontSize = 12.sp, maxLines = 1)
             if (i < parts.lastIndex) {
-                androidx.compose.material3.Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    null,
-                    tint = c.breadcrumbForeground,
-                    modifier = Modifier.size(14.dp),
-                )
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.breadcrumbForeground, modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -154,10 +197,7 @@ private fun Breadcrumbs(state: WorkbenchState, tab: EditorTab) {
 @Composable
 private fun Welcome(state: WorkbenchState, modifier: Modifier) {
     val c = LocalWorkbenchColors.current
-    Column(
-        modifier.fillMaxSize().padding(28.dp),
-        verticalArrangement = Arrangement.Center,
-    ) {
+    Column(modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.Center) {
         Text("Ferride", color = c.editorForeground, fontSize = 34.sp, fontWeight = FontWeight.Light)
         Text("A code editor for your phone", color = c.descriptionForeground, fontSize = 16.sp)
         Spacer(Modifier.height(28.dp))
