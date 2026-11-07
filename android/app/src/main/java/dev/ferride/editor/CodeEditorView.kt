@@ -799,7 +799,11 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val handleRadius get() = 11f * density
     private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val magnifier: Magnifier? by lazy { runCatching { Magnifier.Builder(this).build() }.getOrNull() }
+    /** The platform magnifier while dragging a handle (off in JVM tests, which have no window surface). */
+    internal var magnifierEnabled = true
+    private val magnifier: Magnifier? by lazy {
+        if (magnifierEnabled) runCatching { Magnifier.Builder(this).build() }.getOrNull() else null
+    }
 
     private val hideCaretHandle = Runnable {
         if (handlesShown && !toolbarShown && dragHandle == null && liveModel?.selection?.isEmpty != false) {

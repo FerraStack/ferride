@@ -30,7 +30,7 @@ class SelectionHandlesTest {
     @Before
     fun setUp() {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
-        view = CodeEditorView(activity)
+        view = CodeEditorView(activity).apply { magnifierEnabled = false }
         model = FakeEditorModel(text, "main.rs")
         view.setModel(model)
         view.onSelectionUi = { ui = it }
