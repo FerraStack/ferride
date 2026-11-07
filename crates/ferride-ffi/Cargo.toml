@@ -1,0 +1,38 @@
+[package]
+name = "ferride-ffi"
+description = "UniFFI bindings exposing the Ferride core to Kotlin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "ferride_ffi"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+ferride-buffer.workspace = true
+ferride-syntax.workspace = true
+ferride-lsp.workspace = true
+ferride-workspace.workspace = true
+ferride-host.workspace = true
+lsp-types.workspace = true
+thiserror.workspace = true
+uniffi.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
