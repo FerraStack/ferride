@@ -88,25 +88,29 @@ pub struct LineSpan {
     pub kind: HighlightKind,
 }
 
-/// Runs the highlight query over `range` and flattens nested captures.
+/// Runs the highlight query over `window` and paints the captures into
+/// `paint` (`paint[0]` is the byte at `window.start`), flattening nested
+/// captures.
 ///
 /// Precedence: an inner (narrower) node wins over the node containing it,
 /// and for the same node the pattern that appears *later* in the query wins
 /// (so a generic `(identifier) @variable` at the top of a query is refined
 /// by more specific patterns below it), unless the language's query is
-/// written the other way round ([`LanguageConfig::first_wins`]).
-pub(crate) fn highlight(
+/// written the other way round ([`LanguageConfig::first_wins`]). A `@none`
+/// capture paints plain text over its node; other captures without a
+/// highlight class are ignored.
+pub(crate) fn paint(
     config: &LanguageConfig,
     tree: &Tree,
     rope: &Rope,
-    range: Range<usize>,
-) -> Vec<HighlightSpan> {
-    let range = range.start.min(rope.len_bytes())..range.end.min(rope.len_bytes());
-    if range.is_empty() {
-        return Vec::new();
+    window: Range<usize>,
+    paint: &mut [HighlightKind],
+) {
+    if window.is_empty() {
+        return;
     }
     let mut cursor = QueryCursor::new();
-    cursor.set_byte_range(range.clone());
+    cursor.set_byte_range(window.clone());
     let text = |node: Node| {
         let r = node.byte_range();
         rope.byte_slice(r.start.min(rope.len_bytes())..r.end.min(rope.len_bytes()))
@@ -119,12 +123,11 @@ pub(crate) fn highlight(
     let mut it = cursor.captures(&config.query, tree.root_node(), text);
     while let Some((m, idx)) = it.next() {
         let cap = m.captures()[*idx];
-        let kind = config.kinds[cap.index as usize];
-        if kind == HighlightKind::Plain {
+        let Some(kind) = config.kinds[cap.index as usize] else {
             continue;
-        }
+        };
         let r = cap.node.byte_range();
-        let (start, end) = (r.start.max(range.start), r.end.min(range.end));
+        let (start, end) = (r.start.max(window.start), r.end.min(window.end));
         if start < end {
             caps.push((start, end, m.pattern_index, kind));
         }
@@ -139,12 +142,13 @@ pub(crate) fn highlight(
         };
         a.0.cmp(&b.0).then(b.1.cmp(&a.1)).then(by_pattern)
     });
-
-    let mut paint: Vec<HighlightKind> = vec![HighlightKind::Plain; range.len()];
     for (start, end, _, kind) in caps {
-        paint[start - range.start..end - range.start].fill(kind);
+        paint[start - window.start..end - window.start].fill(kind);
     }
+}
 
+/// Merges a painted window into spans (unhighlighted gaps omitted).
+pub(crate) fn spans(paint: &[HighlightKind], window_start: usize) -> Vec<HighlightSpan> {
     let mut spans: Vec<HighlightSpan> = Vec::new();
     let mut i = 0;
     while i < paint.len() {
@@ -155,8 +159,8 @@ pub(crate) fn highlight(
         }
         if kind != HighlightKind::Plain {
             spans.push(HighlightSpan {
-                start_byte: range.start + i,
-                end_byte: range.start + j,
+                start_byte: window_start + i,
+                end_byte: window_start + j,
                 kind,
             });
         }

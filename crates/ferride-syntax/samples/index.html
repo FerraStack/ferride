@@ -2,9 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Word Counter</title>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    .app { max-width: 40rem; margin: 0 auto; }
+    #count:hover { color: #0078d4; }
+  </style>
 </head>
 <body>
   <!-- Paste some text and press Count. -->
@@ -14,6 +16,9 @@
     <button type="button" id="count" disabled>Count &amp; sort</button>
     <ol id="results"></ol>
   </main>
-  <script src="app.js" defer></script>
+  <script>
+    const button = document.getElementById("count");
+    button.addEventListener("click", () => console.log(42));
+  </script>
 </body>
 </html>

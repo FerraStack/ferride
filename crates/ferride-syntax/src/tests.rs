@@ -254,3 +254,104 @@ fn parse_budget_degrades_gracefully() {
     syn.update_with_budget(buf.rope(), &edits, big);
     assert!(!syn.is_stale());
 }
+
+#[test]
+fn markdown_inline_is_injected_into_paragraphs_and_headings() {
+    let buf = Buffer::new("# The *big* title\n\nSome **bold**, `code` and [a link](https://x.dev).\n");
+    let syn = Syntax::new(LanguageId::Markdown, buf.rope());
+    assert_eq!(kind_at(&syn, &buf, "The"), HighlightKind::Heading);
+    assert_eq!(kind_at(&syn, &buf, "big"), HighlightKind::Emphasis);
+    assert_eq!(kind_at(&syn, &buf, "bold"), HighlightKind::Emphasis);
+    assert_eq!(kind_at(&syn, &buf, "code"), HighlightKind::String);
+    assert_eq!(kind_at(&syn, &buf, "a link"), HighlightKind::Link);
+    assert_eq!(kind_at(&syn, &buf, "https"), HighlightKind::Link);
+    assert_eq!(kind_at(&syn, &buf, "Some"), HighlightKind::Plain);
+}
+
+#[test]
+fn fenced_code_uses_the_info_string_language() {
+    let text =
+        "```py\ndef f(): return 'a'\n```\n\n> ```rs\n> let x = 1;\n> ```\n\n```nosuchlang\nlet y\n```\n";
+    let buf = Buffer::new(text);
+    let syn = Syntax::new(LanguageId::Markdown, buf.rope());
+    assert_eq!(kind_at(&syn, &buf, "def"), HighlightKind::Keyword);
+    assert_eq!(kind_at(&syn, &buf, "'a'"), HighlightKind::String);
+    // Plain embedded tokens don't keep the block's literal color.
+    assert_eq!(kind_at(&syn, &buf, "f()"), HighlightKind::Function);
+    // Inside a block quote the `> ` markers are cut out of the Rust source.
+    assert_eq!(kind_at(&syn, &buf, "let x"), HighlightKind::Keyword);
+    assert_eq!(kind_at(&syn, &buf, "1;"), HighlightKind::Constant);
+    // Unknown language: the content is plain (upstream's `@none`), fences are punctuation.
+    assert_eq!(kind_at(&syn, &buf, "let y"), HighlightKind::Plain);
+    assert_eq!(kind_at(&syn, &buf, "```nosuchlang"), HighlightKind::Punctuation);
+}
+
+#[test]
+fn html_script_style_and_nested_templates() {
+    let text = "<style>a { color: red; }</style>\n<script>\nconst q = sql`SELECT 1`;\n</script>\n";
+    let buf = Buffer::new(text);
+    let syn = Syntax::new(LanguageId::Html, buf.rope());
+    assert_eq!(kind_at(&syn, &buf, "color"), HighlightKind::Property);
+    assert_eq!(kind_at(&syn, &buf, "const"), HighlightKind::Keyword);
+    // HTML → JavaScript → SQL (depth 2).
+    assert_eq!(kind_at(&syn, &buf, "SELECT"), HighlightKind::Keyword);
+    assert_eq!(kind_at(&syn, &buf, "style"), HighlightKind::Tag);
+}
+
+#[test]
+fn injections_follow_edits() {
+    let mut buf = Buffer::new("Text\n\n```rust\nlet a = 1;\n```\n");
+    let mut syn = Syntax::new(LanguageId::Markdown, buf.rope());
+    assert_eq!(kind_at(&syn, &buf, "let"), HighlightKind::Keyword);
+    // Change the fence language: the cached Rust tree must not be reused.
+    let at = buf.text().find("rust").unwrap();
+    let edits = buf
+        .apply(vec![Edit::new(at..at + 4, "python")], EditKind::Other)
+        .unwrap();
+    syn.update(buf.rope(), &edits);
+    assert_eq!(kind_at(&syn, &buf, "let"), HighlightKind::Variable);
+    // Emphasis typed into the paragraph shows up.
+    let edits = buf
+        .apply(vec![Edit::new(0..4, "*Text*")], EditKind::Other)
+        .unwrap();
+    syn.update(buf.rope(), &edits);
+    assert_eq!(kind_at(&syn, &buf, "Text"), HighlightKind::Emphasis);
+}
+
+#[test]
+fn injection_language_names() {
+    use LanguageId as L;
+    for (name, lang) in [
+        ("rust", Some(L::Rust)),
+        ("rs", Some(L::Rust)),
+        ("sh", Some(L::Bash)),
+        ("Shell", Some(L::Bash)),
+        ("c++", Some(L::Cpp)),
+        ("yml", Some(L::Yaml)),
+        ("postgresql", Some(L::Sql)),
+        ("html", Some(L::Html)),
+        ("markdown_inline", Some(L::MarkdownInline)),
+        ("regex", None),
+        ("jsdoc", None),
+    ] {
+        assert_eq!(L::from_injection_name(name), lang, "{name}");
+    }
+    // Injection-only grammars aren't user-selectable languages.
+    assert!(!L::ALL.contains(&L::MarkdownInline));
+    assert_eq!(L::from_name("markdown_inline"), None);
+}
+
+#[test]
+fn injections_are_parsed_for_the_viewport_only() {
+    // 10k paragraphs; highlighting 40 lines parses only the visible ones.
+    let text = "Some *text* here.\n\n".repeat(10_000);
+    let buf = Buffer::new(&text);
+    let syn = Syntax::new(LanguageId::Markdown, buf.rope());
+    let lines = syn.line_spans(&buf, 5_000..5_040);
+    assert!(lines[0].iter().any(|s| s.kind == HighlightKind::Emphasis));
+    assert!(
+        syn.injections.borrow().len() <= 21,
+        "{:?}",
+        syn.injections.borrow()
+    );
+}

@@ -17,53 +17,71 @@
      |   attribute    "charset"
      |   string       "utf-8"
      |   punctuation  ">"
-   5 |   <meta name="viewport" content="width=device-width, initial-scale=1">
-     |   punctuation  "<"
-     |   tag          "meta"
-     |   attribute    "name"
-     |   string       "viewport"
-     |   attribute    "content"
-     |   string       "width=device-width, initial-scale=1"
-     |   punctuation  ">"
-   6 |   <title>Word Counter</title>
+   5 |   <title>Word Counter</title>
      |   punctuation  "<"
      |   tag          "title"
      |   punctuation  ">"
      |   punctuation  "</"
      |   tag          "title"
      |   punctuation  ">"
-   7 |   <link rel="stylesheet" href="style.css">
+   6 |   <style>
      |   punctuation  "<"
-     |   tag          "link"
-     |   attribute    "rel"
-     |   string       "stylesheet"
-     |   attribute    "href"
-     |   string       "style.css"
+     |   tag          "style"
      |   punctuation  ">"
-   8 | </head>
+   7 |     .app { max-width: 40rem; margin: 0 auto; }
+     |   punctuation  "."
+     |   attribute    "app"
+     |   punctuation  "{"
+     |   property     "max-width"
+     |   punctuation  ":"
+     |   number       "40"
+     |   type         "rem"
+     |   punctuation  ";"
+     |   property     "margin"
+     |   punctuation  ":"
+     |   number       "0"
+     |   punctuation  ";"
+     |   punctuation  "}"
+   8 |     #count:hover { color: #0078d4; }
+     |   punctuation  "#"
+     |   attribute    "count"
+     |   punctuation  ":"
+     |   attribute    "hover"
+     |   punctuation  "{"
+     |   property     "color"
+     |   punctuation  ":"
+     |   punctuation  "#"
+     |   string       "0078d4"
+     |   punctuation  ";"
+     |   punctuation  "}"
+   9 |   </style>
+     |   punctuation  "</"
+     |   tag          "style"
+     |   punctuation  ">"
+  10 | </head>
      |   punctuation  "</"
      |   tag          "head"
      |   punctuation  ">"
-   9 | <body>
+  11 | <body>
      |   punctuation  "<"
      |   tag          "body"
      |   punctuation  ">"
-  10 |   <!-- Paste some text and press Count. -->
+  12 |   <!-- Paste some text and press Count. -->
      |   comment      "<!-- Paste some text and press Count. -->"
-  11 |   <main class="app">
+  13 |   <main class="app">
      |   punctuation  "<"
      |   tag          "main"
      |   attribute    "class"
      |   string       "app"
      |   punctuation  ">"
-  12 |     <h1>Word Counter</h1>
+  14 |     <h1>Word Counter</h1>
      |   punctuation  "<"
      |   tag          "h1"
      |   punctuation  ">"
      |   punctuation  "</"
      |   tag          "h1"
      |   punctuation  ">"
-  13 |     <textarea id="input" rows="8" placeholder="Paste text here"></textarea>
+  15 |     <textarea id="input" rows="8" placeholder="Paste text here"></textarea>
      |   punctuation  "<"
      |   tag          "textarea"
      |   attribute    "id"
@@ -75,7 +93,7 @@
      |   punctuation  "></"
      |   tag          "textarea"
      |   punctuation  ">"
-  14 |     <button type="button" id="count" disabled>Count &amp; sort</button>
+  16 |     <button type="button" id="count" disabled>Count &amp; sort</button>
      |   punctuation  "<"
      |   tag          "button"
      |   attribute    "type"
@@ -87,7 +105,7 @@
      |   punctuation  "</"
      |   tag          "button"
      |   punctuation  ">"
-  15 |     <ol id="results"></ol>
+  17 |     <ol id="results"></ol>
      |   punctuation  "<"
      |   tag          "ol"
      |   attribute    "id"
@@ -95,24 +113,48 @@
      |   punctuation  "></"
      |   tag          "ol"
      |   punctuation  ">"
-  16 |   </main>
+  18 |   </main>
      |   punctuation  "</"
      |   tag          "main"
      |   punctuation  ">"
-  17 |   <script src="app.js" defer></script>
+  19 |   <script>
      |   punctuation  "<"
      |   tag          "script"
-     |   attribute    "src"
-     |   string       "app.js"
-     |   attribute    "defer"
-     |   punctuation  "></"
+     |   punctuation  ">"
+  20 |     const button = document.getElementById("count");
+     |   keyword      "const"
+     |   variable     "button"
+     |   operator     "="
+     |   builtin      "document"
+     |   punctuation  "."
+     |   function     "getElementById"
+     |   punctuation  "("
+     |   string       "\"count\""
+     |   punctuation  ");"
+  21 |     button.addEventListener("click", () => console.log(42));
+     |   variable     "button"
+     |   punctuation  "."
+     |   function     "addEventListener"
+     |   punctuation  "("
+     |   string       "\"click\""
+     |   punctuation  ","
+     |   punctuation  "()"
+     |   operator     "=>"
+     |   builtin      "console"
+     |   punctuation  "."
+     |   function     "log"
+     |   punctuation  "("
+     |   number       "42"
+     |   punctuation  "));"
+  22 |   </script>
+     |   punctuation  "</"
      |   tag          "script"
      |   punctuation  ">"
-  18 | </body>
+  23 | </body>
      |   punctuation  "</"
      |   tag          "body"
      |   punctuation  ">"
-  19 | </html>
+  24 | </html>
      |   punctuation  "</"
      |   tag          "html"
      |   punctuation  ">"

@@ -11,8 +11,10 @@
 //! requested range, so cost scales with what is on screen, not file size.
 
 mod highlight;
+mod injection;
 mod language;
 
+use std::cell::RefCell;
 use std::ops::ControlFlow;
 use std::time::{Duration, Instant};
 
@@ -39,6 +41,9 @@ pub struct Syntax {
     generation: u64,
     /// Bracket tokens of `generation`, collected up to `.1` bytes.
     brackets: Option<(u64, usize, Vec<BracketMark>)>,
+    /// Injected trees (Markdown inline, fenced code, `<script>`, ...) parsed
+    /// for highlighting, valid for `generation`.
+    injections: RefCell<injection::InjectionCache>,
 }
 
 impl std::fmt::Debug for Syntax {
@@ -70,6 +75,7 @@ impl Syntax {
             stale: false,
             generation: 0,
             brackets: None,
+            injections: RefCell::new(injection::InjectionCache::new()),
         };
         syntax.reparse(rope, budget);
         syntax
@@ -183,13 +189,23 @@ impl Syntax {
         out
     }
 
-    /// Highlight spans covering `byte_range`, sorted and non-overlapping.
-    /// Unhighlighted gaps are omitted.
+    /// Highlight spans covering `byte_range`, sorted and non-overlapping,
+    /// including injected languages (their tokens replace the host's inside
+    /// the injected region). Unhighlighted gaps are omitted.
     pub fn highlight_bytes(&self, rope: &Rope, byte_range: std::ops::Range<usize>) -> Vec<HighlightSpan> {
-        match &self.tree {
-            Some(tree) => highlight::highlight(self.language.config(), tree, rope, byte_range),
-            None => Vec::new(),
+        let Some(tree) = &self.tree else {
+            return Vec::new();
+        };
+        let len = rope.len_bytes();
+        let window = byte_range.start.min(len)..byte_range.end.min(len);
+        if window.is_empty() {
+            return Vec::new();
         }
+        let mut paint = vec![HighlightKind::Plain; window.len()];
+        let mut cache = self.injections.borrow_mut();
+        cache.sync(self.generation);
+        paint_layer(self.language, tree, rope, &window, &mut paint, &mut cache, 0);
+        highlight::spans(&paint, window.start)
     }
 
     /// Per-line spans for `lines` (clamped to the buffer), with columns in
@@ -205,6 +221,43 @@ impl Syntax {
         let end_byte = buffer.char_to_byte(buffer.line_end_char(end_line - 1));
         let spans = self.highlight_bytes(buffer.rope(), start_byte..end_byte);
         highlight::split_into_lines(buffer, start_line..end_line, &spans)
+    }
+}
+
+/// Paints `tree`'s highlights over `window`, then each injection on top.
+fn paint_layer(
+    language: LanguageId,
+    tree: &Tree,
+    rope: &Rope,
+    window: &std::ops::Range<usize>,
+    paint: &mut [HighlightKind],
+    cache: &mut injection::InjectionCache,
+    depth: usize,
+) {
+    let config = language.config();
+    highlight::paint(config, tree, rope, window.clone(), paint);
+    let Some(query) = &config.injections else {
+        return;
+    };
+    if depth >= injection::MAX_DEPTH {
+        return;
+    }
+    for inj in injection::find(query, tree, rope, window.clone()) {
+        let Some(child) = cache.tree(&inj, rope) else {
+            continue;
+        };
+        // An embedded language owns its region: host styling (e.g. a fenced
+        // block's literal color) doesn't leak into plain embedded tokens.
+        // Markdown's inline grammar only refines its host (a heading's text
+        // stays a heading, with emphasis on top), so it paints over it.
+        let refines_host = inj.language == LanguageId::MarkdownInline;
+        for r in inj.ranges.iter().filter(|_| !refines_host) {
+            let (a, b) = (r.start_byte.max(window.start), r.end_byte.min(window.end));
+            if a < b {
+                paint[a - window.start..b - window.start].fill(HighlightKind::Plain);
+            }
+        }
+        paint_layer(inj.language, &child, rope, window, paint, cache, depth + 1);
     }
 }
 

@@ -3,26 +3,87 @@
      |   heading      "hello-ferride"
    2 | 
    3 | A tiny sample project. Open files from the **Explorer**, search with the
+     |   punctuation  "**"
+     |   emphasis     "Explorer"
+     |   punctuation  "**"
    4 | magnifier, or press the command button to open the *Command Palette*.
+     |   punctuation  "*"
+     |   emphasis     "Command Palette"
+     |   punctuation  "*"
    5 | 
    6 | ## Files
      |   punctuation  "##"
      |   heading      "Files"
    7 | 
-   8 | - `src/main.rs` — Rust
-     |   punctuation  "- "
+   8 | - `src/main.rs` — Rust, with ***bold italic*** and ~~no~~ `code spans`
+     |   punctuation  "- `"
+     |   string       "src/main.rs"
+     |   punctuation  "`"
+     |   punctuation  "***"
+     |   emphasis     "bold italic"
+     |   punctuation  "***"
+     |   punctuation  "~~"
+     |   punctuation  "~~"
+     |   punctuation  "`"
+     |   string       "code spans"
+     |   punctuation  "`"
    9 | - `scripts/stats.py` — Python
-     |   punctuation  "- "
-  10 | - [web/app.ts](web/app.ts) — TypeScript
-     |   punctuation  "- "
+     |   punctuation  "- `"
+     |   string       "scripts/stats.py"
+     |   punctuation  "`"
+  10 | - [web/app.ts](web/app.ts "TypeScript") — see <https://ferride.dev>
+     |   punctuation  "- ["
+     |   link         "web/app.ts"
+     |   punctuation  "]("
+     |   link         "web/app.ts"
+     |   string       "\"TypeScript\""
+     |   punctuation  ")"
+     |   link         "<https://ferride.dev>"
   11 | 
-  12 | > Ferride runs language servers inside Ferrux.
+  12 | > Ferride runs **language servers** inside Ferrux.
      |   punctuation  "> "
+     |   punctuation  "**"
+     |   emphasis     "language servers"
+     |   punctuation  "**"
   13 | 
-  14 | ```sh
+  14 | ```rust
+     |   punctuation  "```"
+     |   string       "rust"
+  15 | fn main() {
+     |   keyword      "fn"
+     |   function     "main"
+     |   punctuation  "()"
+     |   punctuation  "{"
+  16 |     println!("Hello, {}!", "Ferride");
+     |   function     "println!"
+     |   punctuation  "("
+     |   string       "\"Hello, {}!\""
+     |   punctuation  ","
+     |   string       "\"Ferride\""
+     |   punctuation  ");"
+  17 | }
+     |   punctuation  "}"
+  18 | ```
+     |   punctuation  "```"
+  19 | 
+  20 | ```sh
      |   punctuation  "```"
      |   string       "sh"
-  15 | cargo run --release
-     |   string       "cargo run --release"
-  16 | ```
+  21 | cargo run --release # build and run
+     |   function     "cargo"
+     |   constant     "--release"
+     |   comment      "# build and run"
+  22 | ```
      |   punctuation  "```"
+  23 | 
+  24 | <details><summary>More</summary></details>
+     |   punctuation  "<"
+     |   tag          "details"
+     |   punctuation  "><"
+     |   tag          "summary"
+     |   punctuation  ">"
+     |   punctuation  "</"
+     |   tag          "summary"
+     |   punctuation  "></"
+     |   tag          "details"
+     |   punctuation  ">"
