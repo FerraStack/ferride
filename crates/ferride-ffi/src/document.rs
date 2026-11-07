@@ -326,6 +326,21 @@ impl Document {
         inner.sel_to_utf16(Selection::new(start, end))
     }
 
+    /// Start of the grapheme cluster before `offset` (cursor Left): never
+    /// lands inside an emoji sequence, a flag, `e` + accent or `\r\n`.
+    pub fn grapheme_before(&self, offset: i32) -> i32 {
+        let inner = self.lock();
+        let b = &inner.buffer;
+        b.char_to_utf16(b.prev_grapheme_boundary(inner.utf16(offset))) as i32
+    }
+
+    /// End of the grapheme cluster after `offset` (cursor Right).
+    pub fn grapheme_after(&self, offset: i32) -> i32 {
+        let inner = self.lock();
+        let b = &inner.buffer;
+        b.char_to_utf16(b.next_grapheme_boundary(inner.utf16(offset))) as i32
+    }
+
     // ----- selections ----------------------------------------------------
 
     pub fn selection(&self) -> SelectionRange {

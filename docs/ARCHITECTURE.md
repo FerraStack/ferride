@@ -31,7 +31,7 @@ Ferride is a phone-first code editor for Android: a **Rust core** for everything
 
 | Crate | Role | Key dependencies |
 |---|---|---|
-| `ferride-buffer` | Text model: `ropey` rope, batched edits, undo/redo with typing/IME coalescing, multi-cursor `Selections`, offset conversions char ↔ byte ↔ UTF-16 ↔ line/column, CRLF awareness. Emits `ByteEdit`s for tree-sitter. | `ropey` |
+| `ferride-buffer` | Text model: `ropey` rope, batched edits, undo/redo with typing/IME coalescing, multi-cursor `Selections`, offset conversions char ↔ byte ↔ UTF-16 ↔ line/column, CRLF awareness, grapheme cluster boundaries (cursor Left/Right and Delete skip whole clusters; Backspace removes a whole emoji sequence, otherwise one code point, like VS Code's `deleteLeft`). Emits `ByteEdit`s for tree-sitter. | `ropey`, `unicode-segmentation` |
 | `ferride-syntax` | One `Syntax` per document: tree-sitter parser, incremental reparse from the rope (no copy), highlight queries → viewport-scoped style spans (bytes or per-line UTF-16 columns). Grammars: Rust, Python, JavaScript/JSX, TypeScript, TSX, JSON, Markdown (block). | `tree-sitter`, `tree-sitter-*` |
 | `ferride-lsp` | LSP client: `Content-Length` codec, request/response correlation with timeouts and `$/cancelRequest`, default answers to server→client requests, events for diagnostics/messages, typed helpers (initialize, didOpen/didChange/didSave/didClose, completion, hover, shutdown). Transport is any `Read` + `Write`. | `lsp-types`, `serde_json` |
 | `ferride-workspace` | Opened folder: path confinement, directory listing, atomic writes, create/rename/delete, gitignore-aware walk, fuzzy file finder, full-text search with ripgrep's engine. | `ignore`, `grep-searcher`, `grep-regex` |

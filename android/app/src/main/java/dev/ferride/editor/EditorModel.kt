@@ -45,6 +45,13 @@ interface EditorModel {
     fun wordAt(offset: Int): Sel
 
     /**
+     * Grapheme cluster boundaries (cursor Left/Right): never inside an emoji
+     * sequence, a flag, `e` + combining accent or `\r\n`.
+     */
+    fun graphemeBefore(offset: Int): Int
+    fun graphemeAfter(offset: Int): Int
+
+    /**
      * Replaces [start]..[end]; `typing` edits are coalesced for undo. Returns
      * where the inserted text ends (it may differ from `start + text.length`:
      * line endings are normalized to the file's and CRLF pairs are never split).
@@ -88,6 +95,8 @@ class RustEditorModel(private val doc: Document, override val fileName: String) 
     override fun offsetAt(line: Int, column: Int): Int = doc.offsetAt(line, column)
     override fun textRange(start: Int, end: Int): String = doc.textRange(start, end)
     override fun wordAt(offset: Int): Sel = doc.wordAt(offset).let { Sel(it.anchor, it.head) }
+    override fun graphemeBefore(offset: Int): Int = doc.graphemeBefore(offset)
+    override fun graphemeAfter(offset: Int): Int = doc.graphemeAfter(offset)
 
     override fun replace(start: Int, end: Int, text: String, typing: Boolean): Int =
         doc.replace(start, end, text, typing).end

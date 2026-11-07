@@ -260,3 +260,19 @@ fn mark_saved_version_keeps_later_edits_dirty() {
     doc.mark_saved_version(v);
     assert!(doc.is_dirty());
 }
+
+#[test]
+fn grapheme_navigation_in_utf16() {
+    // "a" + family (8 UTF-16 units: three surrogate pairs + two ZWJs) + "b".
+    let doc = Document::new("a👨\u{200D}👩\u{200D}👧b".into(), None);
+    assert_eq!(doc.grapheme_after(1), 9);
+    assert_eq!(doc.grapheme_before(9), 1);
+    // From the middle of the sequence (even mid surrogate pair) both ways leave it.
+    assert_eq!(doc.grapheme_after(4), 9);
+    assert_eq!(doc.grapheme_before(4), 1);
+    assert_eq!(doc.grapheme_before(0), 0);
+    assert_eq!(doc.grapheme_after(10), 10);
+    doc.set_selection(9, 9);
+    doc.backspace();
+    assert_eq!(doc.text(), "ab");
+}

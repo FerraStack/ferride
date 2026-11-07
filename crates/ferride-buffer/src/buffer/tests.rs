@@ -290,3 +290,101 @@ fn mark_saved_at_older_version_stays_dirty() {
     b.mark_saved_at(b.version());
     assert!(!b.is_dirty());
 }
+
+// ----- grapheme clusters (#6) ---------------------------------------------
+
+const FAMILY: &str = "👨\u{200D}👩\u{200D}👧"; // 5 chars, one cluster
+const FLAG: &str = "🇺🇦"; // two regional indicators
+const E_ACUTE: &str = "e\u{0301}"; // e + combining acute
+
+fn chars(s: &str) -> usize {
+    s.chars().count()
+}
+
+#[test]
+fn grapheme_boundaries_skip_whole_clusters() {
+    let text = format!("a{FAMILY}b{FLAG}{E_ACUTE}\r\nz");
+    let b = Buffer::new(&text);
+    let fam_end = 1 + chars(FAMILY);
+    let flag_end = fam_end + 1 + chars(FLAG);
+    let e_end = flag_end + chars(E_ACUTE);
+    // Forward walk visits only cluster boundaries.
+    let mut stops = vec![0];
+    let mut pos = 0;
+    while pos < b.len_chars() {
+        pos = b.next_grapheme_boundary(pos);
+        stops.push(pos);
+    }
+    assert_eq!(
+        stops,
+        vec![0, 1, fam_end, fam_end + 1, flag_end, e_end, e_end + 2, e_end + 3]
+    );
+    // Backward walk is the mirror image.
+    let mut back = vec![b.len_chars()];
+    let mut pos = b.len_chars();
+    while pos > 0 {
+        pos = b.prev_grapheme_boundary(pos);
+        back.push(pos);
+    }
+    back.reverse();
+    assert_eq!(back, stops);
+    // From inside a cluster, both directions leave it.
+    assert_eq!(b.next_grapheme_boundary(3), fam_end);
+    assert_eq!(b.prev_grapheme_boundary(3), 1);
+    assert_eq!(b.next_grapheme_boundary(b.len_chars() + 5), b.len_chars());
+}
+
+#[test]
+fn grapheme_boundaries_across_rope_chunks() {
+    // Long enough that the rope splits into several chunks around the emoji.
+    for pad in [900, 1000, 1021, 1022, 1023, 1024, 2000] {
+        let text = format!("{}{FAMILY}{}", "x".repeat(pad), "y".repeat(pad));
+        let b = Buffer::new(&text);
+        assert_eq!(b.next_grapheme_boundary(pad), pad + chars(FAMILY), "pad {pad}");
+        assert_eq!(b.prev_grapheme_boundary(pad + chars(FAMILY)), pad, "pad {pad}");
+        assert_eq!(b.prev_grapheme_boundary(pad + 2), pad, "pad {pad}");
+    }
+}
+
+#[test]
+fn backspace_deletes_emoji_sequences_whole() {
+    for emoji in [FAMILY, FLAG, "👍🏽", "1\u{FE0F}\u{20E3}", "❤\u{FE0F}"] {
+        let mut b = Buffer::new(&format!("a{emoji}"));
+        b.set_selection(Selection::caret(b.len_chars()));
+        b.delete_backward();
+        assert_eq!(b.text(), "a", "{emoji:?}");
+    }
+}
+
+#[test]
+fn backspace_removes_one_code_point_of_a_combining_sequence() {
+    // VS Code's deleteLeft: the accent goes first, the base letter stays.
+    let mut b = Buffer::new(&format!("x{E_ACUTE}"));
+    b.set_selection(Selection::caret(b.len_chars()));
+    b.delete_backward();
+    assert_eq!(b.text(), "xe");
+    b.delete_backward();
+    assert_eq!(b.text(), "x");
+}
+
+#[test]
+fn backspace_and_delete_keep_crlf_together() {
+    let mut b = Buffer::new("a\r\nb");
+    b.set_selection(Selection::caret(3));
+    b.delete_backward();
+    assert_eq!(b.text(), "ab");
+    let mut b = Buffer::new("a\r\nb");
+    b.set_selection(Selection::caret(1));
+    b.delete_forward();
+    assert_eq!(b.text(), "ab");
+}
+
+#[test]
+fn delete_forward_removes_a_whole_cluster() {
+    for cluster in [FAMILY, FLAG, E_ACUTE] {
+        let mut b = Buffer::new(&format!("{cluster}z"));
+        b.set_selection(Selection::caret(0));
+        b.delete_forward();
+        assert_eq!(b.text(), "z", "{cluster:?}");
+    }
+}
