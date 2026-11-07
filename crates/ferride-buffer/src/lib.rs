@@ -12,6 +12,7 @@
 //! updates).
 
 mod buffer;
+pub mod grapheme;
 mod history;
 mod selection;
 

@@ -2,6 +2,7 @@ use std::ops::Range;
 
 use ropey::Rope;
 
+use crate::grapheme;
 use crate::history::{Change, History, Transaction};
 use crate::selection::{Selection, Selections};
 
@@ -190,6 +191,18 @@ impl Buffer {
 
     pub fn char_at(&self, idx: usize) -> Option<char> {
         (idx < self.len_chars()).then(|| self.rope.char(idx))
+    }
+
+    // ----- grapheme clusters ----------------------------------------------
+
+    /// The grapheme cluster boundary before `char_idx` (cursor Left).
+    pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
+        grapheme::prev_boundary(self.rope.slice(..), char_idx)
+    }
+
+    /// The grapheme cluster boundary after `char_idx` (cursor Right, Delete).
+    pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
+        grapheme::next_boundary(self.rope.slice(..), char_idx)
     }
 
     // ----- offset conversions ---------------------------------------------
@@ -419,8 +432,9 @@ impl Buffer {
         self.apply(edits, kind).expect("selections are always valid")
     }
 
-    /// Backspace: deletes each selection, or the char before each caret
-    /// (`\r\n` counts as one).
+    /// Backspace: deletes each selection, or before each caret: a whole emoji
+    /// sequence or `\r\n`, otherwise one code point (VS Code's `deleteLeft`;
+    /// see [`grapheme::backspace_start`]).
     pub fn delete_backward(&mut self) -> Vec<ByteEdit> {
         let edits: Vec<Edit> = self
             .selections
@@ -434,17 +448,15 @@ impl Buffer {
                 if pos == 0 {
                     return None;
                 }
-                let mut start = pos - 1;
-                if start > 0 && self.rope.char(start) == '\n' && self.rope.char(start - 1) == '\r' {
-                    start -= 1;
-                }
+                let start = grapheme::backspace_start(self.rope.slice(..), pos);
                 Some(Edit::delete(start..pos))
             })
             .collect();
         self.apply(edits, EditKind::Typing).unwrap_or_default()
     }
 
-    /// Forward delete: deletes each selection, or the char after each caret.
+    /// Forward delete: deletes each selection, or the grapheme cluster after
+    /// each caret (`\r\n` and emoji sequences included).
     pub fn delete_forward(&mut self) -> Vec<ByteEdit> {
         let len = self.len_chars();
         let edits: Vec<Edit> = self
@@ -459,11 +471,7 @@ impl Buffer {
                 if pos >= len {
                     return None;
                 }
-                let mut end = pos + 1;
-                if end < len && self.rope.char(pos) == '\r' && self.rope.char(end) == '\n' {
-                    end += 1;
-                }
-                Some(Edit::delete(pos..end))
+                Some(Edit::delete(pos..self.next_grapheme_boundary(pos)))
             })
             .collect();
         self.apply(edits, EditKind::Typing).unwrap_or_default()

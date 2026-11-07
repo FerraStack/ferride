@@ -4,6 +4,7 @@ import dev.ferride.core.BracketMark
 import dev.ferride.core.StyleKind
 import dev.ferride.core.StyleSpan
 import dev.ferride.core.ViewLine
+import java.text.BreakIterator
 
 /**
  * Pure-Kotlin [EditorModel] with a tiny regex highlighter. Used by Compose
@@ -148,16 +149,30 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
         insert("\n$indent", false)
     }
 
+    override fun graphemeBefore(offset: Int): Int {
+        val o = offset.coerceIn(0, live().length)
+        if (o == 0) return 0
+        val it = BreakIterator.getCharacterInstance().apply { setText(sb.toString()) }
+        return it.preceding(o).coerceAtLeast(0)
+    }
+
+    override fun graphemeAfter(offset: Int): Int {
+        val o = offset.coerceIn(0, live().length)
+        if (o == sb.length) return o
+        val it = BreakIterator.getCharacterInstance().apply { setText(sb.toString()) }
+        return it.following(o).let { if (it == BreakIterator.DONE) sb.length else it }
+    }
+
     override fun backspace() {
         val s = selection
         if (!s.isEmpty) replace(s.start, s.end, "", true)
-        else if (s.head > 0) replace(s.head - 1, s.head, "", true)
+        else if (s.head > 0) replace(sb.offsetByCodePoints(s.head, -1), s.head, "", true)
     }
 
     override fun deleteForward() {
         val s = selection
         if (!s.isEmpty) replace(s.start, s.end, "", true)
-        else if (s.head < sb.length) replace(s.head, s.head + 1, "", true)
+        else if (s.head < sb.length) replace(s.head, graphemeAfter(s.head), "", true)
     }
 
     override fun undo(): Boolean {

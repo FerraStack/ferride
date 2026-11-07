@@ -20,6 +20,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.OverScroller
 import dev.ferride.core.StyleKind
 import dev.ferride.core.ViewLine
+import java.text.BreakIterator
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
@@ -243,9 +244,27 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
             val right = xOf(layout, lo + 1)
             if (x - left > right - x) lo++
         }
-        // Never land inside a surrogate pair.
-        if (lo in 1 until layout.text.length && Character.isLowSurrogate(layout.text[lo])) lo--
-        return lo
+        // Never land inside a grapheme cluster (surrogate pair, emoji sequence, e + accent).
+        return snapToGrapheme(layout, lo, x)
+    }
+
+    private val graphemes: BreakIterator = BreakIterator.getCharacterInstance()
+
+    /** Is [col] a grapheme boundary of [text]? Cheap for the common case (no marks/joiners/surrogates). */
+    private fun isGraphemeBoundary(text: String, col: Int): Boolean {
+        if (col <= 0 || col >= text.length) return true
+        if (text[col].code < 0x300 && !Character.isHighSurrogate(text[col - 1])) return true
+        graphemes.setText(text)
+        return graphemes.isBoundary(col)
+    }
+
+    /** The grapheme boundary nearest to [x] around [col] (hit testing). */
+    private fun snapToGrapheme(layout: Layout, col: Int, x: Float): Int {
+        val text = layout.text
+        if (isGraphemeBoundary(text, col)) return col
+        val before = graphemes.preceding(col).coerceAtLeast(0)
+        val after = graphemes.following(col).let { if (it == BreakIterator.DONE) text.length else it }
+        return if (x - xOf(layout, before) <= xOf(layout, after) - x) before else after
     }
 
     /**
@@ -307,7 +326,11 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
             var col = start
             while (col < text.length && lay.map[col + 1] <= dEnd) col++
             if (col <= start) col = start + 1
-            if (col < text.length && Character.isLowSurrogate(text[col])) col--
+            // Wrap between grapheme clusters, never inside one.
+            if (!isGraphemeBoundary(text, col)) {
+                val before = graphemes.preceding(col)
+                col = if (before > start) before else graphemes.following(col).let { if (it == BreakIterator.DONE) text.length else it }
+            }
             // Prefer breaking after whitespace.
             val space = text.lastIndexOf(' ', col - 1)
             if (space >= start + 1 && space + 1 < col) col = space + 1
@@ -891,17 +914,10 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         if (verticalMove) preferredX = keepX
     }
 
-    private fun stepBack(m: EditorModel, pos: Int): Int {
-        if (pos <= 0) return 0
-        val t = m.textRange(max(0, pos - 2), pos)
-        return if (t.length == 2 && Character.isSurrogatePair(t[0], t[1])) pos - 2 else pos - 1
-    }
+    /** One grapheme cluster left/right (the core knows UAX #29; Java strings alone don't). */
+    private fun stepBack(m: EditorModel, pos: Int): Int = if (pos <= 0) 0 else m.graphemeBefore(pos)
 
-    private fun stepForward(m: EditorModel, pos: Int): Int {
-        if (pos >= m.length) return m.length
-        val t = m.textRange(pos, min(m.length, pos + 2))
-        return if (t.length == 2 && Character.isSurrogatePair(t[0], t[1])) pos + 2 else pos + 1
-    }
+    private fun stepForward(m: EditorModel, pos: Int): Int = if (pos >= m.length) m.length else m.graphemeAfter(pos)
 
     override fun undo() {
         val m = liveModel ?: return
