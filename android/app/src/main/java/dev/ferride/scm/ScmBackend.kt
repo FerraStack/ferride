@@ -217,7 +217,7 @@ class FakeScmRepo(
     override fun createBranch(name: String, start: String?, checkout: Boolean) {
         if (branchList.any { it.name == name }) throw GitException.Failed("A branch named '$name' already exists.")
         val tip = commits.firstOrNull()
-        branchList += ScmBranch(name, false, false, tip?.shortId ?: "", tip?.summary ?: "", tip?.authorTime ?: 0, null)
+        branchList += ScmBranch(name, false, false, tip?.shortId ?: "", tip?.summary ?: "", tip?.authorTime ?: 0L, null)
         branchList.sortWith(compareBy({ it.remote }, { it.name }))
         if (checkout) checkout(name)
     }
@@ -260,7 +260,7 @@ class FakeScmRepo(
         )
 
         val SAMPLE_LOG = listOf(
-            commit(6, "Count words with a HashMap", "Ada Lovelace", 2 * 3600, ScmRefLabel("main", ScmRefKind.LOCAL_BRANCH, true)),
+            commit(6, "Count words with a HashMap", "Ada Lovelace", 2 * 3600L, ScmRefLabel("main", ScmRefKind.LOCAL_BRANCH, true)),
             commit(5, "Add a TypeScript front end", "Grace Hopper", DAY, ScmRefLabel("origin/main", ScmRefKind.REMOTE_BRANCH, false)),
             commit(4, "Document the CLI in README", "Ada Lovelace", 3 * DAY, ScmRefLabel("v0.2.0", ScmRefKind.TAG, false)),
             commit(3, "Split text helpers into lib.rs", "Linus Torvalds", 9 * DAY),

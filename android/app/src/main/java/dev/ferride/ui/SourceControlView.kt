@@ -228,8 +228,12 @@ private fun RepositoryView(state: WorkbenchState, scm: ScmState) {
                 CommitInput(state, scm)
                 Spacer(Modifier.height(8.dp))
                 val hasChanges = scm.changes.isNotEmpty()
-                when {
-                    hasChanges || head == null -> PrimaryButton("Commit", Codicons.check, Modifier.fillMaxWidth(), enabled = hasChanges) {
+                if (head == null) {
+                    PrimaryButton("Commit", Codicons.check, Modifier.fillMaxWidth(), enabled = hasChanges) {
+                        state.commands.execute(GitCommandIds.COMMIT)
+                    }
+                } else when {
+                    hasChanges -> PrimaryButton("Commit", Codicons.check, Modifier.fillMaxWidth()) {
                         state.commands.execute(GitCommandIds.COMMIT)
                     }
                     head.branch != null && head.upstream == null && head.commit != null ->
