@@ -13,12 +13,12 @@ mod lsp;
 mod theme;
 mod workspace;
 
-pub use document::{Document, EditOutcome, SelectionRange, StyleKind, StyleSpan, ViewLine};
+pub use document::{Document, DocumentSymbol, EditOutcome, SelectionRange, StyleKind, StyleSpan, ViewLine};
 pub use lsp::{LspCompletion, LspDiagnostic, LspListener, LspSession};
 pub use theme::{TokenStyle, TokenTheme, scope_stack};
 pub use workspace::{
     FileHit, FileNode, MatchRange, SafDoc, SafError, SafTree, SearchCancellation, SearchHit, SearchReport,
-    WorkspaceHandle, WorkspaceKind,
+    SymbolHit, WorkspaceHandle, WorkspaceKind,
 };
 
 use ferride_host::{HostStatus, ProcessHost, UnavailableHost};

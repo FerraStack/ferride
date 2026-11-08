@@ -7,10 +7,12 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ferride.core.DocumentSymbol
 import dev.ferride.core.FerruxStatus
 import dev.ferride.core.FileHit
 import dev.ferride.core.FileNode
 import dev.ferride.core.SearchReport
+import dev.ferride.core.SymbolHit
 import dev.ferride.editor.EditorActions
 import dev.ferride.editor.EditorModel
 import dev.ferride.editor.Sel
@@ -65,6 +67,7 @@ enum class PaletteMode(val prefix: String, val placeholder: String) {
     Commands(">", "Search commands"),
     GotoLine(":", "Type a line number to go to"),
     Symbols("@", "Go to symbol in editor"),
+    WorkspaceSymbols("#", "Go to symbol in workspace"),
     /** A command's own list ([WorkbenchState.quickPick]), e.g. Change Language Mode. */
     QuickPick("", ""),
 }
@@ -89,6 +92,8 @@ data class PaletteItem(
     val keybinding: KeyChord? = null,
     val matches: List<Int> = emptyList(),
     val section: String? = null,
+    /** LSP `SymbolKind` of a Go to Symbol row (drawn as its codicon). */
+    val symbolKind: Int? = null,
     val run: () -> Unit,
 )
 
@@ -218,6 +223,56 @@ class WorkbenchState(
 
     /** The editor view currently attached to the active tab (set by the UI). */
     var editor: EditorActions? = null
+
+    // ----- symbols: Outline, breadcrumbs, Go to Symbol, sticky scroll -------------
+
+    /** The Explorer's OUTLINE section is expanded (VS Code shows it collapsed at first). */
+    var outlineExpanded by mutableStateOf(false)
+    /** Outline rows the user collapsed, by symbol path ("Circle/area"). */
+    val outlineCollapsed = mutableStateListOf<String>()
+    private var symbolCache: Triple<EditorModel, Long, List<DocumentSymbol>>? = null
+
+    /** Symbols of the active editor, recomputed when its text changes. */
+    fun activeSymbols(): List<DocumentSymbol> {
+        val m = activeModel?.takeIf { !it.isClosed } ?: return emptyList()
+        symbolCache?.let { (cm, v, list) -> if (cm === m && v == m.version) return list }
+        val list = runCatching { m.symbols() }.getOrDefault(emptyList())
+        symbolCache = Triple(m, m.version, list)
+        return list
+    }
+
+    /** "Circle/area": the names from the outermost symbol down to [index]. */
+    fun symbolPath(symbols: List<DocumentSymbol>, index: Int): String {
+        val names = ArrayDeque<String>()
+        var i = index
+        while (i >= 0) {
+            names.addFirst(symbols[i].name)
+            i = symbols[i].parent
+        }
+        return names.joinToString("/")
+    }
+
+    /** Indices of the symbols enclosing [offset], outermost first (the breadcrumbs). */
+    fun symbolChainAt(symbols: List<DocumentSymbol>, offset: Int): List<Int> {
+        var deepest = -1
+        symbols.forEachIndexed { i, s ->
+            if (offset >= s.start && offset <= s.end && (deepest < 0 || s.depth >= symbols[deepest].depth)) deepest = i
+        }
+        val chain = ArrayDeque<Int>()
+        var i = deepest
+        while (i >= 0) {
+            chain.addFirst(i)
+            i = symbols[i].parent
+        }
+        return chain
+    }
+
+    /** Selects a symbol's name in the editor and scrolls to it (Outline, `@`, breadcrumbs). */
+    fun revealSymbol(symbol: DocumentSymbol) {
+        paletteOpen = false
+        if (!sideBarDocked) sideBarVisible = false
+        editor?.select(symbol.nameStart, symbol.nameEnd)
+    }
 
     val colors: WorkbenchColors
         get() {
@@ -832,6 +887,7 @@ class WorkbenchState(
         paletteQuery.startsWith(">") -> PaletteMode.Commands
         paletteQuery.startsWith(":") -> PaletteMode.GotoLine
         paletteQuery.startsWith("@") -> PaletteMode.Symbols
+        paletteQuery.startsWith("#") -> PaletteMode.WorkspaceSymbols
         else -> PaletteMode.Files
     }
 
@@ -848,7 +904,7 @@ class WorkbenchState(
     }
 
     /** Palette rows for the current query. */
-    fun paletteItems(fileHits: List<FileHit>): List<PaletteItem> {
+    fun paletteItems(fileHits: List<FileHit>, symbolHits: List<SymbolHit> = emptyList()): List<PaletteItem> {
         val mode = paletteMode()
         val q = paletteQuery.removePrefix(mode.prefix).trim()
         return when (mode) {
@@ -879,9 +935,37 @@ class WorkbenchState(
                 if (line == null) listOf(PaletteItem("Type a line number between 1 and $max to navigate to") {})
                 else listOf(PaletteItem("Go to line $line") { paletteOpen = false; editor?.goToLine(line - 1) })
             }
-            PaletteMode.Symbols -> listOf(
-                PaletteItem("Document symbols need a language server", detail = "Requires Ferrux (see Languages)") {},
-            )
+            PaletteMode.Symbols -> {
+                // Go to Symbol in Editor: document order, the container as description.
+                val symbols = activeSymbols()
+                val rows = symbols.mapIndexedNotNull { i, s ->
+                    val m = if (q.isEmpty()) emptyList() else fuzzyPositions(q, s.name)
+                    if (q.isNotEmpty() && m.isEmpty()) return@mapIndexedNotNull null
+                    PaletteItem(
+                        label = s.name,
+                        description = symbols.getOrNull(s.parent)?.name,
+                        matches = m,
+                        symbolKind = s.kind,
+                    ) { revealSymbol(s) }
+                }
+                when {
+                    activeModel == null -> listOf(PaletteItem("Open a file to go to its symbols") {})
+                    symbols.isEmpty() -> listOf(PaletteItem("No editor symbols") {})
+                    else -> rows.mapIndexed { i, r -> if (i == 0) r.copy(section = "symbols (${rows.size})") else r }
+                }
+            }
+            PaletteMode.WorkspaceSymbols -> symbolHits.map { h ->
+                // VS Code: name, then the container and file dimmed.
+                PaletteItem(
+                    label = h.name,
+                    description = listOfNotNull(h.container, h.relPath).joinToString(" · "),
+                    matches = h.positions,
+                    symbolKind = h.kind,
+                ) {
+                    paletteOpen = false
+                    openFile(h.path, preview = true, line = h.line)
+                }
+            }
             PaletteMode.QuickPick -> {
                 val all = quickPick?.items?.invoke().orEmpty()
                 if (q.isEmpty()) {
@@ -964,6 +1048,9 @@ class WorkbenchState(
         }
         cmd(CommandIds.GOTO_SYMBOL, "Go to Symbol in Editor…", "Go", KeyChord.ctrl(KeyEvent.KEYCODE_O, shift = true), hasEditor) {
             openPalette(PaletteMode.Symbols)
+        }
+        cmd(CommandIds.SHOW_ALL_SYMBOLS, "Go to Symbol in Workspace…", "Go", KeyChord.ctrl(KeyEvent.KEYCODE_T)) {
+            openPalette(PaletteMode.WorkspaceSymbols)
         }
         cmd(CommandIds.CHANGE_LANGUAGE_MODE, "Change Language Mode", null, enabled = hasEditor) {
             showQuickPick(languagePick())

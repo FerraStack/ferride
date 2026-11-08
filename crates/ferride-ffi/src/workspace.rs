@@ -200,6 +200,24 @@ pub struct WorkspaceHandle {
     /// Set for local folders: ripgrep search and the gitignore-aware walker.
     local: Option<LocalVfs>,
     root: String,
+    /// Workspace symbols (`#`), local folders only.
+    symbols: std::sync::Mutex<ferride_workspace::symbols::ThrottledSymbolIndex>,
+}
+
+/// A workspace symbol (`#` in Quick Open): name, LSP kind and where it is.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SymbolHit {
+    pub name: String,
+    /// LSP `SymbolKind` value.
+    pub kind: i32,
+    pub container: Option<String>,
+    pub path: String,
+    pub rel_path: String,
+    /// 0-based line and UTF-16 column of the name.
+    pub line: i32,
+    pub column: i32,
+    /// Char indices of `name` that matched.
+    pub positions: Vec<i32>,
 }
 
 const NO_TEXT_SEARCH: &str = "Text search needs a folder in device storage. Copy this folder into Ferride projects to enable Git and fast search.";
@@ -243,6 +261,7 @@ impl WorkspaceHandle {
             root: path_string(local.workspace().root()),
             vfs: Arc::new(local.clone()),
             local: Some(local),
+            symbols: Default::default(),
         }))
     }
 
@@ -253,6 +272,7 @@ impl WorkspaceHandle {
         Arc::new(Self {
             vfs: Arc::new(SafVfs::new(Arc::new(SafAdapter(tree)))),
             local: None,
+            symbols: Default::default(),
             root: root.trim_end_matches('/').to_owned(),
         })
     }
@@ -263,6 +283,7 @@ impl WorkspaceHandle {
         Arc::new(Self {
             vfs: Arc::new(FerruxVfs),
             local: None,
+            symbols: Default::default(),
             root: "ferrux:~".to_owned(),
         })
     }
@@ -350,6 +371,31 @@ impl WorkspaceHandle {
         let target = LocalVfs::open(&dest_path)?;
         copy_tree(self.vfs.as_ref(), "", &target, "", &mut |_, _| {})?;
         Ok(path_string(target.workspace().root()))
+    }
+
+    /// Go to Symbol in Workspace (`#`): tree-sitter outline symbols of every
+    /// file with a grammar, fuzzy-matched by name. The index refreshes at most
+    /// every few seconds (`force` refreshes now, e.g. after a save). Folders
+    /// outside device storage (SAF) aren't indexed.
+    pub fn workspace_symbols(&self, query: String, limit: i32, force: bool) -> Vec<SymbolHit> {
+        let Some(local) = &self.local else {
+            return Vec::new();
+        };
+        let mut index = self.symbols.lock().unwrap_or_else(|e| e.into_inner());
+        index
+            .query(local.workspace(), &query, limit.max(0) as usize, force)
+            .into_iter()
+            .map(|h| SymbolHit {
+                name: h.name,
+                kind: h.kind as i32,
+                container: h.container,
+                path: path_string(&h.path),
+                rel_path: h.rel_path,
+                line: h.line as i32,
+                column: h.column as i32,
+                positions: h.positions.into_iter().map(|p| p as i32).collect(),
+            })
+            .collect()
     }
 
     /// Quick Open. Local folders use the gitignore-aware walker; other

@@ -269,3 +269,43 @@ fn invalid_utf8_is_refused() {
         Err(WorkspaceError::NotUtf8(_))
     ));
 }
+
+#[test]
+fn workspace_symbols_are_indexed_and_follow_edits() {
+    use crate::symbols::SymbolIndex;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/lib.rs"),
+        "struct Circle { radius: f64 }\nimpl Circle {\n    fn area(&self) {}\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("app.py"),
+        "class Summary:\n    def area_of(self): pass\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("notes.txt"), "fn not_code() {}").unwrap();
+    let ws = Workspace::open(dir.path()).unwrap();
+    let mut index = SymbolIndex::new();
+    assert_eq!(index.update(&ws), 2, "only files with a grammar are parsed");
+
+    let hits = index.query("area", 10);
+    let names: Vec<_> = hits
+        .iter()
+        .map(|h| (h.name.as_str(), h.container.as_deref(), h.rel_path.as_str()))
+        .collect();
+    assert_eq!(names[0], ("area", Some("impl Circle"), "src/lib.rs"), "{names:?}");
+    assert!(names.contains(&("area_of", Some("Summary"), "app.py")));
+    let area = &hits[0];
+    assert_eq!((area.line, area.column), (2, 7));
+    assert!(index.query("zzz", 10).is_empty());
+
+    // Unchanged files aren't reparsed; edited and deleted ones are picked up.
+    assert_eq!(index.update(&ws), 0);
+    std::fs::write(dir.path().join("app.py"), "def renamed_function():\n    pass\n").unwrap();
+    std::fs::remove_file(dir.path().join("src/lib.rs")).unwrap();
+    assert_eq!(index.update(&ws), 1);
+    assert!(index.query("area", 10).is_empty());
+    assert_eq!(index.query("renfun", 10)[0].name, "renamed_function");
+}

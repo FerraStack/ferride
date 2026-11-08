@@ -125,6 +125,11 @@ fun settingDefs(themeNames: List<String>): List<SettingDef> = listOf(
         SettingControl.Bool({ it.minimap }, { s, v -> s.copy(minimap = v) }),
     ),
     SettingDef(
+        Settings.EDITOR_STICKY_SCROLL, SettingGroup.TextEditor, "Editor › Sticky Scroll", "Enabled",
+        "Shows the nested current scopes during the scroll at the top of the editor.",
+        SettingControl.Bool({ it.stickyScroll }, { s, v -> s.copy(stickyScroll = v) }),
+    ),
+    SettingDef(
         Settings.WORKBENCH_COLOR_THEME, SettingGroup.Workbench, "Workbench", "Color Theme",
         "Specifies the color theme used in the workbench when the system scheme isn't followed.",
         SettingControl.Choice(themeNames, { it.colorTheme.ifEmpty { themeNames.first() } }, { s, v -> s.copy(colorTheme = v, autoDetectColorScheme = false) }),

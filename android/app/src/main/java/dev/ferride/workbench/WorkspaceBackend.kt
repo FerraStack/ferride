@@ -7,6 +7,7 @@ import dev.ferride.core.MatchRange
 import dev.ferride.core.SearchHit
 import dev.ferride.core.SearchCancellation
 import dev.ferride.core.SearchReport
+import dev.ferride.core.SymbolHit
 import dev.ferride.core.SafTree
 import dev.ferride.core.WorkspaceHandle
 import dev.ferride.core.WorkspaceKind
@@ -40,6 +41,8 @@ interface WorkspaceBackend {
     /** Deletes a file or a folder with everything in it. */
     fun delete(path: String)
     fun findFiles(query: String, limit: Int): List<FileHit>
+    /** Go to Symbol in Workspace (`#`): outline symbols of every file, fuzzy by name. */
+    fun workspaceSymbols(query: String, limit: Int): List<SymbolHit> = emptyList()
     /** Full-text search; returns early (partial, `cancelled = true`) once [token] is cancelled. */
     fun searchText(query: String, regex: Boolean, caseSensitive: Boolean, wholeWord: Boolean, token: SearchToken = SearchToken()): SearchReport
     fun createModel(text: String, fileName: String): EditorModel
@@ -65,6 +68,7 @@ class RustWorkspaceBackend(private val handle: WorkspaceHandle) : WorkspaceBacke
     override fun rename(from: String, to: String): String = handle.rename(from, to)
     override fun delete(path: String) = handle.delete(path)
     override fun findFiles(query: String, limit: Int) = handle.findFiles(query, limit)
+    override fun workspaceSymbols(query: String, limit: Int): List<SymbolHit> = handle.workspaceSymbols(query, limit, false)
     override fun searchText(
         query: String,
         regex: Boolean,
@@ -183,6 +187,25 @@ class FakeWorkspaceBackend(
         files.keys.removeAll { it == r || it.startsWith("$r/") }
         emptyDirs.removeAll { it == r || it.startsWith("$r/") }
     }
+
+    /** Parses every file with [modelFactory] (real symbols when it's the Rust model). */
+    override fun workspaceSymbols(query: String, limit: Int): List<SymbolHit> = files.toSortedMap().flatMap { (p, text) ->
+        val model = modelFactory(text, p.substringAfterLast('/'))
+        try {
+            val symbols = model.symbols()
+            symbols.mapNotNull { s ->
+                val m = if (query.isEmpty()) emptyList() else fuzzyPositions(query, s.name)
+                if (query.isNotEmpty() && m.isEmpty()) return@mapNotNull null
+                val line = model.lineOfOffset(s.nameStart)
+                SymbolHit(
+                    s.name, s.kind, symbols.getOrNull(s.parent)?.name, "$root/$p", p, line,
+                    s.nameStart - model.lineStart(line), m,
+                )
+            }
+        } finally {
+            model.close()
+        }
+    }.sortedBy { it.name.length }.take(limit)
 
     override fun findFiles(query: String, limit: Int) = files.keys
         .mapNotNull { p -> fuzzyScore(query, p)?.let { FileHit("$root/$p", p, it.toLong(), emptyList()) } }

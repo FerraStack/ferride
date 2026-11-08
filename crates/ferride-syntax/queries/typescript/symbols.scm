@@ -1,0 +1,9 @@
+(interface_declaration name: (_) @name) @symbol.interface
+(type_alias_declaration name: (_) @name) @symbol.typeparameter
+(enum_declaration name: (_) @name) @symbol.enum
+(abstract_class_declaration name: (_) @name) @symbol.class
+(property_signature name: (_) @name) @symbol.property
+(public_field_definition name: (_) @name) @symbol.property
+(method_signature name: (_) @name) @symbol.method
+(module name: (_) @name) @symbol.module
+(internal_module name: (_) @name) @symbol.namespace

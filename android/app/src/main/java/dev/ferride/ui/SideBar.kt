@@ -26,6 +26,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -125,7 +126,7 @@ private fun explorerRows(state: WorkbenchState): List<ExplorerRow> {
 }
 
 @Composable
-private fun Explorer(state: WorkbenchState) {
+private fun ColumnScope.Explorer(state: WorkbenchState) {
     val c = LocalWorkbenchColors.current
     val headerCoords = remember { CoordsHolder() }
     // Section header with VS Code's title actions (always visible on touch).
@@ -170,7 +171,7 @@ private fun Explorer(state: WorkbenchState) {
             }
         }
     }
-    LazyColumn(Modifier.fillMaxSize(), state = listState) {
+    LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState) {
         items(rows, key = { it.key }) { row ->
             when (row) {
                 is ExplorerRow.Node -> TreeRow(state, row.node, row.depth, row.node.path == activePath)
@@ -178,6 +179,7 @@ private fun Explorer(state: WorkbenchState) {
             }
         }
     }
+    OutlineSection(state)
 }
 
 @Composable
