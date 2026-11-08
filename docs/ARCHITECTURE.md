@@ -87,12 +87,14 @@ Ferride is its own engine, but it should **look and feel like VS Code / VSCodium
 |---|---|---|
 | Activity Bar (Explorer, Search, Source Control, Languages, Settings) | left rail | bottom bar (hidden while the keyboard is up); Medium width uses the rail |
 | Side Bar | docked, 280 dp | drawer over the editor |
-| Editor group | tabs (preview tabs in italic, dirty dot, close button), breadcrumbs, editor | same; a "command center" title bar on top opens Quick Open |
+| Editor groups | tabs (preview tabs in italic, dirty dot, close button), breadcrumbs, editor; **View: Split Editor** (Ctrl+\\, the split icon in the tab bar) opens the active file in a second group to the right, Ctrl+1/Ctrl+2 focus a group | one group (the active one); a "command center" title bar on top opens Quick Open |
 | Panel (Problems, Output, Terminal) | docked bottom, 220 dp | bottom section, ~40% height |
 | Status Bar | Ferrux status, branch, errors/warnings, Ln/Col, indentation, encoding, EOL, language mode, LSP status | the same, fewer items |
 | Extra keys | — (hardware keyboard) | symbols row above the keyboard |
 
 Width classes follow Material breakpoints (compact < 600 dp ≤ medium < 840 dp ≤ expanded). The "Languages" view is Ferride's equivalent of Extensions: one entry per language with its bundled grammar and the language server it will run in Ferrux.
+
+Split editors share one `EditorModel` per file: edits, dirty dots and saves show in both groups; a document is freed only when its last tab closes and no group's view still shows it (`disposeRetired` tracks what each group displays). The document has one selection, so it belongs to the view that last acted on it; the other `CodeEditorView` remembers and draws its own and takes the document's back when touched or focused. Empty groups close, like VS Code's `workbench.editor.closeEmptyGroups`.
 
 ### Commands, palette, keybindings
 

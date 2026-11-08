@@ -173,6 +173,13 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         }
         scrollMemory.keys.removeAll { it.isClosed }
         model = newModel
+        ownSelection = null
+        // A document shown by another view too (split editor): keep its selection, start from it.
+        if (newModel != null && selectionOwners[newModel]?.get()?.let { it !== this && it.liveModel === newModel } == true) {
+            ownSelection = newModel.selection
+        } else if (newModel != null) {
+            selectionOwners[newModel] = java.lang.ref.WeakReference(this)
+        }
         hideSelectionControls()
         val (x, y) = newModel?.let { scrollMemory[it] } ?: (0f to 0f)
         sx = x
@@ -471,7 +478,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         val firstLine = lineOfRow(firstRow)
         val lastLine = lineOfRow(lastRow)
         val lines = lines(firstLine, lastLine - firstLine + 1)
-        val sel = m.selection
+        val sel = displayedSelection(m)
         val caretLine = m.lineOfOffset(sel.head)
 
         canvas.save()
@@ -792,6 +799,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            claimSelection()
             val handle = handleAt(event.x, event.y)
             if (handle != null && liveModel != null) {
                 startHandleDrag(handle, event)
@@ -1128,6 +1136,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: android.graphics.Rect?) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        if (gainFocus) claimSelection()
         restartBlink()
         if (!gainFocus) {
             liveModel?.sealUndoGroup()
@@ -1154,6 +1163,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     override fun onCheckIsTextEditor(): Boolean = true
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
+        claimSelection()
         outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
             InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or
@@ -1354,6 +1364,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         val m = liveModel ?: return super.onKeyDown(keyCode, event)
+        claimSelection()
         hideSelectionControls()
         val shift = event.isShiftPressed
         when (keyCode) {
@@ -1392,6 +1403,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     // ----- EditorActions ---------------------------------------------------------------------
 
     override fun insertText(text: String) {
+        claimSelection()
         val m = liveModel ?: return
         clearComposing()
         m.insert(text, false)
@@ -1399,6 +1411,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     override fun indent() {
+        claimSelection()
         val m = liveModel ?: return
         clearComposing()
         if (style.insertSpaces) {
@@ -1412,6 +1425,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     override fun moveCursor(direction: EditorActions.Direction, extend: Boolean) {
+        claimSelection()
         val m = liveModel ?: return
         clearComposing()
         hideSelectionControls()
@@ -1461,16 +1475,19 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     private fun stepForward(m: EditorModel, pos: Int): Int = if (pos >= m.length) m.length else m.graphemeAfter(pos)
 
     override fun undo() {
+        claimSelection()
         val m = liveModel ?: return
         if (m.undo()) afterExternalEdit()
     }
 
     override fun redo() {
+        claimSelection()
         val m = liveModel ?: return
         if (m.redo()) afterExternalEdit()
     }
 
     override fun selectAll() {
+        claimSelection()
         val m = liveModel ?: return
         clearComposing()
         m.selection = Sel(0, m.length)
@@ -1478,12 +1495,14 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     override fun selectedText(): String {
+        claimSelection()
         val m = liveModel ?: return ""
         val s = m.selection
         return m.textRange(s.start, s.end)
     }
 
     override fun escape() {
+        claimSelection()
         val m = liveModel ?: return
         hideSelectionControls()
         if (m.selection.isEmpty) return
@@ -1492,6 +1511,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     override fun select(start: Int, end: Int) {
+        claimSelection()
         val m = liveModel ?: return
         clearComposing()
         hideSelectionControls()
@@ -1501,6 +1521,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     override fun replaceRange(start: Int, end: Int, text: String) {
+        claimSelection()
         val m = liveModel ?: return
         clearComposing()
         m.sealUndoGroup()
@@ -1511,6 +1532,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     private val clipboard get() = context.getSystemService(ClipboardManager::class.java)
 
     override fun copy() {
+        claimSelection()
         val m = liveModel ?: return
         val s = m.selection
         // Like VS Code: copying with no selection copies the whole line.
@@ -1524,6 +1546,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     override fun cut() {
+        claimSelection()
         val m = liveModel ?: return
         val s = m.selection
         copy()
@@ -1538,6 +1561,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     override fun paste() {
+        claimSelection()
         val clip = clipboard?.primaryClip ?: return
         if (clip.itemCount == 0) return
         val text = clip.getItemAt(0).coerceToText(context).toString()
@@ -1545,6 +1569,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     override fun goToLine(line: Int) {
+        claimSelection()
         val m = liveModel ?: return
         val l = line.coerceIn(0, m.lineCount - 1)
         hideSelectionControls()
@@ -1556,7 +1581,40 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         afterSelectionChange(fromIme = false)
     }
 
+    // ----- shared documents (split editor) -------------------------------------------------
+    // Two views can show one document (View: Split Editor). The document holds a
+    // single selection, so it belongs to the view that last acted on it; the
+    // other view remembers and draws its own, and takes the document's back when
+    // it is touched, focused or used.
+
+    /** This view's selection while another view owns the document's. */
+    private var ownSelection: Sel? = null
+
+    private fun clamp(sel: Sel, m: EditorModel) = Sel(sel.anchor.coerceIn(0, m.length), sel.head.coerceIn(0, m.length))
+
+    private fun displayedSelection(m: EditorModel): Sel {
+        val owner = selectionOwners[m]?.get()
+        val mine = ownSelection
+        return if (owner == null || owner === this || mine == null) m.selection else clamp(mine, m)
+    }
+
+    /** Makes this view's selection the document's (before any action from this view). */
+    internal fun claimSelection() {
+        val m = liveModel ?: return
+        val owner = selectionOwners[m]?.get()
+        if (owner === this) return
+        if (owner != null && owner.liveModel === m) {
+            owner.ownSelection = m.selection
+            owner.invalidate()
+        }
+        ownSelection?.let { m.selection = clamp(it, m) }
+        ownSelection = null
+        selectionOwners[m] = java.lang.ref.WeakReference(this)
+    }
+
     companion object {
+        /** Which view owns each shared document's selection (weak: models and views come and go). */
+        private val selectionOwners = java.util.WeakHashMap<EditorModel, java.lang.ref.WeakReference<CodeEditorView>>()
         private const val BLINK_MS = 530L
         /** Android hides an idle insertion (caret) handle after a few seconds. */
         private const val CARET_HANDLE_MS = 4000L
