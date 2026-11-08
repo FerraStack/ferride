@@ -1,74 +1,90 @@
 #!/usr/bin/env bash
-# Reports what the Rust core costs in the APK: libferride_ffi.so per ABI, the
-# APK, and each tree-sitter grammar's compiled objects (arm64, as linked).
-# With COMPARE_OS=1 it also recompiles every grammar with -Os to show what
-# optimizing the parsers for size would save.
+# What users download: the per-ABI release APKs (GitHub), the Play download
+# size estimated by bundletool from the App Bundle for an arm64 phone, and
+# what the Rust core and each tree-sitter grammar contribute.
+#
 # Usage: native-size-report.sh <repo root>
-# Env: ANDROID_NDK_HOME (llvm-size + clang), or SIZE_TOOL/CC_TOOL/BUILD_DIR to override.
+# Env: ANDROID_NDK_HOME (llvm-size), BUNDLETOOL (path to bundletool-all.jar).
+# Prints Markdown to stdout and appends it to $GITHUB_STEP_SUMMARY.
 set -uo pipefail
 root="$(cd "$1" && pwd)"
 ndk_bin="${ANDROID_NDK_HOME:-}/toolchains/llvm/prebuilt/linux-x86_64/bin"
 size_tool="${SIZE_TOOL:-$ndk_bin/llvm-size}"
-cc_tool="${CC_TOOL:-$ndk_bin/aarch64-linux-android30-clang}"
 build="${BUILD_DIR:-$root/target/aarch64-linux-android/release/build}"
+apk_dir="$root/android/app/build/outputs/apk/play/release"
+aab="$root/android/app/build/outputs/bundle/playRelease/app-play-release.aab"
 report="$(mktemp)"
+work="$(mktemp -d)"
 
+mib() { awk -v b="$1" 'BEGIN { printf "%.1f", b / 1048576 }'; }
 kib() { awk -v b="$1" 'BEGIN { printf "%.0f", b / 1024 }'; }
+# Uncompressed bytes of the APK entries matching an ERE.
+entries() { unzip -lv "$1" | awk -v re="$2" '$NF ~ re { s += $1 } END { print s + 0 }'; }
 # text + data + bss of the given objects, in bytes.
 obj_size() { "$size_tool" "$@" | awk 'NR > 1 { s += $1 + $2 + $3 } END { print s + 0 }'; }
 
 {
-  echo "### Native size report"
+  echo "### Release size (play flavor)"
   echo
-  echo "| File | KiB | KiB gzip -9 |"
-  echo "|---|---:|---:|"
-  for so in "$root"/android/app/build/rust/jniLibs/*/libferride_ffi.so; do
-    [ -f "$so" ] && echo "| \`$(basename "$(dirname "$so")")/libferride_ffi.so\` | $(kib "$(stat -c %s "$so")") | $(kib "$(gzip -9c "$so" | wc -c)") |"
+  echo "| APK | MiB | libferride_ffi.so | dex | other |"
+  echo "|---|---:|---:|---:|---:|"
+  for apk in "$apk_dir"/*.apk; do
+    [ -f "$apk" ] || continue
+    total=$(stat -c %s "$apk")
+    so=$(entries "$apk" 'libferride_ffi\.so$')
+    dex=$(entries "$apk" '\.dex$')
+    echo "| \`$(basename "$apk")\` | $(mib "$total") | $(mib "$so") | $(mib "$dex") (uncompressed) | $(mib $((total - so)))* |"
   done
-  apk="$root/android/app/build/outputs/apk/debug/app-debug.apk"
-  [ -f "$apk" ] && echo "| \`app-debug.apk\` | $(kib "$(stat -c %s "$apk")") |"
   echo
-  echo "Grammars (objects as linked$([ "${COMPARE_OS:-}" = 1 ] && echo '; -Os recompiled for comparison')):"
+  echo "<sub>* APK size minus the (stored, uncompressed) native library.</sub>"
   echo
-  if [ "${COMPARE_OS:-}" = 1 ]; then
-    echo "| Grammar | KiB | KiB (-Os) |"
-    echo "|---|---:|---:|"
-  else
-    echo "| Grammar | KiB |"
-    echo "|---|---:|"
+  if [ -f "$aab" ]; then
+    echo "App Bundle: $(mib "$(stat -c %s "$aab")") MiB."
+    if [ -n "${BUNDLETOOL:-}" ] && [ -f "$BUNDLETOOL" ]; then
+      cat > "$work/arm64.json" <<'JSON'
+{ "supportedAbis": ["arm64-v8a"], "supportedLocales": ["en-US"], "screenDensity": 420, "sdkVersion": 34 }
+JSON
+      if java -jar "$BUNDLETOOL" build-apks --bundle="$aab" --output="$work/app.apks" > "$work/bt.log" 2>&1 &&
+        java -jar "$BUNDLETOOL" get-size total --apks="$work/app.apks" --device-spec="$work/arm64.json" > "$work/size.csv" 2>> "$work/bt.log"; then
+        IFS=, read -r min max < <(tail -n 1 "$work/size.csv")
+        echo "Play download for an arm64 phone (bundletool \`get-size total\`, compressed): **$(mib "$min")–$(mib "$max") MiB**."
+      else
+        echo "bundletool failed:"
+        echo '```'
+        tail -n 15 "$work/bt.log"
+        echo '```'
+      fi
+    fi
+    echo
   fi
+  echo "Grammars (arm64 objects as linked, KiB):"
+  echo
+  echo "| Grammar | KiB |"
+  echo "|---|---:|"
 } >> "$report"
 
 total=0
-total_os=0
 rows=()
+# Newest build dir per grammar crate (the cache can hold older ones).
+declare -A newest
 for dir in "$build"/tree-sitter-*/out; do
+  [ -d "$dir" ] || continue
   crate="$(basename "$(dirname "$dir")" | sed -E 's/-[0-9a-f]{16}$//')"
   [ "$crate" = tree-sitter ] && continue
-  mapfile -t objs < <(find "$dir" -name '*.o')
+  if [ -z "${newest[$crate]:-}" ] || [ "$dir" -nt "${newest[$crate]}" ]; then
+    newest[$crate]="$dir"
+  fi
+done
+for crate in "${!newest[@]}"; do
+  mapfile -t objs < <(find "${newest[$crate]}" -name '*.o')
   [ ${#objs[@]} -eq 0 ] && continue
   bytes="$(obj_size "${objs[@]}")"
   total=$((total + bytes))
-  row="$bytes|$crate|$(kib "$bytes")"
-  if [ "${COMPARE_OS:-}" = 1 ]; then
-    src="$(find "$HOME/.cargo/registry/src" -maxdepth 2 -mindepth 2 -type d -name "$crate-[0-9]*" | sort -V | tail -1)"
-    tmp="$(mktemp -d)"
-    while IFS= read -r c; do
-      "$cc_tool" -Os -fPIC -c -w -I "$(dirname "$c")" "$c" -o "$tmp/$(echo "$c" | md5sum | cut -c1-8).o"
-    done < <(find "$src" \( -name parser.c -o -name scanner.c \) -path '*/src/*' -not -path '*/node_modules/*')
-    os_bytes="$(obj_size "$tmp"/*.o)"
-    total_os=$((total_os + os_bytes))
-    rm -rf "$tmp"
-    row+="|$(kib "$os_bytes")"
-  fi
-  rows+=("$row")
+  rows+=("$bytes|$crate|$(kib "$bytes")")
 done
 printf '%s\n' "${rows[@]}" | sort -t'|' -k1,1nr | cut -d'|' -f2- | sed -E 's/\|/ | /g; s/^/| /; s/$/ |/' >> "$report"
-if [ "${COMPARE_OS:-}" = 1 ]; then
-  echo "| **total** | **$(kib "$total")** | **$(kib "$total_os")** |" >> "$report"
-else
-  echo "| **total** | **$(kib "$total")** |" >> "$report"
-fi
+echo "| **total** | **$(kib "$total")** |" >> "$report"
+
 cat "$report"
 [ -n "${GITHUB_STEP_SUMMARY:-}" ] && cat "$report" >> "$GITHUB_STEP_SUMMARY"
-rm -f "$report"
+rm -rf "$report" "$work"

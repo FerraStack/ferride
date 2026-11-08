@@ -15,6 +15,8 @@ plugins {
 // ---------------------------------------------------------------------------
 
 val repoRoot: Directory = rootProject.layout.projectDirectory.dir("..")
+/** `assemble…Release` in this build: produce per-ABI release APKs. */
+val abiSplits = gradle.startParameter.taskNames.any { it.contains("assemble") && it.contains("Release") }
 val rustAbis = mapOf("arm64-v8a" to "aarch64-linux-android", "x86_64" to "x86_64-linux-android")
 val rustSources = files(
     repoRoot.dir("crates"),
@@ -135,8 +137,10 @@ val cargoNdkBuild = tasks.register<CargoNdkBuild>("cargoNdkBuild") {
 val uniffiBindgen = tasks.register<UniffiBindgen>("uniffiBindgen") {
     group = "rust"
     description = "Generates Kotlin bindings for the Rust core with uniffi-bindgen"
-    libraries.from(cargoNdkBuild.flatMap { it.outputDir })
-    libraryRelPath.set("arm64-v8a/libferride_ffi.so")
+    // From the host build: the release .so is stripped of .symtab, where UniFFI's
+    // metadata lives; the metadata doesn't depend on the target.
+    libraries.from(cargoHostBuild.flatMap { it.library })
+    libraryRelPath.set("")
     workspace.set(repoRoot)
     outputDir.set(layout.buildDirectory.dir("generated/uniffi/kotlin"))
 }
@@ -151,8 +155,24 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-        ndk {
-            abiFilters += rustAbis.keys
+        // Release APKs for GitHub are split per ABI (below); AGP refuses abiFilters
+        // together with ABI splits, and the splits' include list does the same job.
+        if (!abiSplits) {
+            ndk {
+                abiFilters += rustAbis.keys
+            }
+        }
+    }
+
+    // One APK per ABI for GitHub releases (`assemble*Release`). Play gets per-ABI
+    // APKs from the App Bundle, which keeps abiFilters (JNA ships more ABIs than
+    // the Rust core; those must not be packaged).
+    splits {
+        abi {
+            isEnable = abiSplits
+            reset()
+            include(*rustAbis.keys.toTypedArray())
+            isUniversalApk = false
         }
     }
 

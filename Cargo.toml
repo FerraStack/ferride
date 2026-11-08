@@ -70,7 +70,12 @@ unsafe_op_in_unsafe_fn = "deny"
 [workspace.lints.clippy]
 dbg_macro = "warn"
 
+# Shipped in the APK: tuned for size and speed (the grammars' C parse tables
+# dominate; -Os on them saves ~1%, so they stay at opt-level 3). `strip =
+# "symbols"` drops .symtab, which UniFFI's library-mode bindgen reads, so the
+# Kotlin bindings are generated from the unstripped host build instead.
 [profile.release]
-lto = "thin"
-codegen-units = 4
-strip = "debuginfo"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
