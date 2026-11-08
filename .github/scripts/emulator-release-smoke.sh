@@ -2,7 +2,7 @@
 # Smoke test of the R8-minified release build (signed with the debug key for
 # CI only): launch, check the Rust core loaded (the status bar shows the
 # grammar's language, which comes from the native document), open a file
-# through Quick Open, open the Command Palette and Change Language Mode.
+# through Quick Open, filter the Command Palette and run Change Language Mode.
 # Usage: emulator-release-smoke.sh <apk> <out-dir>
 set -euo pipefail
 apk="$1"
@@ -28,11 +28,6 @@ ui_dump() {
   done
 }
 expect_text() { ui_dump | grep -q "text=\"$1\"" || fail "expected \"$1\" on screen: $2"; }
-center_of() {
-  grep -o "text=\"$1\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" | head -1 |
-    sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/' |
-    awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }'
-}
 
 adb uninstall dev.ferride > /dev/null 2>&1 || true
 adb install -r "$apk"
@@ -64,14 +59,11 @@ adb shell input text "language"
 sleep 2
 expect_text "Change Language Mode" "the Command Palette filtering commands"
 adb exec-out screencap -p > "$out/emulator_release_palette_dark.png"
-adb shell input keyevent 111
-sleep 1
 
-# Change Language Mode from the status bar.
-read -r lx ly < <(ui_dump | center_of "TypeScript") || fail "status bar language item has no bounds"
-adb shell input tap "$lx" "$ly"
+# Run the highlighted command (Enter): Change Language Mode opens its picker.
+adb shell input keyevent 66
 sleep 2
-alive "Change Language Mode"
+alive "running Change Language Mode from the palette"
 expect_text "Auto Detect" "Change Language Mode picker"
 adb shell input keyevent 111
 sleep 1
