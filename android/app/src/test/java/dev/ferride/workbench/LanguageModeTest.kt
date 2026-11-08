@@ -21,7 +21,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LanguageModeTest {
     private fun state(files: Map<String, String>) = WorkbenchState(
-        FakeWorkspaceBackend(files = files, modelFactory = RustEditorModel::create),
+        FakeWorkspaceBackend(initialFiles = files, modelFactory = RustEditorModel::create),
         CoroutineScope(Dispatchers.Unconfined),
         Dispatchers.Unconfined,
     )
