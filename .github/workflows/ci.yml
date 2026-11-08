@@ -65,12 +65,13 @@ jobs:
       - name: Build Rust core, unit + screenshot tests, debug APKs (play + foss)
         working-directory: android
         run: ./gradlew --max-workers=4 testPlayDebugUnitTest -Proborazzi.test.record=true assemblePlayDebug assembleFossDebug
-      # Release variant (unsigned) to measure what users download. Separate Gradle
-      # runs: `assemble*Release` splits APKs per ABI; the bundle keeps abiFilters.
-      - name: Release APKs per ABI and App Bundle (play)
+      # Release variant (R8) to measure what users download, signed with the debug
+      # key so the emulator job can smoke-test it. Separate Gradle runs:
+      # `assemble*Release` splits APKs per ABI; the bundle keeps abiFilters.
+      - name: Release APKs per ABI and App Bundle (play, R8)
         working-directory: android
         run: |
-          ./gradlew --max-workers=4 assemblePlayRelease
+          ./gradlew --max-workers=4 assemblePlayRelease -Pferride.signReleaseWithDebugKey
           ./gradlew --max-workers=4 bundlePlayRelease
       - name: Release size report (APK per ABI, Play download, grammars)
         env:
@@ -101,7 +102,7 @@ jobs:
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
-          name: ferride-release-apks-unsigned
+          name: ferride-release-apks-debug-signed
           path: android/app/build/outputs/apk/play/release/*.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
@@ -127,6 +128,10 @@ jobs:
         with:
           name: ferride-debug-apk
           path: apk
+      - uses: actions/download-artifact@v8
+        with:
+          name: ferride-release-apks-debug-signed
+          path: apk-release
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -140,7 +145,9 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: bash .github/scripts/emulator-screenshots.sh apk/app-play-debug.apk screenshots-emulator
+          script: |
+            bash .github/scripts/emulator-screenshots.sh apk/app-play-debug.apk screenshots-emulator
+            bash .github/scripts/emulator-release-smoke.sh apk-release/app-play-x86_64-release.apk screenshots-emulator
       - uses: actions/upload-artifact@v7
         if: always()
         with:

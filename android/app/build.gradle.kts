@@ -194,8 +194,15 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: shrinks Compose and material-icons-extended (most of the dex) and unused resources.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // CI installs the release build on the emulator to smoke-test R8's output:
+            // `-Pferride.signReleaseWithDebugKey` signs it with the debug key (never for publishing).
+            if (providers.gradleProperty("ferride.signReleaseWithDebugKey").isPresent) {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 
