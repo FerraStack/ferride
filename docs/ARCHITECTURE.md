@@ -112,7 +112,8 @@ Width classes follow Material breakpoints (compact < 600 dp ≤ medium < 840 dp 
 
 Done now: current line highlight, indent guides, bracket pair colorization (bracket tokens and depths come from the tree-sitter tree in Rust, so brackets in strings/comments are ignored), line numbers, **word wrap** (`editor.wordWrap`; the default is on for compact/phone windows and off otherwise, continuation rows indented like the line, numbers only on the first visual row), thin scrollbars (horizontal when wrap is off), find/replace widget (case/word/regex, n of m, replace/replace all), diagnostics squiggles + Problems panel, VS Code-style copy/cut of the whole line without a selection, smart Home, auto-indent on Enter, unsaved-changes prompt on close.
 Done in M1: selection handles and floating toolbar (#8).
-Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already supports it), snippets in VS Code snippet JSON format, sticky scroll, code folding.
+Done: **snippets** in VS Code's snippet JSON (`assets/snippets/<language>.json` built in for Rust, Python, JavaScript, TypeScript and Markdown; the user's own in `files/snippets/<language>.json`). Snippets: Insert Snippet (`editor.action.insertSnippet`) lists them by prefix; placeholders, mirrors, choices (first option inserted), variables (`TM_FILENAME`, `TM_SELECTED_TEXT`, `CURRENT_YEAR`, …) and escapes are supported, bodies follow the line's indentation and `editor.insertSpaces`, and Tab walks the tab stops to `$0`.
+Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already supports it), sticky scroll, code folding.
 
 ## Syntax highlighting
 

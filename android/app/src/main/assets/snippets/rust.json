@@ -1,0 +1,14 @@
+{
+  // Built-in Rust snippets (VS Code snippet format).
+  "fn": { "prefix": "fn", "body": ["fn ${1:name}(${2}) ${3:-> ${4:()} }{", "\t$0", "}"], "description": "Function" },
+  "pub fn": { "prefix": "pfn", "body": ["pub fn ${1:name}(${2}) ${3:-> ${4:()} }{", "\t$0", "}"], "description": "Public function" },
+  "struct": { "prefix": "struct", "body": ["#[derive(Debug${1:, Clone})]", "pub struct ${2:Name} {", "\t${3:field}: ${4:Type},", "}"], "description": "Struct" },
+  "enum": { "prefix": "enum", "body": ["#[derive(Debug)]", "pub enum ${1:Name} {", "\t${2:Variant},", "}"], "description": "Enum" },
+  "impl": { "prefix": "impl", "body": ["impl ${1:Type} {", "\t$0", "}"], "description": "Impl block" },
+  "match": { "prefix": "match", "body": ["match ${1:value} {", "\t${2:pattern} => ${3:todo!()},", "\t_ => $0,", "}"], "description": "Match expression" },
+  "test": { "prefix": "test", "body": ["#[test]", "fn ${1:it_works}() {", "\t$0", "}"], "description": "Test function" },
+  "tests module": { "prefix": "modtest", "body": ["#[cfg(test)]", "mod tests {", "\tuse super::*;", "", "\t#[test]", "\tfn ${1:it_works}() {", "\t\t$0", "\t}", "}"], "description": "Test module" },
+  "for": { "prefix": "for", "body": ["for ${1:item} in ${2:iter} {", "\t$0", "}"], "description": "for loop" },
+  "if let": { "prefix": "iflet", "body": ["if let ${1:Some(value)} = ${2:option} {", "\t$0", "}"], "description": "if let" },
+  "println": { "prefix": "println", "body": ["println!(\"${1:{${2:value}:?}}\");$0"], "description": "println!" }
+}

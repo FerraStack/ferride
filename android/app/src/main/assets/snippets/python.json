@@ -1,0 +1,9 @@
+{
+  "def": { "prefix": "def", "body": ["def ${1:name}(${2}):", "\t${3:pass}"], "description": "Function" },
+  "class": { "prefix": "class", "body": ["class ${1:Name}:", "\tdef __init__(self${2}):", "\t\t${3:pass}"], "description": "Class" },
+  "if __main__": { "prefix": "ifmain", "body": ["if __name__ == \"__main__\":", "\t${1:main()}"], "description": "if __name__ == \"__main__\"" },
+  "for": { "prefix": "for", "body": ["for ${1:item} in ${2:items}:", "\t${3:pass}"], "description": "for loop" },
+  "try": { "prefix": "try", "body": ["try:", "\t${1:pass}", "except ${2:Exception} as ${3:e}:", "\t${4:raise}"], "description": "try/except" },
+  "with": { "prefix": "with", "body": ["with ${1:open(path)} as ${2:f}:", "\t${3:pass}"], "description": "with statement" },
+  "dataclass": { "prefix": "dataclass", "body": ["@dataclass", "class ${1:Name}:", "\t${2:field}: ${3:int}"], "description": "Dataclass" }
+}

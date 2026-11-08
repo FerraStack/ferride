@@ -111,6 +111,7 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
         host = host,
     ).also {
         it.onWorkspaceOpened = ::remember
+        it.snippetLoader = ::snippetsFor
         it.start(openFirst = if (restoredLocal == null) "src/main.rs" else null, showWelcome = true)
     }
 
@@ -118,6 +119,30 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
         // A system-picker folder needs its persisted grant; reopen it off the main thread.
         val saf = last?.removePrefix("saf:")?.takeIf { last.startsWith("saf:") }?.let(Uri::parse)
         if (saf != null && app.contentResolver.persistedUriPermissions.any { it.uri == saf }) openFolder(saf)
+    }
+
+    private val snippetCache = HashMap<String, List<dev.ferride.editor.Snippet>>()
+
+    /**
+     * Built-in snippets (`assets/snippets/<language>.json`) plus the user's
+     * (`files/snippets/<language>.json`, VS Code's format), cached per language.
+     */
+    private fun snippetsFor(language: String): List<dev.ferride.editor.Snippet> = synchronized(snippetCache) {
+        snippetCache.getOrPut(language) {
+            val app = getApplication<Application>()
+            val file = when (language) {
+                "typescriptreact" -> "typescript"
+                "javascriptreact" -> "javascript"
+                else -> language
+            }
+            val builtIn = runCatching {
+                app.assets.open("snippets/$file.json").bufferedReader().use { r -> dev.ferride.editor.Snippets.parse(r.readText()) }
+            }.getOrDefault(emptyList())
+            val user = runCatching {
+                dev.ferride.editor.Snippets.parse(File(app.filesDir, "snippets/$language.json").readText())
+            }.getOrDefault(emptyList())
+            builtIn + user
+        }
     }
 
     /** Result of the system folder picker (or a restored grant). */

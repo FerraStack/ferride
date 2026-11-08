@@ -173,6 +173,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         }
         scrollMemory.keys.removeAll { it.isClosed }
         model = newModel
+        snippet = null
         hideSelectionControls()
         val (x, y) = newModel?.let { scrollMemory[it] } ?: (0f to 0f)
         sx = x
@@ -1400,6 +1401,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun indent() {
         val m = liveModel ?: return
+        if (nextSnippetStop()) return
         clearComposing()
         if (style.insertSpaces) {
             val head = m.selection.head
@@ -1409,6 +1411,66 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
             m.insert("\t", true)
         }
         afterExternalEdit()
+    }
+
+    // ----- snippets ----------------------------------------------------------------------------
+    // After a snippet is inserted its first tab stop is selected; Tab moves to
+    // the next one (stops after the current shift by however much was typed),
+    // ending at $0. Moving away or pressing Esc ends the session.
+
+    private class SnippetSession(
+        val stops: MutableList<IntRange>,
+        var current: Int,
+        var lengthAtStop: Int,
+    )
+
+    private var snippet: SnippetSession? = null
+
+    override fun insertSnippet(expanded: ExpandedSnippet) {
+        val m = liveModel ?: return
+        clearComposing()
+        hideSelectionControls()
+        m.sealUndoGroup()
+        val sel = m.selection
+        val base = sel.start
+        m.replace(sel.start, sel.end, expanded.text, false)
+        m.sealUndoGroup()
+        val stops = expanded.stops.map { stop -> stop.ranges.first().let { (it.first + base)..(it.last + base) } }.toMutableList()
+        snippet = if (stops.size > 1) SnippetSession(stops, 0, m.length) else null
+        selectStop(m, stops.first())
+        afterExternalEdit()
+    }
+
+    private fun selectStop(m: EditorModel, r: IntRange) {
+        // An empty range is `start until start` (last = start - 1).
+        m.selection = Sel(r.first.coerceIn(0, m.length), (r.last + 1).coerceIn(0, m.length))
+    }
+
+    /** Tab inside a snippet: jump to the next tab stop. False when there's no active snippet. */
+    private fun nextSnippetStop(): Boolean {
+        val m = liveModel ?: return false
+        val session = snippet ?: return false
+        val cur = session.stops[session.current]
+        val delta = m.length - session.lengthAtStop
+        val head = m.selection.head
+        // Typing elsewhere ends the snippet.
+        if (head < cur.first || head > cur.last + 1 + delta) {
+            snippet = null
+            return false
+        }
+        for (k in session.current + 1 until session.stops.size) {
+            val r = session.stops[k]
+            if (r.first >= cur.first) session.stops[k] = (r.first + delta)..(r.last + delta)
+        }
+        session.current++
+        session.lengthAtStop = m.length
+        clearComposing()
+        m.sealUndoGroup()
+        selectStop(m, session.stops[session.current])
+        if (session.current == session.stops.lastIndex) snippet = null
+        afterSelectionChange(fromIme = false)
+        imeSink.restartInput(this)
+        return true
     }
 
     override fun moveCursor(direction: EditorActions.Direction, extend: Boolean) {
@@ -1485,6 +1547,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun escape() {
         val m = liveModel ?: return
+        snippet = null
         hideSelectionControls()
         if (m.selection.isEmpty) return
         m.selection = Sel.caret(m.selection.head)

@@ -1,0 +1,8 @@
+{
+  "Insert heading level 2": { "prefix": "heading2", "body": ["## ${1:${TM_SELECTED_TEXT}}$0"], "description": "Insert heading level 2" },
+  "Insert fenced code block": { "prefix": "fenced codeblock", "body": ["```${1|python,rust,typescript,bash,json|}", "${TM_SELECTED_TEXT}$0", "```"], "description": "Insert fenced code block" },
+  "Insert link": { "prefix": "link", "body": ["[${1:${TM_SELECTED_TEXT:text}}](${2:https://link})$0"], "description": "Insert link" },
+  "Insert image": { "prefix": "image", "body": ["![${1:alt}](${2:https://link})$0"], "description": "Insert image" },
+  "Insert table": { "prefix": "table", "body": ["| ${1:Column} | ${2:Column} |", "| --- | --- |", "| ${3:Cell} | ${4:Cell} |$0"], "description": "Insert table" },
+  "Insert task list": { "prefix": "task", "body": ["- [${1| ,x|}] ${2:text}", "${0}"], "description": "Insert task list" }
+}

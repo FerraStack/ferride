@@ -1,0 +1,9 @@
+{
+  "function": { "prefix": "function", "body": ["function ${1:name}(${2}) {", "\t$0", "}"], "description": "Function Statement" },
+  "arrow": { "prefix": "af", "body": ["const ${1:name} = (${2}) => {", "\t$0", "};"], "description": "Arrow function" },
+  "for of": { "prefix": "forof", "body": ["for (const ${1:item} of ${2:items}) {", "\t$0", "}"], "description": "For-Of Loop" },
+  "if": { "prefix": "if", "body": ["if (${1:condition}) {", "\t$0", "}"], "description": "If Statement" },
+  "try": { "prefix": "try", "body": ["try {", "\t$0", "} catch (${1:error}) {", "\t", "}"], "description": "Try-Catch Statement" },
+  "log": { "prefix": "log", "body": ["console.log($1);"], "description": "Log to the console" },
+  "import": { "prefix": "import", "body": ["import { $2 } from \"${1:module}\";"], "description": "Import external module" }
+}

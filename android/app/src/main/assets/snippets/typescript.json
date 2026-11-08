@@ -1,0 +1,9 @@
+{
+  "function": { "prefix": "function", "body": ["function ${1:name}(${2}): ${3:void} {", "\t$0", "}"], "description": "Function Statement" },
+  "interface": { "prefix": "interface", "body": ["interface ${1:Name} {", "\t${2:field}: ${3:string};", "}"], "description": "Interface Declaration" },
+  "type": { "prefix": "type", "body": ["type ${1:Name} = ${2:string};"], "description": "Type alias" },
+  "class": { "prefix": "class", "body": ["class ${1:Name} {", "\tconstructor(${2}) {", "\t\t$0", "\t}", "}"], "description": "Class Definition" },
+  "for of": { "prefix": "forof", "body": ["for (const ${1:item} of ${2:items}) {", "\t$0", "}"], "description": "For-Of Loop" },
+  "log": { "prefix": "log", "body": ["console.log($1);"], "description": "Log to the console" },
+  "import": { "prefix": "import", "body": ["import { $2 } from \"${1:module}\";"], "description": "Import external module" }
+}

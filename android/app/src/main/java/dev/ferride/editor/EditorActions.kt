@@ -21,6 +21,9 @@ interface EditorActions {
     /** Replaces a range as one undo step (find/replace). */
     fun replaceRange(start: Int, end: Int, text: String)
 
+    /** Inserts an expanded snippet at the selection and starts tab-stop navigation. */
+    fun insertSnippet(expanded: ExpandedSnippet) {}
+
     enum class Direction { Left, Right, Up, Down, LineStart, LineEnd, PageUp, PageDown }
 }
 

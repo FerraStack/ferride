@@ -15,6 +15,8 @@ import dev.ferride.core.WorkspaceKind
 import dev.ferride.editor.EditorActions
 import dev.ferride.editor.EditorModel
 import dev.ferride.editor.Sel
+import dev.ferride.editor.Snippet
+import dev.ferride.editor.Snippets
 import dev.ferride.theme.BuiltInThemes
 import dev.ferride.theme.DarkModern
 import dev.ferride.theme.LightModern
@@ -1032,6 +1034,9 @@ class WorkbenchState(
         cmd(CommandIds.GOTO_SYMBOL, "Go to Symbol in Editor…", "Go", KeyChord.ctrl(KeyEvent.KEYCODE_O, shift = true), hasEditor) {
             openPalette(PaletteMode.Symbols)
         }
+        cmd(CommandIds.INSERT_SNIPPET, "Insert Snippet", "Snippets", enabled = hasEditor) {
+            showQuickPick(snippetPick())
+        }
         cmd(CommandIds.CHANGE_LANGUAGE_MODE, "Change Language Mode", null, enabled = hasEditor) {
             showQuickPick(languagePick())
         }
@@ -1112,6 +1117,74 @@ class WorkbenchState(
         cmd(CommandIds.ZOOM_OUT, "Decrease Editor Font Size", "Editor", KeyChord.ctrl(KeyEvent.KEYCODE_MINUS)) {
             updateSettings { it.copy(fontSize = (it.fontSize - 1).coerceAtLeast(6)) }
         }
+    }
+
+    // ----- snippets ---------------------------------------------------------------
+
+    /**
+     * Snippets for a language id (VS Code snippet JSON): the app reads the
+     * built-in ones from assets and the user's from `files/snippets/`; tests
+     * pass their own.
+     */
+    var snippetLoader: (String) -> List<Snippet> = { emptyList() }
+
+    /** Snippets: Insert Snippet — the active language's snippets by prefix and name. */
+    fun snippetPick(): QuickPick = QuickPick("Select a snippet") {
+        val tab = activeTab
+        val model = tab?.model?.takeIf { !it.isClosed }
+        val language = model?.language ?: "plaintext"
+        val list = runCatching { snippetLoader(language) }.getOrDefault(emptyList())
+        if (list.isEmpty()) {
+            listOf(PaletteItem("No snippets for ${Languages.displayName(model?.language)}") {})
+        } else {
+            list.sortedBy { it.prefixes.firstOrNull() ?: it.name }.map { sn ->
+                PaletteItem(
+                    label = sn.prefixes.firstOrNull() ?: sn.name,
+                    description = sn.description ?: sn.name,
+                ) {
+                    paletteOpen = false
+                    quickPick = null
+                    insertSnippet(sn)
+                }
+            }
+        }
+    }
+
+    /** Expands [snippet] for the active editor (indentation, tabs, variables) and inserts it. */
+    fun insertSnippet(snippet: Snippet) {
+        val tab = activeTab ?: return
+        val model = tab.model?.takeIf { !it.isClosed } ?: return
+        val head = model.selection.start
+        val line = model.lineOfOffset(head)
+        val lineText = model.textRange(model.lineStart(line), model.lineEnd(line))
+        val indent = lineText.takeWhile { it == ' ' || it == '\t' }
+        val tabText = if (settings.insertSpaces) " ".repeat(settings.tabSize) else "\t"
+        val now = java.util.Calendar.getInstance()
+        fun two(n: Int) = n.toString().padStart(2, '0')
+        val selected = model.selection.let { model.textRange(it.start, it.end) }
+        val expanded = Snippets.expand(snippet.body, indent, tabText) { name ->
+            when (name) {
+                "TM_FILENAME" -> tab.name
+                "TM_FILENAME_BASE" -> tab.name.substringBeforeLast('.')
+                "TM_DIRECTORY" -> tab.path.substringBeforeLast('/')
+                "TM_FILEPATH" -> tab.path
+                "RELATIVE_FILEPATH" -> tab.path.removePrefix(backend.root).trimStart('/')
+                "TM_SELECTED_TEXT", "SELECTION" -> selected
+                "TM_CURRENT_LINE" -> lineText
+                "TM_LINE_INDEX" -> line.toString()
+                "TM_LINE_NUMBER" -> (line + 1).toString()
+                "WORKSPACE_NAME" -> backend.name
+                "CURRENT_YEAR" -> now.get(java.util.Calendar.YEAR).toString()
+                "CURRENT_YEAR_SHORT" -> (now.get(java.util.Calendar.YEAR) % 100).toString().padStart(2, '0')
+                "CURRENT_MONTH" -> two(now.get(java.util.Calendar.MONTH) + 1)
+                "CURRENT_DATE" -> two(now.get(java.util.Calendar.DAY_OF_MONTH))
+                "CURRENT_HOUR" -> two(now.get(java.util.Calendar.HOUR_OF_DAY))
+                "CURRENT_MINUTE" -> two(now.get(java.util.Calendar.MINUTE))
+                "CURRENT_SECOND" -> two(now.get(java.util.Calendar.SECOND))
+                else -> null
+            }
+        }
+        editor?.insertSnippet(expanded)
     }
 
     /**
