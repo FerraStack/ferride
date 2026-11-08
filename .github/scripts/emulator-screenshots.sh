@@ -62,7 +62,19 @@ center_of() {
     sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/' |
     awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }'
 }
+# The CI emulator sometimes shows "Pixel Launcher isn't responding" over our
+# app; it's not ours, so dismiss it ("Wait") instead of failing on it.
+dismiss_system_dialogs() {
+  local dump
+  dump="$(ui_dump)"
+  if grep -q "isn't responding" <<<"$dump"; then
+    echo "dismissing a system ANR dialog"
+    read -r wx wy < <(center_of "Wait" <<<"$dump") && adb shell input tap "$wx" "$wy"
+    sleep 2
+  fi
+}
 expect_text() {
+  dismiss_system_dialogs
   if ! ui_dump | grep -q "text=\"$1\""; then
     echo "::error::Expected \"$1\" on screen: $2"
     adb exec-out screencap -p > "$out/failure.png" || true
@@ -87,8 +99,19 @@ sw="${size%x*}"
 sh="${size#*x}"
 lx=$((sw / 2))
 ly=$((sh * 3 / 10))
-adb shell input swipe "$lx" "$ly" "$lx" "$ly" 1200
-sleep 2
+long_press() {
+  adb shell input swipe "$lx" "$ly" "$lx" "$ly" 1200
+  sleep 2
+}
+dismiss_system_dialogs
+long_press
+if ! ui_dump | grep -q 'text="Select All"'; then
+  # A system dialog may have eaten the gesture; clear it and retry once.
+  dismiss_system_dialogs
+  adb shell input tap "$lx" "$ly"
+  sleep 1
+  long_press
+fi
 alive "long press in the editor"
 expect_text "Select All" "selection toolbar after a long press"
 read -r ax ay < <(ui_dump | center_of "Select All") || { echo "::error::Select All has no bounds"; exit 1; }
@@ -109,6 +132,26 @@ alive "open lib.rs"
 quick_open app
 alive "replace preview tab with app.ts"
 adb exec-out screencap -p > "$out/emulator_quickopen_dark.png"
+
+# File: Open Folder… launches the system folder picker (SAF); Back returns.
+dismiss_system_dialogs
+adb shell input keycombination 113 59 44   # Ctrl+Shift+P (SHIFT_LEFT=59)
+sleep 1
+adb shell input keyevent 123   # MOVE_END: type after the ">" prefix
+adb shell input text "openfolder"
+sleep 1
+adb shell input keyevent 66
+sleep 4
+if ! adb shell dumpsys activity activities | grep -iE "(topResumedActivity|mResumedActivity).*documentsui" >/dev/null; then
+  echo "::error::Open Folder did not show the system folder picker"
+  adb exec-out screencap -p > "$out/failure.png" || true
+  exit 1
+fi
+adb exec-out screencap -p > "$out/emulator_open_folder_picker.png"
+adb shell input keyevent 4   # BACK
+sleep 2
+alive "cancel the folder picker"
+echo "open folder picker: OK"
 adb shell input keycombination 113 51
 sleep 1
 adb shell input keycombination 113 51

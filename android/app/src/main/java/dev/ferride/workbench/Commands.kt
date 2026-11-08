@@ -155,6 +155,8 @@ object CommandIds {
     const val SAVE = "workbench.action.files.save"
     const val SAVE_ALL = "workbench.action.files.saveAll"
     const val NEW_FILE = "workbench.action.files.newUntitledFile"
+    const val OPEN_FOLDER = "workbench.action.files.openFolder"
+    const val COPY_INTO_PROJECTS = "ferride.workspace.copyIntoProjects"
     const val CLOSE_EDITOR = "workbench.action.closeActiveEditor"
     const val NEXT_EDITOR = "workbench.action.nextEditor"
     const val PREVIOUS_EDITOR = "workbench.action.previousEditor"

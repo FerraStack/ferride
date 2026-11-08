@@ -132,6 +132,10 @@ private fun TreeRow(state: WorkbenchState, node: FileNode, depth: Int, active: B
 
 @Composable
 private fun SearchView(state: WorkbenchState) {
+    if (!state.backend.supportsTextSearch) {
+        CopyIntoProjectsWelcome(state, "Text search")
+        return
+    }
     val c = LocalWorkbenchColors.current
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         Row(
@@ -276,6 +280,46 @@ private fun LanguagesView() {
                     Text("Language server: ${lang.server} — requires Ferrux", color = c.descriptionForeground, fontSize = 11.sp)
                 }
             }
+        }
+    }
+}
+
+/**
+ * VS Code-style "view welcome" for folders opened with the system picker
+ * (SAF): no real path, so ripgrep and Git can't run. Says so plainly and
+ * offers the fix instead of pretending.
+ */
+@Composable
+fun CopyIntoProjectsWelcome(state: WorkbenchState, feature: String) {
+    val c = LocalWorkbenchColors.current
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Text(
+            "$feature isn't available for folders opened with the system file picker: Android only lets " +
+                "Ferride read them one file at a time.",
+            color = c.sideBarForeground,
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Copy this folder into Ferride projects to enable Git and fast search. The original stays where it is.",
+            color = c.descriptionForeground,
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
+        )
+        Spacer(Modifier.height(14.dp))
+        val busy = state.copyProgress
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .background(c.buttonBackground.copy(alpha = if (busy == null) 1f else 0.6f), RoundedCornerShape(2.dp))
+                .clickable(enabled = busy == null, role = androidx.compose.ui.semantics.Role.Button) {
+                    state.commands.execute(dev.ferride.workbench.CommandIds.COPY_INTO_PROJECTS)
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(busy ?: "Copy into Ferride Projects", color = c.buttonForeground, fontSize = 13.sp, maxLines = 1)
         }
     }
 }

@@ -116,6 +116,22 @@ android {
         }
     }
 
+    // Storage differs by store (docs/ARCHITECTURE.md, "Storage"):
+    // - play: app-private projects + folders from the system picker (SAF) + Ferrux.
+    // - foss (F-Droid, GitHub): additionally all-files access, so device folders get real paths.
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "ALL_FILES_ACCESS", "false")
+        }
+        create("foss") {
+            dimension = "distribution"
+            versionNameSuffix = "-foss"
+            buildConfigField("boolean", "ALL_FILES_ACCESS", "true")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -130,6 +146,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {

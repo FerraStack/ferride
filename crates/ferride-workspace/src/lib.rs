@@ -6,6 +6,7 @@
 
 mod fuzzy;
 mod search;
+pub mod vfs;
 
 use std::fs;
 use std::io::Write;
@@ -13,6 +14,10 @@ use std::path::{Component, Path, PathBuf};
 
 pub use fuzzy::{FileMatch, fuzzy_score};
 pub use search::{SearchOptions, SearchResults, TextMatch};
+pub use vfs::{
+    DocNode, DocumentTree, FerruxVfs, LocalVfs, SafVfs, Vfs, VfsEntry, VfsKind, VfsStat, copy_tree,
+    normalize_rel, read_text, walk_files,
+};
 
 /// Files larger than this are not opened in the editor or searched.
 pub const MAX_FILE_SIZE: u64 = 8 * 1024 * 1024;
@@ -33,6 +38,13 @@ pub enum WorkspaceError {
     AlreadyExists(PathBuf),
     #[error("invalid search pattern: {0}")]
     BadPattern(String),
+    #[error("{0}")]
+    Unsupported(String),
+    #[error("{0}")]
+    Unavailable(String),
+    /// A storage provider (SAF) refused or failed.
+    #[error("{0}")]
+    Provider(String),
     #[error("{path}: {source}")]
     Io {
         path: PathBuf,
@@ -196,6 +208,11 @@ impl Workspace {
 
     /// Writes atomically: a temp file in the same directory, then rename.
     pub fn write_file(&self, path: impl AsRef<Path>, contents: &str) -> Result<()> {
+        self.write_bytes(path, contents.as_bytes())
+    }
+
+    /// [`write_file`](Self::write_file) for raw bytes (copies, non-UTF-8 files).
+    pub fn write_bytes(&self, path: impl AsRef<Path>, contents: &[u8]) -> Result<()> {
         let path = self.resolve(path)?;
         let dir = path.parent().unwrap_or(&self.root).to_owned();
         let file_name = path
@@ -205,7 +222,7 @@ impl Workspace {
         let tmp = dir.join(format!(".{file_name}.ferride-tmp"));
         {
             let mut f = fs::File::create(&tmp).map_err(io_err(&tmp))?;
-            f.write_all(contents.as_bytes()).map_err(io_err(&tmp))?;
+            f.write_all(contents).map_err(io_err(&tmp))?;
             f.sync_all().map_err(io_err(&tmp))?;
         }
         if let Ok(meta) = fs::metadata(&path) {

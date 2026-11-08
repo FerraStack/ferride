@@ -26,6 +26,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ferride.core.WorkspaceKind
 import dev.ferride.editor.CodeEditorView
 import dev.ferride.editor.Sel
 import dev.ferride.theme.VsCodeTheme
@@ -68,9 +69,9 @@ class WorkbenchScreenshotTest {
         settingsJson: String? = null,
         ime: Boolean = false,
         afterContent: (WorkbenchState) -> Unit = {},
+        backend: FakeWorkspaceBackend = FakeWorkspaceBackend(),
         setup: (WorkbenchState) -> Unit = {},
     ) {
-        val backend = FakeWorkspaceBackend()
         val state = WorkbenchState(
             backend,
             CoroutineScope(Dispatchers.Unconfined),
@@ -216,6 +217,21 @@ class WorkbenchScreenshotTest {
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
     fun tabletSelectionLight() = shoot("tablet_selection", dark = false, afterContent = ::selectionControls)
+
+    /** A folder opened with the system picker (SAF): Search explains why it's off and offers the copy. */
+    private val safBackend get() = FakeWorkspaceBackend(name = "Shared", kind = WorkspaceKind.SAF)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneSearchSafDark() = shoot("phone_search_saf", dark = true, backend = safBackend) { it.showView(SideView.Search) }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneSearchSafLight() = shoot("phone_search_saf", dark = false, backend = safBackend) { it.showView(SideView.Search) }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletSearchSafDark() = shoot("tablet_search_saf", dark = true, backend = safBackend) { it.showView(SideView.Search) }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletSearchSafLight() = shoot("tablet_search_saf", dark = false, backend = safBackend) { it.showView(SideView.Search) }
 
     // ----- tablet, landscape: desktop-like layout -----------------------------------
 

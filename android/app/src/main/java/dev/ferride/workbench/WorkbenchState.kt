@@ -72,6 +72,20 @@ data class PaletteItem(
     val run: () -> Unit,
 )
 
+/**
+ * What opening folders needs from the platform: the system folder picker,
+ * Ferride's private projects directory and opening a local folder. The
+ * activity implements it; tests pass a fake.
+ */
+interface WorkspaceHost {
+    /** `files/projects`: the default home of new, copied and cloned projects. */
+    val projectsDir: String
+    /** Shows the system folder picker; the result comes back through [WorkbenchState.openWorkspace]. */
+    fun pickFolder()
+    /** Opens a real directory (blocks; called on the IO dispatcher). */
+    fun openLocal(path: String): WorkspaceBackend
+}
+
 /** Where `settings.json` lives (a file in the app; memory in tests). */
 interface SettingsStore {
     fun read(): String?
@@ -90,13 +104,25 @@ class InMemorySettingsStore(private var text: String? = null) : SettingsStore {
  * shell renders it, commands mutate it. All blocking work goes to [io].
  */
 class WorkbenchState(
-    val backend: WorkspaceBackend,
+    backend: WorkspaceBackend,
     private val scope: CoroutineScope,
     private val io: CoroutineDispatcher,
     private val settingsStore: SettingsStore = InMemorySettingsStore(),
     val extraThemes: List<WorkbenchColors> = emptyList(),
+    var host: WorkspaceHost? = null,
 ) {
     val commands = CommandRegistry()
+
+    /** The open folder; replaced by [openWorkspace]. */
+    var backend: WorkspaceBackend by mutableStateOf(backend)
+        private set
+
+    /** Called after [openWorkspace] switched folders (the app remembers the last one). */
+    var onWorkspaceOpened: ((WorkspaceBackend) -> Unit)? = null
+
+    /** Progress text while a folder is being copied into Ferride projects. */
+    var copyProgress by mutableStateOf<String?>(null)
+        private set
 
     /** Parse error of the user's settings.json, if any (then we never overwrite it). */
     var settingsError by mutableStateOf<String?>(null)
@@ -194,9 +220,60 @@ class WorkbenchState(
         }
         scope.launch {
             ferrux = withContext(io) { runCatching { backend.ferrux() }.getOrDefault(FerruxStatus.NotInstalled) }
-            branch = withContext(io) { backend.gitBranch() }
+            branch = withContext(io) { runCatching { backend.gitBranch() }.getOrNull() }
             loadDir(backend.root)
             if (openFirst != null) openFile("${backend.root}/$openFirst", preview = false)
+        }
+    }
+
+    /**
+     * Switches to another folder (VS Code's File: Open Folder): closes all
+     * editors and resets the Explorer and Search. Refuses while an editor has
+     * unsaved changes. Returns whether it switched.
+     */
+    fun openWorkspace(next: WorkspaceBackend): Boolean {
+        if (tabs.any { it.dirty }) {
+            message = "Save or close editors with unsaved changes before opening another folder"
+            return false
+        }
+        tabs.forEach { retire(it.model) }
+        tabs.clear()
+        activeIndex = -1
+        tree.clear()
+        expanded.clear()
+        searchResult = null
+        searchError = null
+        diagnostics.clear()
+        backend = next
+        log("Opened workspace ${next.name} (${next.root})")
+        onWorkspaceOpened?.invoke(next)
+        scope.launch {
+            branch = withContext(io) { runCatching { next.gitBranch() }.getOrNull() }
+            loadDir(next.root)
+        }
+        return true
+    }
+
+    /**
+     * Copies a system-picker (SAF) folder into `files/projects/<name>` and
+     * opens the copy, so Git and fast search work on it.
+     */
+    fun copyIntoProjects() {
+        val h = host ?: return
+        val source = backend
+        if (copyProgress != null) return
+        copyProgress = "Copying ${source.name} into Ferride projects…"
+        scope.launch {
+            val result = withContext(io) {
+                runCatching {
+                    val dest = uniqueDir(h.projectsDir, source.name)
+                    h.openLocal(source.copyInto(dest))
+                }
+            }
+            copyProgress = null
+            result.onSuccess { local ->
+                if (openWorkspace(local)) message = "Copied to ${local.root}. Git and search now work on this copy."
+            }.onFailure { message = "Couldn't copy the folder: ${it.message}" }
         }
     }
 
@@ -459,6 +536,7 @@ class WorkbenchState(
 
     fun runSearch() {
         val q = searchQuery
+        if (!backend.supportsTextSearch) return
         if (q.isEmpty()) {
             searchResult = null
             return
@@ -609,6 +687,13 @@ class WorkbenchState(
             openPalette(PaletteMode.Commands)
         }
         cmd(CommandIds.QUICK_OPEN, "Go to File…", null, KeyChord.ctrl(KeyEvent.KEYCODE_P)) { openPalette(PaletteMode.Files) }
+        cmd(CommandIds.OPEN_FOLDER, "Open Folder…", "File", enabled = { host != null }) { host?.pickFolder() }
+        cmd(
+            CommandIds.COPY_INTO_PROJECTS,
+            "Copy Folder into Ferride Projects",
+            "File",
+            enabled = { host != null && backend.kind == dev.ferride.core.WorkspaceKind.SAF },
+        ) { copyIntoProjects() }
         cmd(CommandIds.GOTO_LINE, "Go to Line/Column…", "Go", KeyChord.ctrl(KeyEvent.KEYCODE_G), hasEditor) {
             openPalette(PaletteMode.GotoLine)
         }
@@ -699,4 +784,13 @@ class WorkbenchState(
         const val SETTINGS_JSON_PATH = "ferride:settings.json"
         private const val MAX_RECENT = 5
     }
+}
+
+/** `<parent>/<name>`, or `<name> 2`, `<name> 3`… if that already exists. */
+fun uniqueDir(parent: String, name: String): String {
+    val safe = name.replace('/', '_').ifBlank { "folder" }
+    var candidate = java.io.File(parent, safe)
+    var n = 2
+    while (candidate.exists()) candidate = java.io.File(parent, "$safe ${n++}")
+    return candidate.path
 }
