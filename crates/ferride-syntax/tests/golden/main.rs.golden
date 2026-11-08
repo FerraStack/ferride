@@ -1,202 +1,241 @@
    1 | use std::collections::HashMap;
-     |   keyword      "use"
-     |   punctuation  "::"
-     |   punctuation  "::"
-     |   type         "HashMap"
-     |   punctuation  ";"
+     |   keyword      "use"            keyword.other.rust
+     |   variable     "std"            entity.name.namespace.rust
+     |   punctuation  "::"             punctuation.accessor.rust
+     |   variable     "collections"    variable.other.rust
+     |   punctuation  "::"             punctuation.accessor.rust
+     |   type         "HashMap"        entity.name.type.class.rust
+     |   punctuation  ";"              punctuation.terminator.rust
    2 | 
    3 | /// Counts words in a line of text.
-     |   comment      "/// Counts words in a line of text."
+     |   comment      "/// Counts words in a line of text." comment.line.documentation.rust
    4 | fn word_counts(text: &str) -> HashMap<&str, usize> {
-     |   keyword      "fn"
-     |   function     "word_counts"
-     |   punctuation  "("
-     |   variable     "text"
-     |   punctuation  ":"
-     |   operator     "&"
-     |   builtin      "str"
-     |   punctuation  ")"
-     |   type         "HashMap"
-     |   punctuation  "<"
-     |   operator     "&"
-     |   builtin      "str"
-     |   punctuation  ","
-     |   builtin      "usize"
-     |   punctuation  ">"
-     |   punctuation  "{"
+     |   keyword      "fn"             keyword.other.rust
+     |   function     "word_counts"    entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   variable     "text"           variable.other.rust
+     |   punctuation  ":"              punctuation.separator.key-value.rust
+     |   operator     "&"              keyword.operator.rust
+     |   builtin      "str"            support.type.primitive.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   type         "HashMap"        entity.name.type.rust
+     |   punctuation  "<"              punctuation.rust
+     |   operator     "&"              keyword.operator.rust
+     |   builtin      "str"            support.type.primitive.rust
+     |   punctuation  ","              punctuation.separator.comma.rust
+     |   builtin      "usize"          support.type.primitive.rust
+     |   punctuation  ">"              punctuation.rust
+     |   punctuation  "{"              punctuation.definition.block.rust
    5 |     let mut counts = HashMap::new();
-     |   keyword      "let"
-     |   keyword      "mut"
-     |   type         "HashMap"
-     |   punctuation  "::"
-     |   function     "new"
-     |   punctuation  "();"
+     |   keyword      "let"            keyword.other.rust
+     |   keyword      "mut"            storage.modifier.rust
+     |   variable     "counts"         variable.other.rust
+     |   type         "HashMap"        entity.name.namespace.rust
+     |   punctuation  "::"             punctuation.accessor.rust
+     |   function     "new"            entity.name.function.rust
+     |   punctuation  "()"             meta.brace.round.rust
+     |   punctuation  ";"              punctuation.terminator.rust
    6 |     for word in text.split_whitespace() {
-     |   keyword      "for"
-     |   keyword      "in"
-     |   punctuation  "."
-     |   function     "split_whitespace"
-     |   punctuation  "()"
-     |   punctuation  "{"
+     |   keyword      "for"            keyword.control.rust
+     |   variable     "word"           variable.other.rust
+     |   keyword      "in"             keyword.control.rust
+     |   variable     "text"           variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "split_whitespace" entity.name.function.rust
+     |   punctuation  "()"             meta.brace.round.rust
+     |   punctuation  "{"              punctuation.definition.block.rust
    7 |         *counts.entry(word).or_insert(0) += 1;
-     |   operator     "*"
-     |   punctuation  "."
-     |   function     "entry"
-     |   punctuation  "("
-     |   punctuation  ")."
-     |   function     "or_insert"
-     |   punctuation  "("
-     |   constant     "0"
-     |   punctuation  ")"
-     |   constant     "1"
-     |   punctuation  ";"
+     |   operator     "*"              keyword.operator.rust
+     |   variable     "counts"         variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "entry"          entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   variable     "word"           variable.other.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "or_insert"      entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   constant     "0"              constant.numeric.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   constant     "1"              constant.numeric.rust
+     |   punctuation  ";"              punctuation.terminator.rust
    8 |     }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.rust
    9 |     counts
+     |   variable     "counts"         variable.other.rust
   10 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.rust
   11 | 
   12 | #[derive(Debug, Clone, Copy)]
-     |   attribute    "#"
-     |   punctuation  "["
-     |   attribute    "derive"
-     |   punctuation  "("
-     |   type         "Debug"
-     |   punctuation  ","
-     |   attribute    " "
-     |   type         "Clone"
-     |   punctuation  ","
-     |   attribute    " "
-     |   type         "Copy"
-     |   punctuation  ")]"
+     |   attribute    "#"              meta.attribute.rust
+     |   punctuation  "["              meta.brace.square.rust
+     |   variable     "derive"         variable.other.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   type         "Debug"          entity.name.type.class.rust
+     |   punctuation  ","              punctuation.separator.comma.rust
+     |   attribute    " "              meta.attribute.rust
+     |   type         "Clone"          entity.name.type.class.rust
+     |   punctuation  ","              punctuation.separator.comma.rust
+     |   attribute    " "              meta.attribute.rust
+     |   type         "Copy"           entity.name.type.class.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   punctuation  "]"              meta.brace.square.rust
   13 | pub struct Circle {
-     |   keyword      "pub"
-     |   keyword      "struct"
-     |   type         "Circle"
-     |   punctuation  "{"
+     |   keyword      "pub"            storage.modifier.rust
+     |   keyword      "struct"         keyword.other.rust
+     |   type         "Circle"         entity.name.type.rust
+     |   punctuation  "{"              punctuation.definition.block.rust
   14 |     pub radius: f64,
-     |   keyword      "pub"
-     |   property     "radius"
-     |   punctuation  ":"
-     |   builtin      "f64"
-     |   punctuation  ","
+     |   keyword      "pub"            storage.modifier.rust
+     |   property     "radius"         variable.other.property.rust
+     |   punctuation  ":"              punctuation.separator.key-value.rust
+     |   builtin      "f64"            support.type.primitive.rust
+     |   punctuation  ","              punctuation.separator.comma.rust
   15 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.rust
   16 | 
   17 | impl Circle {
-     |   keyword      "impl"
-     |   type         "Circle"
-     |   punctuation  "{"
+     |   keyword      "impl"           keyword.other.rust
+     |   type         "Circle"         entity.name.type.rust
+     |   punctuation  "{"              punctuation.definition.block.rust
   18 |     pub const UNIT: Circle = Circle { radius: 1.0 };
-     |   keyword      "pub"
-     |   keyword      "const"
-     |   type         "UNIT"
-     |   punctuation  ":"
-     |   type         "Circle"
-     |   type         "Circle"
-     |   punctuation  "{"
-     |   property     "radius"
-     |   punctuation  ":"
-     |   constant     "1.0"
-     |   punctuation  "};"
+     |   keyword      "pub"            storage.modifier.rust
+     |   keyword      "const"          storage.modifier.rust
+     |   type         "UNIT"           entity.name.type.class.rust
+     |   punctuation  ":"              punctuation.separator.key-value.rust
+     |   type         "Circle"         entity.name.type.rust
+     |   type         "Circle"         entity.name.type.rust
+     |   punctuation  "{"              punctuation.definition.block.rust
+     |   property     "radius"         variable.other.property.rust
+     |   punctuation  ":"              punctuation.separator.key-value.rust
+     |   constant     "1.0"            constant.numeric.rust
+     |   punctuation  "}"              punctuation.definition.block.rust
+     |   punctuation  ";"              punctuation.terminator.rust
   19 | 
   20 |     pub fn area(&self) -> f64 {
-     |   keyword      "pub"
-     |   keyword      "fn"
-     |   function     "area"
-     |   punctuation  "("
-     |   operator     "&"
-     |   builtin      "self"
-     |   punctuation  ")"
-     |   builtin      "f64"
-     |   punctuation  "{"
+     |   keyword      "pub"            storage.modifier.rust
+     |   keyword      "fn"             keyword.other.rust
+     |   function     "area"           entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   operator     "&"              keyword.operator.rust
+     |   builtin      "self"           variable.other.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   builtin      "f64"            support.type.primitive.rust
+     |   punctuation  "{"              punctuation.definition.block.rust
   21 |         std::f64::consts::PI * self.radius * self.radius
-     |   punctuation  "::"
-     |   punctuation  "::"
-     |   punctuation  "::"
-     |   type         "PI"
-     |   operator     "*"
-     |   builtin      "self"
-     |   punctuation  "."
-     |   property     "radius"
-     |   operator     "*"
-     |   builtin      "self"
-     |   punctuation  "."
-     |   property     "radius"
+     |   variable     "std"            entity.name.namespace.rust
+     |   punctuation  "::"             punctuation.accessor.rust
+     |   variable     "f64"            variable.other.rust
+     |   punctuation  "::"             punctuation.accessor.rust
+     |   variable     "consts"         variable.other.rust
+     |   punctuation  "::"             punctuation.accessor.rust
+     |   type         "PI"             entity.name.type.class.rust
+     |   operator     "*"              keyword.operator.rust
+     |   builtin      "self"           variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   property     "radius"         variable.other.property.rust
+     |   operator     "*"              keyword.operator.rust
+     |   builtin      "self"           variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   property     "radius"         variable.other.property.rust
   22 |     }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.rust
   23 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.rust
   24 | 
   25 | fn main() {
-     |   keyword      "fn"
-     |   function     "main"
-     |   punctuation  "()"
-     |   punctuation  "{"
+     |   keyword      "fn"             keyword.other.rust
+     |   function     "main"           entity.name.function.rust
+     |   punctuation  "()"             meta.brace.round.rust
+     |   punctuation  "{"              punctuation.definition.block.rust
   26 |     let text = "the quick brown fox jumps over the lazy dog";
-     |   keyword      "let"
-     |   string       "\"the quick brown fox jumps over the lazy dog\""
-     |   punctuation  ";"
+     |   keyword      "let"            keyword.other.rust
+     |   variable     "text"           variable.other.rust
+     |   string       "\""             punctuation.definition.string.begin.rust
+     |   string       "the quick brown fox jumps over the lazy dog" string.quoted.double.rust
+     |   string       "\""             punctuation.definition.string.end.rust
+     |   punctuation  ";"              punctuation.terminator.rust
   27 |     let mut words: Vec<_> = word_counts(text).into_iter().collect();
-     |   keyword      "let"
-     |   keyword      "mut"
-     |   punctuation  ":"
-     |   type         "Vec"
-     |   punctuation  "<"
-     |   type         "_"
-     |   punctuation  ">"
-     |   function     "word_counts"
-     |   punctuation  "("
-     |   punctuation  ")."
-     |   function     "into_iter"
-     |   punctuation  "()."
-     |   function     "collect"
-     |   punctuation  "();"
+     |   keyword      "let"            keyword.other.rust
+     |   keyword      "mut"            storage.modifier.rust
+     |   variable     "words"          variable.other.rust
+     |   punctuation  ":"              punctuation.separator.key-value.rust
+     |   type         "Vec"            entity.name.type.rust
+     |   punctuation  "<"              punctuation.rust
+     |   type         "_"              entity.name.type.rust
+     |   punctuation  ">"              punctuation.rust
+     |   function     "word_counts"    entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   variable     "text"           variable.other.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "into_iter"      entity.name.function.rust
+     |   punctuation  "()"             meta.brace.round.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "collect"        entity.name.function.rust
+     |   punctuation  "()"             meta.brace.round.rust
+     |   punctuation  ";"              punctuation.terminator.rust
   28 |     words.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
-     |   punctuation  "."
-     |   function     "sort_by"
-     |   punctuation  "("
-     |   punctuation  ","
-     |   punctuation  "."
-     |   constant     "1"
-     |   punctuation  "."
-     |   function     "cmp"
-     |   punctuation  "("
-     |   operator     "&"
-     |   punctuation  "."
-     |   constant     "1"
-     |   punctuation  ")."
-     |   function     "then"
-     |   punctuation  "("
-     |   punctuation  "."
-     |   constant     "0"
-     |   punctuation  "."
-     |   function     "cmp"
-     |   punctuation  "("
-     |   punctuation  "."
-     |   constant     "0"
-     |   punctuation  ")));"
+     |   variable     "words"          variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "sort_by"        entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   variable     "a"              variable.other.rust
+     |   punctuation  ","              punctuation.separator.comma.rust
+     |   variable     "b"              variable.other.rust
+     |   variable     "b"              variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   constant     "1"              constant.numeric.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "cmp"            entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   operator     "&"              keyword.operator.rust
+     |   variable     "a"              variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   constant     "1"              constant.numeric.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "then"           entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   variable     "a"              variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   constant     "0"              constant.numeric.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "cmp"            entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   variable     "b"              variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   constant     "0"              constant.numeric.rust
+     |   punctuation  ")))"            meta.brace.round.rust
+     |   punctuation  ";"              punctuation.terminator.rust
   29 |     for (word, n) in words.iter().take(3) {
-     |   keyword      "for"
-     |   punctuation  "("
-     |   punctuation  ","
-     |   punctuation  ")"
-     |   keyword      "in"
-     |   punctuation  "."
-     |   function     "iter"
-     |   punctuation  "()."
-     |   function     "take"
-     |   punctuation  "("
-     |   constant     "3"
-     |   punctuation  ")"
-     |   punctuation  "{"
+     |   keyword      "for"            keyword.control.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   variable     "word"           variable.other.rust
+     |   punctuation  ","              punctuation.separator.comma.rust
+     |   variable     "n"              variable.other.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   keyword      "in"             keyword.control.rust
+     |   variable     "words"          variable.other.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "iter"           entity.name.function.rust
+     |   punctuation  "()"             meta.brace.round.rust
+     |   punctuation  "."              keyword.operator.access.dot.rust
+     |   function     "take"           entity.name.function.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   constant     "3"              constant.numeric.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   punctuation  "{"              punctuation.definition.block.rust
   30 |         println!("{word}: {n}"); // top three
-     |   function     "println!"
-     |   punctuation  "("
-     |   string       "\"{word}: {n}\""
-     |   punctuation  ");"
-     |   comment      "// top three"
+     |   function     "println!"       entity.name.function.macro.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   string       "\""             punctuation.definition.string.begin.rust
+     |   string       "{word}: {n}"    string.quoted.double.rust
+     |   string       "\""             punctuation.definition.string.end.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   punctuation  ";"              punctuation.terminator.rust
+     |   comment      "// top three"   comment.line.rust
   31 |     }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.rust
   32 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.rust

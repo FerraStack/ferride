@@ -1,118 +1,134 @@
    1 | #!/usr/bin/env bash
-     |   comment      "#!/usr/bin/env bash"
+     |   comment      "#!/usr/bin/env bash" comment.line.shell
    2 | # Counts words in the given files and prints the top N.
-     |   comment      "# Counts words in the given files and prints the top N."
+     |   comment      "# Counts words in the given files and prints the top N." comment.line.shell
    3 | set -euo pipefail
-     |   function     "set"
-     |   constant     "-euo"
+     |   function     "set"            support.function.builtin.shell
+     |   constant     "-euo"           constant.other.option.shell
    4 | 
    5 | TOP="${TOP:-3}"
-     |   property     "TOP"
-     |   string       "\"${"
-     |   property     "TOP"
-     |   string       ":-3}\""
+     |   property     "TOP"            variable.other.normal.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   string       "${"             string.quoted.double.shell
+     |   property     "TOP"            variable.other.normal.shell
+     |   string       ":-3}"           string.quoted.double.shell
+     |   string       "\""             punctuation.definition.string.end.shell
    6 | readonly OUT_DIR="$HOME/.cache/wc"
-     |   property     "OUT_DIR"
-     |   string       "\""
-     |   operator     "$"
-     |   property     "HOME"
-     |   string       "/.cache/wc\""
+     |   property     "OUT_DIR"        variable.other.normal.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   property     "HOME"           variable.other.normal.shell
+     |   string       "/.cache/wc"     string.quoted.double.shell
+     |   string       "\""             punctuation.definition.string.end.shell
    7 | 
    8 | usage() {
-     |   function     "usage"
+     |   function     "usage"          entity.name.command.shell
    9 |   echo "usage: $(basename "$0") [-n N] FILE..." >&2
-     |   function     "echo"
-     |   string       "\"usage: $("
-     |   function     "basename"
-     |   string       " \""
-     |   operator     "$"
-     |   property     "0"
-     |   string       "\") [-n N] FILE...\""
+     |   function     "echo"           support.function.builtin.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   string       "usage: $("      string.quoted.double.shell
+     |   function     "basename"       entity.name.command.shell
+     |   string       " "              string.quoted.double.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   property     "0"              variable.other.normal.shell
+     |   string       "\""             punctuation.definition.string.end.shell
+     |   string       ") [-n N] FILE..." string.quoted.double.shell
+     |   string       "\""             punctuation.definition.string.end.shell
   10 |   exit 1
-     |   function     "exit"
+     |   function     "exit"           support.function.builtin.shell
   11 | }
   12 | 
   13 | while getopts "n:" opt; do
-     |   keyword      "while"
-     |   function     "getopts"
-     |   string       "\"n:\""
-     |   keyword      "do"
+     |   keyword      "while"          keyword.control.shell
+     |   function     "getopts"        support.function.builtin.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   string       "n:"             string.quoted.double.shell
+     |   string       "\""             punctuation.definition.string.end.shell
+     |   keyword      "do"             keyword.control.shell
   14 |   case "$opt" in
-     |   keyword      "case"
-     |   string       "\""
-     |   operator     "$"
-     |   property     "opt"
-     |   string       "\""
-     |   keyword      "in"
+     |   keyword      "case"           keyword.control.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   property     "opt"            variable.other.normal.shell
+     |   string       "\""             punctuation.definition.string.end.shell
+     |   keyword      "in"             keyword.control.shell
   15 |     n) TOP="$OPTARG" ;;
-     |   property     "TOP"
-     |   string       "\""
-     |   operator     "$"
-     |   property     "OPTARG"
-     |   string       "\""
+     |   property     "TOP"            variable.other.normal.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   property     "OPTARG"         variable.other.normal.shell
+     |   string       "\""             punctuation.definition.string.end.shell
   16 |     *) usage ;;
-     |   function     "usage"
+     |   function     "usage"          entity.name.command.shell
   17 |   esac
-     |   keyword      "esac"
+     |   keyword      "esac"           keyword.control.shell
   18 | done
-     |   keyword      "done"
+     |   keyword      "done"           keyword.control.shell
   19 | shift $((OPTIND - 1))
-     |   function     "shift"
-     |   property     "OPTIND"
+     |   function     "shift"          support.function.builtin.shell
+     |   property     "OPTIND"         variable.other.normal.shell
   20 | 
   21 | [[ $# -gt 0 ]] || usage
-     |   operator     "$"
-     |   function     "usage"
+     |   operator     "$"              keyword.operator.shell
+     |   function     "usage"          entity.name.command.shell
   22 | mkdir -p "$OUT_DIR"
-     |   function     "mkdir"
-     |   constant     "-p"
-     |   string       "\""
-     |   operator     "$"
-     |   property     "OUT_DIR"
-     |   string       "\""
+     |   function     "mkdir"          entity.name.command.shell
+     |   constant     "-p"             constant.other.option.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   property     "OUT_DIR"        variable.other.normal.shell
+     |   string       "\""             punctuation.definition.string.end.shell
   23 | for f in "$@"; do
-     |   keyword      "for"
-     |   property     "f"
-     |   keyword      "in"
-     |   string       "\""
-     |   operator     "$"
-     |   string       "@\""
-     |   keyword      "do"
+     |   keyword      "for"            keyword.control.shell
+     |   property     "f"              variable.other.normal.shell
+     |   keyword      "in"             keyword.control.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   string       "@"              string.quoted.double.shell
+     |   string       "\""             punctuation.definition.string.end.shell
+     |   keyword      "do"             keyword.control.shell
   24 |   tr -s '[:space:]' '\n' < "$f"
-     |   function     "tr"
-     |   constant     "-s"
-     |   string       "'[:space:]'"
-     |   string       "'\\n'"
-     |   operator     "<"
-     |   string       "\""
-     |   operator     "$"
-     |   property     "f"
-     |   string       "\""
+     |   function     "tr"             entity.name.command.shell
+     |   constant     "-s"             constant.other.option.shell
+     |   string       "'"              punctuation.definition.string.begin.shell
+     |   string       "[:space:]"      string.quoted.single.shell
+     |   string       "'"              punctuation.definition.string.end.shell
+     |   string       "'"              punctuation.definition.string.begin.shell
+     |   string       "\\n"            string.quoted.single.shell
+     |   string       "'"              punctuation.definition.string.end.shell
+     |   operator     "<"              keyword.operator.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   property     "f"              variable.other.normal.shell
+     |   string       "\""             punctuation.definition.string.end.shell
   25 | done | sort | uniq -c | sort -rn | head -n "$TOP" > "$OUT_DIR/top.txt"
-     |   keyword      "done"
-     |   operator     "|"
-     |   function     "sort"
-     |   operator     "|"
-     |   function     "uniq"
-     |   constant     "-c"
-     |   operator     "|"
-     |   function     "sort"
-     |   constant     "-rn"
-     |   operator     "|"
-     |   function     "head"
-     |   constant     "-n"
-     |   string       "\""
-     |   operator     "$"
-     |   property     "TOP"
-     |   string       "\""
-     |   operator     ">"
-     |   string       "\""
-     |   operator     "$"
-     |   property     "OUT_DIR"
-     |   string       "/top.txt\""
+     |   keyword      "done"           keyword.control.shell
+     |   operator     "|"              keyword.operator.shell
+     |   function     "sort"           entity.name.command.shell
+     |   operator     "|"              keyword.operator.shell
+     |   function     "uniq"           entity.name.command.shell
+     |   constant     "-c"             constant.other.option.shell
+     |   operator     "|"              keyword.operator.shell
+     |   function     "sort"           entity.name.command.shell
+     |   constant     "-rn"            constant.other.option.shell
+     |   operator     "|"              keyword.operator.shell
+     |   function     "head"           entity.name.command.shell
+     |   constant     "-n"             constant.other.option.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   property     "TOP"            variable.other.normal.shell
+     |   string       "\""             punctuation.definition.string.end.shell
+     |   operator     ">"              keyword.operator.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   property     "OUT_DIR"        variable.other.normal.shell
+     |   string       "/top.txt"       string.quoted.double.shell
+     |   string       "\""             punctuation.definition.string.end.shell
   26 | cat "$OUT_DIR/top.txt"
-     |   function     "cat"
-     |   string       "\""
-     |   operator     "$"
-     |   property     "OUT_DIR"
-     |   string       "/top.txt\""
+     |   function     "cat"            entity.name.command.shell
+     |   string       "\""             punctuation.definition.string.begin.shell
+     |   operator     "$"              keyword.operator.shell
+     |   property     "OUT_DIR"        variable.other.normal.shell
+     |   string       "/top.txt"       string.quoted.double.shell
+     |   string       "\""             punctuation.definition.string.end.shell

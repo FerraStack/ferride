@@ -1,37 +1,79 @@
    1 | {
    2 |   "name": "hello-web",
-     |   string       "\"name\""
-     |   string       "\"hello-web\""
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "name"           support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   string       "\""             punctuation.definition.string.begin.json
+     |   string       "hello-web"      string.quoted.double.json
+     |   string       "\""             punctuation.definition.string.end.json
    3 |   "version": "1.0.0",
-     |   string       "\"version\""
-     |   string       "\"1.0.0\""
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "version"        support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   string       "\""             punctuation.definition.string.begin.json
+     |   string       "1.0.0"          string.quoted.double.json
+     |   string       "\""             punctuation.definition.string.end.json
    4 |   "private": true,
-     |   string       "\"private\""
-     |   constant     "true"
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "private"        support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   constant     "true"           constant.language.boolean.json
    5 |   "scripts": { "build": "tsc -p .", "test": "vitest" },
-     |   string       "\"scripts\""
-     |   string       "\"build\""
-     |   string       "\"tsc -p .\""
-     |   string       "\"test\""
-     |   string       "\"vitest\""
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "scripts"        support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "build"          support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   string       "\""             punctuation.definition.string.begin.json
+     |   string       "tsc -p ."       string.quoted.double.json
+     |   string       "\""             punctuation.definition.string.end.json
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "test"           support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   string       "\""             punctuation.definition.string.begin.json
+     |   string       "vitest"         string.quoted.double.json
+     |   string       "\""             punctuation.definition.string.end.json
    6 |   "dependencies": { "react": "^19.0.0" },
-     |   string       "\"dependencies\""
-     |   string       "\"react\""
-     |   string       "\"^19.0.0\""
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "dependencies"   support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "react"          support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   string       "\""             punctuation.definition.string.begin.json
+     |   string       "^19.0.0"        string.quoted.double.json
+     |   string       "\""             punctuation.definition.string.end.json
    7 |   "engines": { "node": ">=22" },
-     |   string       "\"engines\""
-     |   string       "\"node\""
-     |   string       "\">=22\""
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "engines"        support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "node"           support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   string       "\""             punctuation.definition.string.begin.json
+     |   string       ">=22"           string.quoted.double.json
+     |   string       "\""             punctuation.definition.string.end.json
    8 |   "workspaces": ["packages/*"],
-     |   string       "\"workspaces\""
-     |   string       "\"packages/*\""
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "workspaces"     support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   string       "\""             punctuation.definition.string.begin.json
+     |   string       "packages/*"     string.quoted.double.json
+     |   string       "\""             punctuation.definition.string.end.json
    9 |   "sideEffects": false,
-     |   string       "\"sideEffects\""
-     |   constant     "false"
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "sideEffects"    support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   constant     "false"          constant.language.boolean.json
   10 |   "funding": null,
-     |   string       "\"funding\""
-     |   constant     "null"
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "funding"        support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   constant     "null"           constant.language.null.json
   11 |   "port": 8080
-     |   string       "\"port\""
-     |   number       "8080"
+     |   property     "\""             punctuation.support.type.property-name.begin.json
+     |   property     "port"           support.type.property-name.json
+     |   property     "\""             punctuation.support.type.property-name.end.json
+     |   number       "8080"           constant.numeric.json
   12 | }

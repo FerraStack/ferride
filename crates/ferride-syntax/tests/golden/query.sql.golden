@@ -1,146 +1,156 @@
    1 | -- Ferride sample: the most common words per document
-     |   comment      "-- Ferride sample: the most common words per document"
+     |   comment      "-- Ferride sample: the most common words per document" comment.line.sql
    2 | CREATE TABLE IF NOT EXISTS words (
-     |   keyword      "CREATE"
-     |   keyword      "TABLE"
-     |   keyword      "IF"
-     |   keyword      "NOT"
-     |   keyword      "EXISTS"
-     |   type         "words"
-     |   punctuation  "("
+     |   keyword      "CREATE"         keyword.other.sql
+     |   keyword      "TABLE"          keyword.other.sql
+     |   keyword      "IF"             keyword.other.sql
+     |   keyword      "NOT"            keyword.other.sql
+     |   keyword      "EXISTS"         keyword.other.sql
+     |   type         "words"          source.sql
+     |   punctuation  "("              meta.brace.round.sql
    3 |     id INTEGER PRIMARY KEY,
-     |   builtin      "INTEGER"
-     |   keyword      "PRIMARY"
-     |   keyword      "KEY"
-     |   punctuation  ","
+     |   builtin      "INTEGER"        storage.type.sql
+     |   keyword      "PRIMARY"        keyword.other.sql
+     |   keyword      "KEY"            keyword.other.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
    4 |     document_id INTEGER NOT NULL REFERENCES documents (id),
-     |   builtin      "INTEGER"
-     |   keyword      "NOT"
-     |   builtin      "NULL"
-     |   keyword      "REFERENCES"
-     |   type         "documents"
-     |   punctuation  "("
-     |   punctuation  "),"
+     |   builtin      "INTEGER"        storage.type.sql
+     |   keyword      "NOT"            keyword.other.sql
+     |   builtin      "NULL"           storage.type.sql
+     |   keyword      "REFERENCES"     keyword.other.sql
+     |   type         "documents"      source.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   punctuation  ")"              meta.brace.round.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
    5 |     word TEXT NOT NULL,
-     |   builtin      "TEXT"
-     |   keyword      "NOT"
-     |   builtin      "NULL"
-     |   punctuation  ","
+     |   builtin      "TEXT"           storage.type.sql
+     |   keyword      "NOT"            keyword.other.sql
+     |   builtin      "NULL"           storage.type.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
    6 |     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-     |   builtin      "TIMESTAMP"
-     |   attribute    "DEFAULT"
-     |   attribute    "CURRENT_TIMESTAMP"
+     |   builtin      "TIMESTAMP"      storage.type.sql
+     |   attribute    "DEFAULT"        source.sql
+     |   attribute    "CURRENT_TIMESTAMP" source.sql
    7 | );
-     |   punctuation  ");"
+     |   punctuation  ")"              meta.brace.round.sql
+     |   punctuation  ";"              punctuation.terminator.sql
    8 | 
    9 | INSERT INTO words (document_id, word) VALUES (1, 'quick'), (1, 'fox');
-     |   keyword      "INSERT"
-     |   keyword      "INTO"
-     |   type         "words"
-     |   punctuation  "("
-     |   punctuation  ","
-     |   punctuation  ")"
-     |   keyword      "VALUES"
-     |   punctuation  "("
-     |   number       "1"
-     |   punctuation  ","
-     |   string       "'quick'"
-     |   punctuation  "),"
-     |   punctuation  "("
-     |   number       "1"
-     |   punctuation  ","
-     |   string       "'fox'"
-     |   punctuation  ");"
+     |   keyword      "INSERT"         keyword.other.sql
+     |   keyword      "INTO"           keyword.other.sql
+     |   type         "words"          source.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
+     |   punctuation  ")"              meta.brace.round.sql
+     |   keyword      "VALUES"         keyword.other.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   number       "1"              constant.numeric.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
+     |   string       "'"              punctuation.definition.string.begin.sql
+     |   string       "quick"          string.quoted.single.sql
+     |   string       "'"              punctuation.definition.string.end.sql
+     |   punctuation  ")"              meta.brace.round.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   number       "1"              constant.numeric.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
+     |   string       "'"              punctuation.definition.string.begin.sql
+     |   string       "fox"            string.quoted.single.sql
+     |   string       "'"              punctuation.definition.string.end.sql
+     |   punctuation  ")"              meta.brace.round.sql
+     |   punctuation  ";"              punctuation.terminator.sql
   10 | 
   11 | SELECT d.title,
-     |   keyword      "SELECT"
-     |   type         "d"
-     |   punctuation  "."
-     |   property     "title"
-     |   punctuation  ","
+     |   keyword      "SELECT"         keyword.other.sql
+     |   type         "d"              source.sql
+     |   punctuation  "."              punctuation.accessor.sql
+     |   property     "title"          source.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
   12 |        w.word,
-     |   type         "w"
-     |   punctuation  "."
-     |   property     "word"
-     |   punctuation  ","
+     |   type         "w"              source.sql
+     |   punctuation  "."              punctuation.accessor.sql
+     |   property     "word"           source.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
   13 |        COUNT(*) AS occurrences,
-     |   function     "COUNT"
-     |   punctuation  "("
-     |   operator     "*"
-     |   punctuation  ")"
-     |   keyword      "AS"
-     |   variable     "occurrences"
-     |   punctuation  ","
+     |   function     "COUNT"          support.function.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   operator     "*"              keyword.operator.sql
+     |   punctuation  ")"              meta.brace.round.sql
+     |   keyword      "AS"             keyword.other.sql
+     |   variable     "occurrences"    source.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
   14 |        ROUND(AVG(LENGTH(w.word)), 2) AS avg_length
-     |   function     "ROUND"
-     |   punctuation  "("
-     |   function     "AVG"
-     |   punctuation  "("
-     |   function     "LENGTH"
-     |   punctuation  "("
-     |   type         "w"
-     |   punctuation  "."
-     |   property     "word"
-     |   punctuation  ")),"
-     |   number       "2"
-     |   punctuation  ")"
-     |   keyword      "AS"
-     |   variable     "avg_length"
+     |   function     "ROUND"          support.function.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   function     "AVG"            support.function.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   function     "LENGTH"         support.function.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   type         "w"              source.sql
+     |   punctuation  "."              punctuation.accessor.sql
+     |   property     "word"           source.sql
+     |   punctuation  "))"             meta.brace.round.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
+     |   number       "2"              constant.numeric.sql
+     |   punctuation  ")"              meta.brace.round.sql
+     |   keyword      "AS"             keyword.other.sql
+     |   variable     "avg_length"     source.sql
   15 | FROM words AS w
-     |   keyword      "FROM"
-     |   type         "words"
-     |   keyword      "AS"
-     |   variable     "w"
+     |   keyword      "FROM"           keyword.other.sql
+     |   type         "words"          source.sql
+     |   keyword      "AS"             keyword.other.sql
+     |   variable     "w"              source.sql
   16 | JOIN documents AS d ON d.id = w.document_id
-     |   keyword      "JOIN"
-     |   type         "documents"
-     |   keyword      "AS"
-     |   variable     "d"
-     |   keyword      "ON"
-     |   type         "d"
-     |   punctuation  "."
-     |   property     "id"
-     |   operator     "="
-     |   type         "w"
-     |   punctuation  "."
-     |   property     "document_id"
+     |   keyword      "JOIN"           keyword.other.sql
+     |   type         "documents"      source.sql
+     |   keyword      "AS"             keyword.other.sql
+     |   variable     "d"              source.sql
+     |   keyword      "ON"             keyword.other.sql
+     |   type         "d"              source.sql
+     |   punctuation  "."              punctuation.accessor.sql
+     |   property     "id"             source.sql
+     |   operator     "="              keyword.operator.sql
+     |   type         "w"              source.sql
+     |   punctuation  "."              punctuation.accessor.sql
+     |   property     "document_id"    source.sql
   17 | WHERE w.word <> '' AND d.archived = FALSE
-     |   keyword      "WHERE"
-     |   type         "w"
-     |   punctuation  "."
-     |   property     "word"
-     |   operator     "<>"
-     |   string       "''"
-     |   keyword      "AND"
-     |   type         "d"
-     |   punctuation  "."
-     |   property     "archived"
-     |   operator     "="
-     |   constant     "FALSE"
+     |   keyword      "WHERE"          keyword.other.sql
+     |   type         "w"              source.sql
+     |   punctuation  "."              punctuation.accessor.sql
+     |   property     "word"           source.sql
+     |   operator     "<>"             keyword.operator.sql
+     |   string       "'"              punctuation.definition.string.begin.sql
+     |   string       "'"              punctuation.definition.string.end.sql
+     |   keyword      "AND"            keyword.other.sql
+     |   type         "d"              source.sql
+     |   punctuation  "."              punctuation.accessor.sql
+     |   property     "archived"       source.sql
+     |   operator     "="              keyword.operator.sql
+     |   constant     "FALSE"          constant.language.boolean.sql
   18 | GROUP BY d.title, w.word
-     |   keyword      "GROUP"
-     |   keyword      "BY"
-     |   type         "d"
-     |   punctuation  "."
-     |   property     "title"
-     |   punctuation  ","
-     |   type         "w"
-     |   punctuation  "."
-     |   property     "word"
+     |   keyword      "GROUP"          keyword.other.sql
+     |   keyword      "BY"             keyword.other.sql
+     |   type         "d"              source.sql
+     |   punctuation  "."              punctuation.accessor.sql
+     |   property     "title"          source.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
+     |   type         "w"              source.sql
+     |   punctuation  "."              punctuation.accessor.sql
+     |   property     "word"           source.sql
   19 | HAVING COUNT(*) > 1
-     |   keyword      "HAVING"
-     |   function     "COUNT"
-     |   punctuation  "("
-     |   operator     "*"
-     |   punctuation  ")"
-     |   operator     ">"
-     |   number       "1"
+     |   keyword      "HAVING"         keyword.other.sql
+     |   function     "COUNT"          support.function.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   operator     "*"              keyword.operator.sql
+     |   punctuation  ")"              meta.brace.round.sql
+     |   operator     ">"              keyword.operator.sql
+     |   number       "1"              constant.numeric.sql
   20 | ORDER BY occurrences DESC
-     |   keyword      "ORDER"
-     |   keyword      "BY"
-     |   property     "occurrences"
-     |   attribute    "DESC"
+     |   keyword      "ORDER"          keyword.other.sql
+     |   keyword      "BY"             keyword.other.sql
+     |   property     "occurrences"    source.sql
+     |   attribute    "DESC"           source.sql
   21 | LIMIT 10;
-     |   keyword      "LIMIT"
-     |   number       "10"
-     |   punctuation  ";"
+     |   keyword      "LIMIT"          keyword.other.sql
+     |   number       "10"             constant.numeric.sql
+     |   punctuation  ";"              punctuation.terminator.sql

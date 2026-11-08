@@ -40,11 +40,9 @@ fn viewport_has_highlight_spans() {
     assert_eq!(lines.len(), 4);
     assert_eq!(lines[1].text, "    let x = 1;");
     assert_eq!(lines[1].start_offset, 12);
-    assert!(lines[0].spans.contains(&StyleSpan {
-        start: 0,
-        end: 2,
-        kind: StyleKind::Keyword
-    }));
+    let fn_kw = lines[0].spans.iter().find(|s| s.start == 0).unwrap();
+    assert_eq!((fn_kw.end, fn_kw.kind), (2, StyleKind::Keyword));
+    assert_eq!(scope_stack(fn_kw.scope), ["source.rust", "keyword.other.rust"]);
     assert!(
         lines[1]
             .spans
@@ -55,14 +53,8 @@ fn viewport_has_highlight_spans() {
     // Editing reparses: turning `main` into a comment changes its style.
     doc.replace(0, 0, "// ".into(), false).unwrap();
     let lines = doc.viewport(0, 1);
-    assert_eq!(
-        lines[0].spans,
-        vec![StyleSpan {
-            start: 0,
-            end: 14,
-            kind: StyleKind::Comment
-        }]
-    );
+    let spans: Vec<_> = lines[0].spans.iter().map(|s| (s.start, s.end, s.kind)).collect();
+    assert_eq!(spans, vec![(0, 14, StyleKind::Comment)]);
     assert!(doc.viewport(50, 10).is_empty());
 }
 
@@ -327,4 +319,37 @@ fn grapheme_navigation_in_utf16() {
     doc.set_selection(9, 9);
     doc.backspace();
     assert_eq!(doc.text(), "ab");
+}
+
+#[test]
+fn token_theme_styles_span_scopes() {
+    let theme = TokenTheme::new(
+        r##"{ "type": "dark", "colors": { "editor.foreground": "#cccccc" },
+             "tokenColors": [
+               { "scope": "keyword", "settings": { "foreground": "#ff79c6" } },
+               { "scope": "comment", "settings": { "foreground": "#6272a4", "fontStyle": "italic" } },
+             ] }"##
+            .into(),
+    )
+    .unwrap();
+    let doc = Document::new("fn main() {} // hi\n".into(), Some("main.rs".into()));
+    let line = &doc.viewport(0, 1)[0];
+    let style = |kind| theme.style(line.spans.iter().find(|s| s.kind == kind).unwrap().scope);
+    assert_eq!(
+        style(StyleKind::Keyword),
+        TokenStyle {
+            foreground: 0xFFFF79C6,
+            font_style: 0
+        }
+    );
+    assert_eq!(
+        style(StyleKind::Comment),
+        TokenStyle {
+            foreground: 0xFF6272A4,
+            font_style: 1
+        }
+    );
+    // Unknown ids fall back to the default foreground.
+    assert_eq!(theme.style(0).foreground, 0xFFCCCCCC);
+    assert!(TokenTheme::new("not json".into()).is_err());
 }

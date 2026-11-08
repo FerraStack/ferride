@@ -1,233 +1,245 @@
    1 | package dev.ferride.sample
-     |   keyword      "package"
-     |   type         "dev"
-     |   punctuation  "."
-     |   type         "ferride"
-     |   punctuation  "."
-     |   type         "sample"
+     |   keyword      "package"        keyword.control.import.kotlin
+     |   type         "dev"            entity.name.namespace.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   type         "ferride"        entity.name.namespace.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   type         "sample"         entity.name.namespace.kotlin
    2 | 
    3 | import kotlin.math.max
-     |   keyword      "import"
-     |   type         "kotlin"
-     |   punctuation  "."
-     |   type         "math"
-     |   punctuation  "."
-     |   type         "max"
+     |   keyword      "import"         keyword.control.import.kotlin
+     |   type         "kotlin"         entity.name.namespace.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   type         "math"           entity.name.namespace.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   type         "max"            entity.name.namespace.kotlin
    4 | 
    5 | /** A word and how often it appears. */
-     |   comment      "/** A word and how often it appears. */"
+     |   comment      "/** A word and how often it appears. */" comment.block.documentation.kotlin
    6 | data class WordCount(val word: String, val count: Int)
-     |   keyword      "data"
-     |   keyword      "class"
-     |   type         "WordCount"
-     |   punctuation  "("
-     |   keyword      "val"
-     |   variable     "word"
-     |   punctuation  ":"
-     |   type         "String"
-     |   punctuation  ","
-     |   keyword      "val"
-     |   variable     "count"
-     |   punctuation  ":"
-     |   type         "Int"
-     |   punctuation  ")"
+     |   keyword      "data"           storage.modifier.kotlin
+     |   keyword      "class"          storage.type.kotlin
+     |   type         "WordCount"      entity.name.type.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   keyword      "val"            storage.type.kotlin
+     |   variable     "word"           variable.parameter.kotlin
+     |   punctuation  ":"              punctuation.separator.key-value.kotlin
+     |   type         "String"         entity.name.type.kotlin
+     |   punctuation  ","              punctuation.separator.comma.kotlin
+     |   keyword      "val"            storage.type.kotlin
+     |   variable     "count"          variable.parameter.kotlin
+     |   punctuation  ":"              punctuation.separator.key-value.kotlin
+     |   type         "Int"            entity.name.type.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
    7 | 
    8 | private const val TOP = 3
-     |   keyword      "private"
-     |   keyword      "const"
-     |   keyword      "val"
-     |   constant     "TOP"
-     |   operator     "="
-     |   number       "3"
+     |   keyword      "private"        storage.modifier.kotlin
+     |   keyword      "const"          storage.modifier.kotlin
+     |   keyword      "val"            storage.type.kotlin
+     |   constant     "TOP"            variable.other.constant.kotlin
+     |   operator     "="              keyword.operator.kotlin
+     |   number       "3"              constant.numeric.kotlin
    9 | 
   10 | fun countWords(text: String): List<WordCount> =
-     |   keyword      "fun"
-     |   function     "countWords"
-     |   punctuation  "("
-     |   variable     "text"
-     |   punctuation  ":"
-     |   type         "String"
-     |   punctuation  "):"
-     |   type         "List"
-     |   punctuation  "<"
-     |   type         "WordCount"
-     |   punctuation  ">"
-     |   operator     "="
+     |   keyword      "fun"            storage.type.kotlin
+     |   function     "countWords"     entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   variable     "text"           variable.parameter.kotlin
+     |   punctuation  ":"              punctuation.separator.key-value.kotlin
+     |   type         "String"         entity.name.type.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
+     |   punctuation  ":"              punctuation.separator.key-value.kotlin
+     |   type         "List"           entity.name.type.kotlin
+     |   punctuation  "<"              punctuation.kotlin
+     |   type         "WordCount"      entity.name.type.kotlin
+     |   punctuation  ">"              punctuation.kotlin
+     |   operator     "="              keyword.operator.kotlin
   11 |     text.lowercase()
-     |   variable     "text"
-     |   punctuation  "."
-     |   function     "lowercase"
-     |   punctuation  "()"
+     |   variable     "text"           variable.other.readwrite.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "lowercase"      entity.name.function.kotlin
+     |   punctuation  "()"             meta.brace.round.kotlin
   12 |         .split(Regex("\\s+"))
-     |   punctuation  "."
-     |   function     "split"
-     |   punctuation  "("
-     |   function     "Regex"
-     |   punctuation  "("
-     |   string       "\""
-     |   escape       "\\\\"
-     |   string       "s+\""
-     |   punctuation  "))"
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "split"          entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   function     "Regex"          entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   string       "\""             punctuation.definition.string.begin.kotlin
+     |   escape       "\\\\"           constant.character.escape.kotlin
+     |   string       "s+"             string.kotlin
+     |   string       "\""             punctuation.definition.string.end.kotlin
+     |   punctuation  "))"             meta.brace.round.kotlin
   13 |         .filter { it.isNotBlank() }
-     |   punctuation  "."
-     |   function     "filter"
-     |   punctuation  "{"
-     |   variable     "it"
-     |   punctuation  "."
-     |   function     "isNotBlank"
-     |   punctuation  "()"
-     |   punctuation  "}"
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "filter"         entity.name.function.kotlin
+     |   punctuation  "{"              punctuation.definition.block.kotlin
+     |   variable     "it"             variable.other.readwrite.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "isNotBlank"     entity.name.function.kotlin
+     |   punctuation  "()"             meta.brace.round.kotlin
+     |   punctuation  "}"              punctuation.definition.block.kotlin
   14 |         .groupingBy { it }
-     |   punctuation  "."
-     |   function     "groupingBy"
-     |   punctuation  "{"
-     |   variable     "it"
-     |   punctuation  "}"
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "groupingBy"     entity.name.function.kotlin
+     |   punctuation  "{"              punctuation.definition.block.kotlin
+     |   variable     "it"             variable.other.readwrite.kotlin
+     |   punctuation  "}"              punctuation.definition.block.kotlin
   15 |         .eachCount()
-     |   punctuation  "."
-     |   function     "eachCount"
-     |   punctuation  "()"
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "eachCount"      entity.name.function.kotlin
+     |   punctuation  "()"             meta.brace.round.kotlin
   16 |         .map { (word, count) -> WordCount(word, count) }
-     |   punctuation  "."
-     |   function     "map"
-     |   punctuation  "{"
-     |   punctuation  "("
-     |   variable     "word"
-     |   punctuation  ","
-     |   variable     "count"
-     |   punctuation  ")"
-     |   operator     "->"
-     |   function     "WordCount"
-     |   punctuation  "("
-     |   variable     "word"
-     |   punctuation  ","
-     |   variable     "count"
-     |   punctuation  ")"
-     |   punctuation  "}"
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "map"            entity.name.function.kotlin
+     |   punctuation  "{"              punctuation.definition.block.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   variable     "word"           variable.other.readwrite.kotlin
+     |   punctuation  ","              punctuation.separator.comma.kotlin
+     |   variable     "count"          variable.other.readwrite.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
+     |   operator     "->"             keyword.operator.kotlin
+     |   function     "WordCount"      entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   variable     "word"           variable.other.readwrite.kotlin
+     |   punctuation  ","              punctuation.separator.comma.kotlin
+     |   variable     "count"          variable.other.readwrite.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
+     |   punctuation  "}"              punctuation.definition.block.kotlin
   17 |         .sortedByDescending { it.count }
-     |   punctuation  "."
-     |   function     "sortedByDescending"
-     |   punctuation  "{"
-     |   variable     "it"
-     |   punctuation  "."
-     |   property     "count"
-     |   punctuation  "}"
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "sortedByDescending" entity.name.function.kotlin
+     |   punctuation  "{"              punctuation.definition.block.kotlin
+     |   variable     "it"             variable.other.readwrite.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   property     "count"          variable.other.property.kotlin
+     |   punctuation  "}"              punctuation.definition.block.kotlin
   18 | 
   19 | sealed interface Result {
-     |   keyword      "sealed"
-     |   keyword      "interface"
-     |   type         "Result"
-     |   punctuation  "{"
+     |   keyword      "sealed"         storage.modifier.kotlin
+     |   keyword      "interface"      storage.type.kotlin
+     |   type         "Result"         entity.name.type.kotlin
+     |   punctuation  "{"              punctuation.definition.block.kotlin
   20 |     object Empty : Result
-     |   keyword      "object"
-     |   type         "Empty"
-     |   punctuation  ":"
-     |   type         "Result"
+     |   keyword      "object"         storage.type.kotlin
+     |   type         "Empty"          entity.name.type.kotlin
+     |   punctuation  ":"              punctuation.separator.key-value.kotlin
+     |   type         "Result"         entity.name.type.kotlin
   21 |     data class Found(val words: List<WordCount>) : Result
-     |   keyword      "data"
-     |   keyword      "class"
-     |   type         "Found"
-     |   punctuation  "("
-     |   keyword      "val"
-     |   variable     "words"
-     |   punctuation  ":"
-     |   type         "List"
-     |   punctuation  "<"
-     |   type         "WordCount"
-     |   punctuation  ">)"
-     |   punctuation  ":"
-     |   type         "Result"
+     |   keyword      "data"           storage.modifier.kotlin
+     |   keyword      "class"          storage.type.kotlin
+     |   type         "Found"          entity.name.type.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   keyword      "val"            storage.type.kotlin
+     |   variable     "words"          variable.parameter.kotlin
+     |   punctuation  ":"              punctuation.separator.key-value.kotlin
+     |   type         "List"           entity.name.type.kotlin
+     |   punctuation  "<"              punctuation.kotlin
+     |   type         "WordCount"      entity.name.type.kotlin
+     |   punctuation  ">"              punctuation.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
+     |   punctuation  ":"              punctuation.separator.key-value.kotlin
+     |   type         "Result"         entity.name.type.kotlin
   22 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.kotlin
   23 | 
   24 | fun main(args: Array<String>) {
-     |   keyword      "fun"
-     |   function     "main"
-     |   punctuation  "("
-     |   variable     "args"
-     |   punctuation  ":"
-     |   type         "Array"
-     |   punctuation  "<"
-     |   type         "String"
-     |   punctuation  ">)"
-     |   punctuation  "{"
+     |   keyword      "fun"            storage.type.kotlin
+     |   function     "main"           entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   variable     "args"           variable.parameter.kotlin
+     |   punctuation  ":"              punctuation.separator.key-value.kotlin
+     |   type         "Array"          entity.name.type.kotlin
+     |   punctuation  "<"              punctuation.kotlin
+     |   type         "String"         entity.name.type.kotlin
+     |   punctuation  ">"              punctuation.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
+     |   punctuation  "{"              punctuation.definition.block.kotlin
   25 |     val text = args.joinToString(" ").ifEmpty { "the quick brown fox jumps over the lazy dog" }
-     |   keyword      "val"
-     |   variable     "text"
-     |   operator     "="
-     |   variable     "args"
-     |   punctuation  "."
-     |   function     "joinToString"
-     |   punctuation  "("
-     |   string       "\" \""
-     |   punctuation  ")."
-     |   function     "ifEmpty"
-     |   punctuation  "{"
-     |   string       "\"the quick brown fox jumps over the lazy dog\""
-     |   punctuation  "}"
+     |   keyword      "val"            storage.type.kotlin
+     |   variable     "text"           variable.other.readwrite.kotlin
+     |   operator     "="              keyword.operator.kotlin
+     |   variable     "args"           variable.other.readwrite.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "joinToString"   entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   string       "\""             punctuation.definition.string.begin.kotlin
+     |   string       " "              string.kotlin
+     |   string       "\""             punctuation.definition.string.end.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "ifEmpty"        entity.name.function.kotlin
+     |   punctuation  "{"              punctuation.definition.block.kotlin
+     |   string       "\""             punctuation.definition.string.begin.kotlin
+     |   string       "the quick brown fox jumps over the lazy dog" string.kotlin
+     |   string       "\""             punctuation.definition.string.end.kotlin
+     |   punctuation  "}"              punctuation.definition.block.kotlin
   26 |     val result = countWords(text).take(max(TOP, 1))
-     |   keyword      "val"
-     |   variable     "result"
-     |   operator     "="
-     |   function     "countWords"
-     |   punctuation  "("
-     |   variable     "text"
-     |   punctuation  ")."
-     |   function     "take"
-     |   punctuation  "("
-     |   function     "max"
-     |   punctuation  "("
-     |   constant     "TOP"
-     |   punctuation  ","
-     |   number       "1"
-     |   punctuation  "))"
+     |   keyword      "val"            storage.type.kotlin
+     |   variable     "result"         variable.other.readwrite.kotlin
+     |   operator     "="              keyword.operator.kotlin
+     |   function     "countWords"     entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   variable     "text"           variable.other.readwrite.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "take"           entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   function     "max"            entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   constant     "TOP"            variable.other.constant.kotlin
+     |   punctuation  ","              punctuation.separator.comma.kotlin
+     |   number       "1"              constant.numeric.kotlin
+     |   punctuation  "))"             meta.brace.round.kotlin
   27 |     when {
-     |   keyword      "when"
-     |   punctuation  "{"
+     |   keyword      "when"           keyword.control.kotlin
+     |   punctuation  "{"              punctuation.definition.block.kotlin
   28 |         result.isEmpty() -> println("no words")
-     |   variable     "result"
-     |   punctuation  "."
-     |   function     "isEmpty"
-     |   punctuation  "()"
-     |   operator     "->"
-     |   function     "println"
-     |   punctuation  "("
-     |   string       "\"no words\""
-     |   punctuation  ")"
+     |   variable     "result"         variable.other.readwrite.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "isEmpty"        entity.name.function.kotlin
+     |   punctuation  "()"             meta.brace.round.kotlin
+     |   operator     "->"             keyword.operator.kotlin
+     |   function     "println"        entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   string       "\""             punctuation.definition.string.begin.kotlin
+     |   string       "no words"       string.kotlin
+     |   string       "\""             punctuation.definition.string.end.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
   29 |         else -> result.forEach { println("${it.word}: ${it.count}") }
-     |   keyword      "else"
-     |   operator     "->"
-     |   variable     "result"
-     |   punctuation  "."
-     |   function     "forEach"
-     |   punctuation  "{"
-     |   function     "println"
-     |   punctuation  "("
-     |   string       "\""
-     |   punctuation  "${"
-     |   variable     "it"
-     |   punctuation  "."
-     |   property     "word"
-     |   punctuation  "}"
-     |   string       ": "
-     |   punctuation  "${"
-     |   variable     "it"
-     |   punctuation  "."
-     |   property     "count"
-     |   punctuation  "}"
-     |   string       "\""
-     |   punctuation  ")"
-     |   punctuation  "}"
+     |   keyword      "else"           keyword.control.kotlin
+     |   operator     "->"             keyword.operator.kotlin
+     |   variable     "result"         variable.other.readwrite.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   function     "forEach"        entity.name.function.kotlin
+     |   punctuation  "{"              punctuation.definition.block.kotlin
+     |   function     "println"        entity.name.function.kotlin
+     |   punctuation  "("              meta.brace.round.kotlin
+     |   string       "\""             punctuation.definition.string.begin.kotlin
+     |   punctuation  "${"             punctuation.definition.template-expression.kotlin
+     |   variable     "it"             variable.other.readwrite.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   property     "word"           variable.other.property.kotlin
+     |   punctuation  "}"              punctuation.definition.block.kotlin
+     |   string       ": "             string.kotlin
+     |   punctuation  "${"             punctuation.definition.template-expression.kotlin
+     |   variable     "it"             variable.other.readwrite.kotlin
+     |   punctuation  "."              punctuation.accessor.kotlin
+     |   property     "count"          variable.other.property.kotlin
+     |   punctuation  "}"              punctuation.definition.block.kotlin
+     |   string       "\""             punctuation.definition.string.end.kotlin
+     |   punctuation  ")"              meta.brace.round.kotlin
+     |   punctuation  "}"              punctuation.definition.block.kotlin
   30 |     }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.kotlin
   31 |     val enabled = true && text != null
-     |   keyword      "val"
-     |   variable     "enabled"
-     |   operator     "="
-     |   constant     "true"
-     |   operator     "&&"
-     |   variable     "text"
-     |   operator     "!="
-     |   constant     "null"
+     |   keyword      "val"            storage.type.kotlin
+     |   variable     "enabled"        variable.other.readwrite.kotlin
+     |   operator     "="              keyword.operator.kotlin
+     |   constant     "true"           constant.language.boolean.kotlin
+     |   operator     "&&"             keyword.operator.kotlin
+     |   variable     "text"           variable.other.readwrite.kotlin
+     |   operator     "!="             keyword.operator.kotlin
+     |   constant     "null"           constant.language.null.kotlin
   32 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.kotlin

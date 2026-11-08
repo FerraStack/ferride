@@ -1,142 +1,146 @@
    1 | #include <stdio.h>
-     |   keyword      "#include"
-     |   string       "<stdio.h>"
+     |   keyword      "#include"       keyword.control.directive.c
+     |   string       "<stdio.h>"      string.quoted.other.lt-gt.c
    2 | #include <stdlib.h>
-     |   keyword      "#include"
-     |   string       "<stdlib.h>"
+     |   keyword      "#include"       keyword.control.directive.c
+     |   string       "<stdlib.h>"     string.quoted.other.lt-gt.c
    3 | 
    4 | #define MAX_WORDS 128
-     |   keyword      "#define"
-     |   constant     "MAX_WORDS"
+     |   keyword      "#define"        keyword.control.directive.c
+     |   constant     "MAX_WORDS"      entity.name.function.preprocessor.c
    5 | 
    6 | /* A word and how often it appears. */
-     |   comment      "/* A word and how often it appears. */"
+     |   comment      "/* A word and how often it appears. */" comment.block.c
    7 | typedef struct {
-     |   keyword      "typedef"
-     |   keyword      "struct"
+     |   keyword      "typedef"        storage.type.c
+     |   keyword      "struct"         storage.type.c
    8 |     const char *text;
-     |   keyword      "const"
-     |   type         "char"
-     |   operator     "*"
-     |   property     "text"
-     |   punctuation  ";"
+     |   keyword      "const"          storage.modifier.c
+     |   type         "char"           storage.type.built-in.primitive.c
+     |   operator     "*"              keyword.operator.c
+     |   property     "text"           variable.other.property.c
+     |   punctuation  ";"              punctuation.terminator.c
    9 |     unsigned int count;
-     |   type         "unsigned int"
-     |   property     "count"
-     |   punctuation  ";"
+     |   type         "unsigned "      storage.type.built-in.primitive.c
+     |   type         "int"            storage.type.built-in.primitive.c
+     |   property     "count"          variable.other.property.c
+     |   punctuation  ";"              punctuation.terminator.c
   10 | } Word;
-     |   type         "Word"
-     |   punctuation  ";"
+     |   type         "Word"           entity.name.type.c
+     |   punctuation  ";"              punctuation.terminator.c
   11 | 
   12 | static int compare(const void *a, const void *b) {
-     |   keyword      "static"
-     |   type         "int"
-     |   function     "compare"
-     |   keyword      "const"
-     |   type         "void"
-     |   operator     "*"
-     |   variable     "a"
-     |   keyword      "const"
-     |   type         "void"
-     |   operator     "*"
-     |   variable     "b"
+     |   keyword      "static"         storage.modifier.c
+     |   type         "int"            storage.type.built-in.primitive.c
+     |   function     "compare"        entity.name.function.c
+     |   keyword      "const"          storage.modifier.c
+     |   type         "void"           storage.type.built-in.primitive.c
+     |   operator     "*"              keyword.operator.c
+     |   variable     "a"              variable.parameter.c
+     |   keyword      "const"          storage.modifier.c
+     |   type         "void"           storage.type.built-in.primitive.c
+     |   operator     "*"              keyword.operator.c
+     |   variable     "b"              variable.parameter.c
   13 |     const Word *x = a, *y = b;
-     |   keyword      "const"
-     |   type         "Word"
-     |   operator     "*"
-     |   variable     "x"
-     |   operator     "="
-     |   variable     "a"
-     |   operator     "*"
-     |   variable     "y"
-     |   operator     "="
-     |   variable     "b"
-     |   punctuation  ";"
+     |   keyword      "const"          storage.modifier.c
+     |   type         "Word"           entity.name.type.c
+     |   operator     "*"              keyword.operator.c
+     |   variable     "x"              source.c
+     |   operator     "="              keyword.operator.c
+     |   variable     "a"              source.c
+     |   operator     "*"              keyword.operator.c
+     |   variable     "y"              source.c
+     |   operator     "="              keyword.operator.c
+     |   variable     "b"              source.c
+     |   punctuation  ";"              punctuation.terminator.c
   14 |     return (int)y->count - (int)x->count;
-     |   keyword      "return"
-     |   type         "int"
-     |   variable     "y"
-     |   operator     "->"
-     |   property     "count"
-     |   operator     "-"
-     |   type         "int"
-     |   variable     "x"
-     |   operator     "->"
-     |   property     "count"
-     |   punctuation  ";"
+     |   keyword      "return"         keyword.control.c
+     |   type         "int"            storage.type.built-in.primitive.c
+     |   variable     "y"              source.c
+     |   operator     "->"             keyword.operator.c
+     |   property     "count"          variable.other.property.c
+     |   operator     "-"              keyword.operator.c
+     |   type         "int"            storage.type.built-in.primitive.c
+     |   variable     "x"              source.c
+     |   operator     "->"             keyword.operator.c
+     |   property     "count"          variable.other.property.c
+     |   punctuation  ";"              punctuation.terminator.c
   15 | }
   16 | 
   17 | int main(int argc, char **argv) {
-     |   type         "int"
-     |   function     "main"
-     |   type         "int"
-     |   variable     "argc"
-     |   type         "char"
-     |   operator     "**"
-     |   variable     "argv"
+     |   type         "int"            storage.type.built-in.primitive.c
+     |   function     "main"           entity.name.function.c
+     |   type         "int"            storage.type.built-in.primitive.c
+     |   variable     "argc"           variable.parameter.c
+     |   type         "char"           storage.type.built-in.primitive.c
+     |   operator     "**"             keyword.operator.c
+     |   variable     "argv"           variable.parameter.c
   18 |     Word words[MAX_WORDS] = {0};
-     |   type         "Word"
-     |   variable     "words"
-     |   constant     "MAX_WORDS"
-     |   operator     "="
-     |   number       "0"
-     |   punctuation  ";"
+     |   type         "Word"           entity.name.type.c
+     |   variable     "words"          source.c
+     |   constant     "MAX_WORDS"      source.c
+     |   operator     "="              keyword.operator.c
+     |   number       "0"              constant.numeric.c
+     |   punctuation  ";"              punctuation.terminator.c
   19 |     size_t n = 0;
-     |   type         "size_t"
-     |   variable     "n"
-     |   operator     "="
-     |   number       "0"
-     |   punctuation  ";"
+     |   type         "size_t"         storage.type.built-in.primitive.c
+     |   variable     "n"              source.c
+     |   operator     "="              keyword.operator.c
+     |   number       "0"              constant.numeric.c
+     |   punctuation  ";"              punctuation.terminator.c
   20 |     for (int i = 1; i < argc && n < MAX_WORDS; i++) {
-     |   keyword      "for"
-     |   type         "int"
-     |   variable     "i"
-     |   operator     "="
-     |   number       "1"
-     |   punctuation  ";"
-     |   variable     "i"
-     |   operator     "<"
-     |   variable     "argc"
-     |   operator     "&&"
-     |   variable     "n"
-     |   operator     "<"
-     |   constant     "MAX_WORDS"
-     |   punctuation  ";"
-     |   variable     "i"
-     |   operator     "++"
+     |   keyword      "for"            keyword.control.c
+     |   type         "int"            storage.type.built-in.primitive.c
+     |   variable     "i"              source.c
+     |   operator     "="              keyword.operator.c
+     |   number       "1"              constant.numeric.c
+     |   punctuation  ";"              punctuation.terminator.c
+     |   variable     "i"              source.c
+     |   operator     "<"              keyword.operator.c
+     |   variable     "argc"           source.c
+     |   operator     "&&"             keyword.operator.c
+     |   variable     "n"              source.c
+     |   operator     "<"              keyword.operator.c
+     |   constant     "MAX_WORDS"      source.c
+     |   punctuation  ";"              punctuation.terminator.c
+     |   variable     "i"              source.c
+     |   operator     "++"             keyword.operator.c
   21 |         words[n++] = (Word){ .text = argv[i], .count = 1 };
-     |   variable     "words"
-     |   variable     "n"
-     |   operator     "++"
-     |   operator     "="
-     |   type         "Word"
-     |   punctuation  "."
-     |   property     "text"
-     |   operator     "="
-     |   variable     "argv"
-     |   variable     "i"
-     |   punctuation  "."
-     |   property     "count"
-     |   operator     "="
-     |   number       "1"
-     |   punctuation  ";"
+     |   variable     "words"          source.c
+     |   variable     "n"              source.c
+     |   operator     "++"             keyword.operator.c
+     |   operator     "="              keyword.operator.c
+     |   type         "Word"           entity.name.type.c
+     |   punctuation  "."              punctuation.accessor.c
+     |   property     "text"           variable.other.property.c
+     |   operator     "="              keyword.operator.c
+     |   variable     "argv"           source.c
+     |   variable     "i"              source.c
+     |   punctuation  "."              punctuation.accessor.c
+     |   property     "count"          variable.other.property.c
+     |   operator     "="              keyword.operator.c
+     |   number       "1"              constant.numeric.c
+     |   punctuation  ";"              punctuation.terminator.c
   22 |     }
   23 |     qsort(words, n, sizeof(Word), compare);
-     |   function     "qsort"
-     |   variable     "words"
-     |   variable     "n"
-     |   keyword      "sizeof"
-     |   variable     "Word"
-     |   variable     "compare"
-     |   punctuation  ";"
+     |   function     "qsort"          entity.name.function.c
+     |   variable     "words"          source.c
+     |   variable     "n"              source.c
+     |   keyword      "sizeof"         keyword.operator.expression.c
+     |   variable     "Word"           source.c
+     |   variable     "compare"        source.c
+     |   punctuation  ";"              punctuation.terminator.c
   24 |     printf("%zu words\n", n); // done
-     |   function     "printf"
-     |   string       "\"%zu words\\n\""
-     |   variable     "n"
-     |   punctuation  ";"
-     |   comment      "// done"
+     |   function     "printf"         entity.name.function.c
+     |   string       "\""             punctuation.definition.string.begin.c
+     |   string       "%zu"            constant.other.placeholder.c
+     |   string       " words\\n"      string.quoted.double.c
+     |   string       "\""             punctuation.definition.string.end.c
+     |   variable     "n"              source.c
+     |   punctuation  ";"              punctuation.terminator.c
+     |   comment      "// done"        comment.line.c
   25 |     return EXIT_SUCCESS;
-     |   keyword      "return"
-     |   constant     "EXIT_SUCCESS"
-     |   punctuation  ";"
+     |   keyword      "return"         keyword.control.c
+     |   constant     "EXIT_SUCCESS"   source.c
+     |   punctuation  ";"              punctuation.terminator.c
   26 | }

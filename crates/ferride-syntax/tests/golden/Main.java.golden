@@ -1,142 +1,149 @@
    1 | package dev.ferride.sample;
-     |   keyword      "package"
-     |   variable     "dev"
-     |   variable     "ferride"
-     |   variable     "sample"
+     |   keyword      "package"        keyword.control.import.java
+     |   variable     "dev"            storage.modifier.package.java
+     |   variable     "ferride"        storage.modifier.package.java
+     |   variable     "sample"         storage.modifier.package.java
    2 | 
    3 | import java.util.HashMap;
-     |   keyword      "import"
-     |   variable     "java"
-     |   variable     "util"
-     |   variable     "HashMap"
+     |   keyword      "import"         keyword.control.import.java
+     |   variable     "java"           storage.modifier.import.java
+     |   variable     "util"           storage.modifier.import.java
+     |   variable     "HashMap"        storage.modifier.import.java
    4 | import java.util.List;
-     |   keyword      "import"
-     |   variable     "java"
-     |   variable     "util"
-     |   variable     "List"
+     |   keyword      "import"         keyword.control.import.java
+     |   variable     "java"           storage.modifier.import.java
+     |   variable     "util"           storage.modifier.import.java
+     |   variable     "List"           storage.modifier.import.java
    5 | import java.util.Map;
-     |   keyword      "import"
-     |   variable     "java"
-     |   variable     "util"
-     |   variable     "Map"
+     |   keyword      "import"         keyword.control.import.java
+     |   variable     "java"           storage.modifier.import.java
+     |   variable     "util"           storage.modifier.import.java
+     |   variable     "Map"            storage.modifier.import.java
    6 | 
    7 | /** Counts words and prints the most common ones. */
-     |   comment      "/** Counts words and prints the most common ones. */"
+     |   comment      "/** Counts words and prints the most common ones. */" comment.block.documentation.java
    8 | public final class Main {
-     |   keyword      "public"
-     |   keyword      "final"
-     |   keyword      "class"
-     |   type         "Main"
+     |   keyword      "public"         storage.modifier.java
+     |   keyword      "final"          storage.modifier.java
+     |   keyword      "class"          storage.modifier.java
+     |   type         "Main"           entity.name.type.java
    9 |     private static final int TOP = 3;
-     |   keyword      "private"
-     |   keyword      "static"
-     |   keyword      "final"
-     |   builtin      "int"
-     |   constant     "TOP"
-     |   number       "3"
+     |   keyword      "private"        storage.modifier.java
+     |   keyword      "static"         storage.modifier.java
+     |   keyword      "final"          storage.modifier.java
+     |   builtin      "int"            storage.type.primitive.java
+     |   constant     "TOP"            variable.other.constant.java
+     |   number       "3"              constant.numeric.java
   10 | 
   11 |     record WordCount(String word, int count) {}
-     |   keyword      "record"
-     |   variable     "WordCount"
-     |   type         "String"
-     |   variable     "word"
-     |   builtin      "int"
-     |   variable     "count"
+     |   keyword      "record"         storage.modifier.java
+     |   variable     "WordCount"      variable.other.readwrite.java
+     |   type         "String"         storage.type.java
+     |   variable     "word"           variable.other.readwrite.java
+     |   builtin      "int"            storage.type.primitive.java
+     |   variable     "count"          variable.other.readwrite.java
   12 | 
   13 |     static List<WordCount> countWords(String text) {
-     |   keyword      "static"
-     |   type         "List"
-     |   type         "WordCount"
-     |   function     "countWords"
-     |   type         "String"
-     |   variable     "text"
+     |   keyword      "static"         storage.modifier.java
+     |   type         "List"           storage.type.java
+     |   type         "WordCount"      storage.type.generic.java
+     |   function     "countWords"     entity.name.function.java
+     |   type         "String"         storage.type.java
+     |   variable     "text"           variable.other.readwrite.java
   14 |         Map<String, Integer> counts = new HashMap<>();
-     |   type         "Map"
-     |   type         "String"
-     |   type         "Integer"
-     |   variable     "counts"
-     |   keyword      "new"
-     |   type         "HashMap"
+     |   type         "Map"            storage.type.java
+     |   type         "String"         storage.type.generic.java
+     |   type         "Integer"        storage.type.generic.java
+     |   variable     "counts"         variable.other.readwrite.java
+     |   keyword      "new"            keyword.operator.expression.java
+     |   type         "HashMap"        storage.type.java
   15 |         for (String w : text.toLowerCase().split("\\s+")) {
-     |   keyword      "for"
-     |   type         "String"
-     |   variable     "w"
-     |   variable     "text"
-     |   function     "toLowerCase"
-     |   function     "split"
-     |   string       "\""
-     |   escape       "\\\\"
-     |   string       "s+\""
+     |   keyword      "for"            keyword.control.java
+     |   type         "String"         storage.type.java
+     |   variable     "w"              variable.other.readwrite.java
+     |   variable     "text"           variable.other.readwrite.java
+     |   function     "toLowerCase"    entity.name.function.java
+     |   function     "split"          entity.name.function.java
+     |   string       "\""             punctuation.definition.string.begin.java
+     |   escape       "\\\\"           constant.character.escape.java
+     |   string       "s+"             string.quoted.double.java
+     |   string       "\""             punctuation.definition.string.end.java
   16 |             counts.merge(w, 1, Integer::sum);
-     |   variable     "counts"
-     |   function     "merge"
-     |   variable     "w"
-     |   number       "1"
-     |   type         "Integer"
-     |   variable     "sum"
+     |   variable     "counts"         variable.other.readwrite.java
+     |   function     "merge"          entity.name.function.java
+     |   variable     "w"              variable.other.readwrite.java
+     |   number       "1"              constant.numeric.java
+     |   type         "Integer"        storage.type.java
+     |   variable     "sum"            variable.other.readwrite.java
   17 |         }
   18 |         return counts.entrySet().stream()
-     |   keyword      "return"
-     |   variable     "counts"
-     |   function     "entrySet"
-     |   function     "stream"
+     |   keyword      "return"         keyword.control.java
+     |   variable     "counts"         variable.other.readwrite.java
+     |   function     "entrySet"       entity.name.function.java
+     |   function     "stream"         entity.name.function.java
   19 |                 .map(e -> new WordCount(e.getKey(), e.getValue()))
-     |   function     "map"
-     |   variable     "e"
-     |   keyword      "new"
-     |   type         "WordCount"
-     |   variable     "e"
-     |   function     "getKey"
-     |   variable     "e"
-     |   function     "getValue"
+     |   function     "map"            entity.name.function.java
+     |   variable     "e"              variable.other.readwrite.java
+     |   keyword      "new"            keyword.operator.expression.java
+     |   type         "WordCount"      storage.type.java
+     |   variable     "e"              variable.other.readwrite.java
+     |   function     "getKey"         entity.name.function.java
+     |   variable     "e"              variable.other.readwrite.java
+     |   function     "getValue"       entity.name.function.java
   20 |                 .sorted((a, b) -> Integer.compare(b.count(), a.count()))
-     |   function     "sorted"
-     |   variable     "a"
-     |   variable     "b"
-     |   type         "Integer"
-     |   function     "compare"
-     |   variable     "b"
-     |   function     "count"
-     |   variable     "a"
-     |   function     "count"
+     |   function     "sorted"         entity.name.function.java
+     |   variable     "a"              variable.other.readwrite.java
+     |   variable     "b"              variable.other.readwrite.java
+     |   type         "Integer"        storage.type.java
+     |   function     "compare"        entity.name.function.java
+     |   variable     "b"              variable.other.readwrite.java
+     |   function     "count"          entity.name.function.java
+     |   variable     "a"              variable.other.readwrite.java
+     |   function     "count"          entity.name.function.java
   21 |                 .toList();
-     |   function     "toList"
+     |   function     "toList"         entity.name.function.java
   22 |     }
   23 | 
   24 |     @SuppressWarnings("unused")
-     |   operator     "@"
-     |   attribute    "SuppressWarnings"
-     |   string       "\"unused\""
+     |   operator     "@"              keyword.operator.java
+     |   attribute    "SuppressWarnings" storage.type.annotation.java
+     |   string       "\""             punctuation.definition.string.begin.java
+     |   string       "unused"         string.quoted.double.java
+     |   string       "\""             punctuation.definition.string.end.java
   25 |     public static void main(String[] args) {
-     |   keyword      "public"
-     |   keyword      "static"
-     |   builtin      "void"
-     |   function     "main"
-     |   type         "String"
-     |   variable     "args"
+     |   keyword      "public"         storage.modifier.java
+     |   keyword      "static"         storage.modifier.java
+     |   builtin      "void"           storage.type.primitive.java
+     |   function     "main"           entity.name.function.java
+     |   type         "String"         storage.type.java
+     |   variable     "args"           variable.other.readwrite.java
   26 |         var text = "the quick brown fox jumps over the lazy dog";
-     |   type         "var"
-     |   variable     "text"
-     |   string       "\"the quick brown fox jumps over the lazy dog\""
+     |   type         "var"            storage.type.java
+     |   variable     "text"           variable.other.readwrite.java
+     |   string       "\""             punctuation.definition.string.begin.java
+     |   string       "the quick brown fox jumps over the lazy dog" string.quoted.double.java
+     |   string       "\""             punctuation.definition.string.end.java
   27 |         for (WordCount wc : countWords(text).subList(0, TOP)) {
-     |   keyword      "for"
-     |   type         "WordCount"
-     |   variable     "wc"
-     |   function     "countWords"
-     |   variable     "text"
-     |   function     "subList"
-     |   number       "0"
-     |   constant     "TOP"
+     |   keyword      "for"            keyword.control.java
+     |   type         "WordCount"      storage.type.java
+     |   variable     "wc"             variable.other.readwrite.java
+     |   function     "countWords"     entity.name.function.java
+     |   variable     "text"           variable.other.readwrite.java
+     |   function     "subList"        entity.name.function.java
+     |   number       "0"              constant.numeric.java
+     |   constant     "TOP"            variable.other.constant.java
   28 |             System.out.printf("%s: %d%n", wc.word(), wc.count()); // 1.5x faster
-     |   type         "System"
-     |   variable     "out"
-     |   function     "printf"
-     |   string       "\"%s: %d%n\""
-     |   variable     "wc"
-     |   function     "word"
-     |   variable     "wc"
-     |   function     "count"
-     |   comment      "// 1.5x faster"
+     |   type         "System"         storage.type.java
+     |   variable     "out"            variable.other.readwrite.java
+     |   function     "printf"         entity.name.function.java
+     |   string       "\""             punctuation.definition.string.begin.java
+     |   string       "%s: %d%n"       string.quoted.double.java
+     |   string       "\""             punctuation.definition.string.end.java
+     |   variable     "wc"             variable.other.readwrite.java
+     |   function     "word"           entity.name.function.java
+     |   variable     "wc"             variable.other.readwrite.java
+     |   function     "count"          entity.name.function.java
+     |   comment      "// 1.5x faster" comment.line.java
   29 |         }
   30 |     }
   31 | }

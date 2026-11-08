@@ -134,8 +134,13 @@ fn line_spans_use_utf16_columns() {
         .find(|s| s.kind == HighlightKind::Constant)
         .unwrap();
     assert_eq!((num.start_col, num.end_col), (9, 10));
-    let string = lines[1].iter().find(|s| s.kind == HighlightKind::String).unwrap();
-    assert_eq!((string.start_col, string.end_col), (8, 11));
+    // The string's quotes are nested punctuation scopes, same class.
+    let string: Vec<_> = lines[1]
+        .iter()
+        .filter(|s| s.kind == HighlightKind::String)
+        .collect();
+    assert_eq!((string[0].start_col, string.last().unwrap().end_col), (8, 11));
+    assert_eq!(string.len(), 3);
     // Clamped past the end.
     assert_eq!(syn.line_spans(&buf, 2..50).len(), 1);
     assert!(syn.line_spans(&buf, 10..20).is_empty());

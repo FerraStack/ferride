@@ -1,179 +1,206 @@
    1 | interface Todo {
-     |   keyword      "interface"
-     |   type         "Todo"
-     |   punctuation  "{"
+     |   keyword      "interface"      storage.type.ts
+     |   type         "Todo"           entity.name.type.ts
+     |   punctuation  "{"              punctuation.definition.block.ts
    2 |   id: number;
-     |   property     "id"
-     |   builtin      "number"
-     |   punctuation  ";"
+     |   property     "id"             variable.other.property.ts
+     |   builtin      "number"         support.type.primitive.ts
+     |   punctuation  ";"              punctuation.terminator.ts
    3 |   title: string;
-     |   property     "title"
-     |   builtin      "string"
-     |   punctuation  ";"
+     |   property     "title"          variable.other.property.ts
+     |   builtin      "string"         support.type.primitive.ts
+     |   punctuation  ";"              punctuation.terminator.ts
    4 |   done: boolean;
-     |   property     "done"
-     |   builtin      "boolean"
-     |   punctuation  ";"
+     |   property     "done"           variable.other.property.ts
+     |   builtin      "boolean"        support.type.primitive.ts
+     |   punctuation  ";"              punctuation.terminator.ts
    5 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.ts
    6 | 
    7 | type Filter = "all" | "pending" | "done";
-     |   keyword      "type"
-     |   type         "Filter"
-     |   operator     "="
-     |   string       "\"all\""
-     |   operator     "|"
-     |   string       "\"pending\""
-     |   operator     "|"
-     |   string       "\"done\""
-     |   punctuation  ";"
+     |   keyword      "type"           storage.type.ts
+     |   type         "Filter"         entity.name.type.ts
+     |   operator     "="              keyword.operator.ts
+     |   string       "\""             punctuation.definition.string.begin.ts
+     |   string       "all"            string.quoted.double.ts
+     |   string       "\""             punctuation.definition.string.end.ts
+     |   operator     "|"              keyword.operator.ts
+     |   string       "\""             punctuation.definition.string.begin.ts
+     |   string       "pending"        string.quoted.double.ts
+     |   string       "\""             punctuation.definition.string.end.ts
+     |   operator     "|"              keyword.operator.ts
+     |   string       "\""             punctuation.definition.string.begin.ts
+     |   string       "done"           string.quoted.double.ts
+     |   string       "\""             punctuation.definition.string.end.ts
+     |   punctuation  ";"              punctuation.terminator.ts
    8 | 
    9 | export function visible(todos: readonly Todo[], filter: Filter = "all"): Todo[] {
-     |   keyword      "export"
-     |   keyword      "function"
-     |   function     "visible"
-     |   punctuation  "("
-     |   variable     "todos"
-     |   keyword      "readonly"
-     |   type         "Todo"
-     |   punctuation  "[],"
-     |   variable     "filter"
-     |   type         "Filter"
-     |   operator     "="
-     |   string       "\"all\""
-     |   punctuation  ")"
-     |   type         "Todo"
-     |   punctuation  "[]"
-     |   punctuation  "{"
+     |   keyword      "export"         keyword.control.import.ts
+     |   keyword      "function"       storage.type.ts
+     |   function     "visible"        entity.name.function.ts
+     |   punctuation  "("              meta.brace.round.ts
+     |   variable     "todos"          variable.parameter.ts
+     |   keyword      "readonly"       storage.modifier.ts
+     |   type         "Todo"           entity.name.type.ts
+     |   punctuation  "[]"             meta.brace.square.ts
+     |   punctuation  ","              punctuation.separator.comma.ts
+     |   variable     "filter"         variable.parameter.ts
+     |   type         "Filter"         entity.name.type.ts
+     |   operator     "="              keyword.operator.ts
+     |   string       "\""             punctuation.definition.string.begin.ts
+     |   string       "all"            string.quoted.double.ts
+     |   string       "\""             punctuation.definition.string.end.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   type         "Todo"           entity.name.type.ts
+     |   punctuation  "[]"             meta.brace.square.ts
+     |   punctuation  "{"              punctuation.definition.block.ts
   10 |   switch (filter) {
-     |   keyword      "switch"
-     |   punctuation  "("
-     |   variable     "filter"
-     |   punctuation  ")"
-     |   punctuation  "{"
+     |   keyword      "switch"         keyword.control.ts
+     |   punctuation  "("              meta.brace.round.ts
+     |   variable     "filter"         variable.other.readwrite.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   punctuation  "{"              punctuation.definition.block.ts
   11 |     case "pending":
-     |   keyword      "case"
-     |   string       "\"pending\""
+     |   keyword      "case"           keyword.control.ts
+     |   string       "\""             punctuation.definition.string.begin.ts
+     |   string       "pending"        string.quoted.double.ts
+     |   string       "\""             punctuation.definition.string.end.ts
   12 |       return todos.filter((t) => !t.done);
-     |   keyword      "return"
-     |   variable     "todos"
-     |   punctuation  "."
-     |   function     "filter"
-     |   punctuation  "(("
-     |   variable     "t"
-     |   punctuation  ")"
-     |   operator     "=>"
-     |   operator     "!"
-     |   variable     "t"
-     |   punctuation  "."
-     |   property     "done"
-     |   punctuation  ");"
+     |   keyword      "return"         keyword.control.ts
+     |   variable     "todos"          variable.other.object.ts
+     |   punctuation  "."              punctuation.accessor.ts
+     |   function     "filter"         entity.name.function.ts
+     |   punctuation  "(("             meta.brace.round.ts
+     |   variable     "t"              variable.parameter.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   operator     "=>"             keyword.operator.ts
+     |   operator     "!"              keyword.operator.ts
+     |   variable     "t"              variable.other.object.ts
+     |   punctuation  "."              punctuation.accessor.ts
+     |   property     "done"           variable.other.property.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   punctuation  ";"              punctuation.terminator.ts
   13 |     case "done":
-     |   keyword      "case"
-     |   string       "\"done\""
+     |   keyword      "case"           keyword.control.ts
+     |   string       "\""             punctuation.definition.string.begin.ts
+     |   string       "done"           string.quoted.double.ts
+     |   string       "\""             punctuation.definition.string.end.ts
   14 |       return todos.filter((t) => t.done);
-     |   keyword      "return"
-     |   variable     "todos"
-     |   punctuation  "."
-     |   function     "filter"
-     |   punctuation  "(("
-     |   variable     "t"
-     |   punctuation  ")"
-     |   operator     "=>"
-     |   variable     "t"
-     |   punctuation  "."
-     |   property     "done"
-     |   punctuation  ");"
+     |   keyword      "return"         keyword.control.ts
+     |   variable     "todos"          variable.other.object.ts
+     |   punctuation  "."              punctuation.accessor.ts
+     |   function     "filter"         entity.name.function.ts
+     |   punctuation  "(("             meta.brace.round.ts
+     |   variable     "t"              variable.parameter.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   operator     "=>"             keyword.operator.ts
+     |   variable     "t"              variable.other.object.ts
+     |   punctuation  "."              punctuation.accessor.ts
+     |   property     "done"           variable.other.property.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   punctuation  ";"              punctuation.terminator.ts
   15 |     default:
-     |   keyword      "default"
+     |   keyword      "default"        keyword.control.ts
   16 |       return [...todos];
-     |   keyword      "return"
-     |   punctuation  "["
-     |   variable     "todos"
-     |   punctuation  "];"
+     |   keyword      "return"         keyword.control.ts
+     |   punctuation  "["              meta.brace.square.ts
+     |   variable     "todos"          variable.other.readwrite.ts
+     |   punctuation  "]"              meta.brace.square.ts
+     |   punctuation  ";"              punctuation.terminator.ts
   17 |   }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.ts
   18 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.ts
   19 | 
   20 | export class TodoStore<T extends Todo = Todo> {
-     |   keyword      "export"
-     |   keyword      "class"
-     |   type         "TodoStore"
-     |   operator     "<"
-     |   type         "T"
-     |   keyword      "extends"
-     |   type         "Todo"
-     |   operator     "="
-     |   type         "Todo"
-     |   operator     ">"
-     |   punctuation  "{"
+     |   keyword      "export"         keyword.control.import.ts
+     |   keyword      "class"          storage.type.ts
+     |   type         "TodoStore"      entity.name.type.ts
+     |   operator     "<"              keyword.operator.ts
+     |   type         "T"              entity.name.type.ts
+     |   keyword      "extends"        storage.type.ts
+     |   type         "Todo"           entity.name.type.ts
+     |   operator     "="              keyword.operator.ts
+     |   type         "Todo"           entity.name.type.ts
+     |   operator     ">"              keyword.operator.ts
+     |   punctuation  "{"              punctuation.definition.block.ts
   21 |   private items: T[] = [];
-     |   keyword      "private"
-     |   property     "items"
-     |   type         "T"
-     |   punctuation  "[]"
-     |   operator     "="
-     |   punctuation  "[];"
+     |   keyword      "private"        storage.modifier.ts
+     |   property     "items"          variable.other.property.ts
+     |   type         "T"              entity.name.type.ts
+     |   punctuation  "[]"             meta.brace.square.ts
+     |   operator     "="              keyword.operator.ts
+     |   punctuation  "[]"             meta.brace.square.ts
+     |   punctuation  ";"              punctuation.terminator.ts
   22 |   constructor(private readonly name: string) {}
-     |   function     "constructor"
-     |   punctuation  "("
-     |   keyword      "private"
-     |   keyword      "readonly"
-     |   variable     "name"
-     |   builtin      "string"
-     |   punctuation  ")"
-     |   punctuation  "{}"
+     |   function     "constructor"    storage.type.ts
+     |   punctuation  "("              meta.brace.round.ts
+     |   keyword      "private"        storage.modifier.ts
+     |   keyword      "readonly"       storage.modifier.ts
+     |   variable     "name"           variable.parameter.ts
+     |   builtin      "string"         support.type.primitive.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   punctuation  "{}"             punctuation.definition.block.ts
   23 |   add(item: T): void {
-     |   function     "add"
-     |   punctuation  "("
-     |   variable     "item"
-     |   type         "T"
-     |   punctuation  ")"
-     |   builtin      "void"
-     |   punctuation  "{"
+     |   function     "add"            entity.name.function.ts
+     |   punctuation  "("              meta.brace.round.ts
+     |   variable     "item"           variable.parameter.ts
+     |   type         "T"              entity.name.type.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   builtin      "void"           support.type.primitive.ts
+     |   punctuation  "{"              punctuation.definition.block.ts
   24 |     this.items.push(item);
-     |   builtin      "this"
-     |   punctuation  "."
-     |   property     "items"
-     |   punctuation  "."
-     |   function     "push"
-     |   punctuation  "("
-     |   variable     "item"
-     |   punctuation  ");"
+     |   builtin      "this"           variable.other.object.ts
+     |   punctuation  "."              punctuation.accessor.ts
+     |   property     "items"          variable.other.property.ts
+     |   punctuation  "."              punctuation.accessor.ts
+     |   function     "push"           entity.name.function.ts
+     |   punctuation  "("              meta.brace.round.ts
+     |   variable     "item"           variable.other.readwrite.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   punctuation  ";"              punctuation.terminator.ts
   25 |   }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.ts
   26 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.ts
   27 | 
   28 | const todos: Todo[] = [{ id: 1, title: "Write the editor", done: true }];
-     |   keyword      "const"
-     |   variable     "todos"
-     |   type         "Todo"
-     |   punctuation  "[]"
-     |   operator     "="
-     |   punctuation  "[{"
-     |   property     "id"
-     |   number       "1"
-     |   punctuation  ","
-     |   property     "title"
-     |   string       "\"Write the editor\""
-     |   punctuation  ","
-     |   property     "done"
-     |   constant     "true"
-     |   punctuation  "}];"
+     |   keyword      "const"          storage.modifier.ts
+     |   variable     "todos"          variable.other.constant.ts
+     |   type         "Todo"           entity.name.type.ts
+     |   punctuation  "[]"             meta.brace.square.ts
+     |   operator     "="              keyword.operator.ts
+     |   punctuation  "["              meta.brace.square.ts
+     |   punctuation  "{"              punctuation.definition.block.ts
+     |   property     "id"             variable.other.property.ts
+     |   number       "1"              constant.numeric.ts
+     |   punctuation  ","              punctuation.separator.comma.ts
+     |   property     "title"          variable.other.property.ts
+     |   string       "\""             punctuation.definition.string.begin.ts
+     |   string       "Write the editor" string.quoted.double.ts
+     |   string       "\""             punctuation.definition.string.end.ts
+     |   punctuation  ","              punctuation.separator.comma.ts
+     |   property     "done"           variable.other.property.ts
+     |   constant     "true"           constant.language.boolean.ts
+     |   punctuation  "}"              punctuation.definition.block.ts
+     |   punctuation  "]"              meta.brace.square.ts
+     |   punctuation  ";"              punctuation.terminator.ts
   29 | console.log(visible(todos, "pending").length as number);
-     |   builtin      "console"
-     |   punctuation  "."
-     |   function     "log"
-     |   punctuation  "("
-     |   function     "visible"
-     |   punctuation  "("
-     |   variable     "todos"
-     |   punctuation  ","
-     |   string       "\"pending\""
-     |   punctuation  ")."
-     |   property     "length"
-     |   keyword      "as"
-     |   builtin      "number"
-     |   punctuation  ");"
+     |   builtin      "console"        variable.other.object.ts
+     |   punctuation  "."              punctuation.accessor.ts
+     |   function     "log"            entity.name.function.ts
+     |   punctuation  "("              meta.brace.round.ts
+     |   function     "visible"        entity.name.function.ts
+     |   punctuation  "("              meta.brace.round.ts
+     |   variable     "todos"          variable.other.readwrite.ts
+     |   punctuation  ","              punctuation.separator.comma.ts
+     |   string       "\""             punctuation.definition.string.begin.ts
+     |   string       "pending"        string.quoted.double.ts
+     |   string       "\""             punctuation.definition.string.end.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   punctuation  "."              punctuation.accessor.ts
+     |   property     "length"         variable.other.property.ts
+     |   keyword      "as"             keyword.operator.expression.ts
+     |   builtin      "number"         support.type.primitive.ts
+     |   punctuation  ")"              meta.brace.round.ts
+     |   punctuation  ";"              punctuation.terminator.ts

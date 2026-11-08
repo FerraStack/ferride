@@ -1,177 +1,179 @@
    1 | #include <iostream>
-     |   keyword      "#include"
-     |   string       "<iostream>"
+     |   keyword      "#include"       keyword.control.directive.cpp
+     |   string       "<iostream>"     string.quoted.other.lt-gt.cpp
    2 | #include <map>
-     |   keyword      "#include"
-     |   string       "<map>"
+     |   keyword      "#include"       keyword.control.directive.cpp
+     |   string       "<map>"          string.quoted.other.lt-gt.cpp
    3 | #include <string>
-     |   keyword      "#include"
-     |   string       "<string>"
+     |   keyword      "#include"       keyword.control.directive.cpp
+     |   string       "<string>"       string.quoted.other.lt-gt.cpp
    4 | #include <vector>
-     |   keyword      "#include"
-     |   string       "<vector>"
+     |   keyword      "#include"       keyword.control.directive.cpp
+     |   string       "<vector>"       string.quoted.other.lt-gt.cpp
    5 | 
    6 | namespace stats {
-     |   keyword      "namespace"
+     |   keyword      "namespace"      storage.type.cpp
    7 | 
    8 | // Counts how often each word appears.
-     |   comment      "// Counts how often each word appears."
+     |   comment      "// Counts how often each word appears." comment.line.cpp
    9 | template <typename T>
-     |   keyword      "template"
-     |   operator     "<"
-     |   keyword      "typename"
-     |   type         "T"
-     |   operator     ">"
+     |   keyword      "template"       storage.type.cpp
+     |   operator     "<"              keyword.operator.cpp
+     |   keyword      "typename"       storage.type.cpp
+     |   type         "T"              entity.name.type.cpp
+     |   operator     ">"              keyword.operator.cpp
   10 | class Counter {
-     |   keyword      "class"
-     |   type         "Counter"
+     |   keyword      "class"          storage.type.cpp
+     |   type         "Counter"        entity.name.type.cpp
   11 | public:
-     |   keyword      "public"
+     |   keyword      "public"         storage.modifier.cpp
   12 |     void add(const T& item) { ++counts_[item]; }
-     |   type         "void"
-     |   function     "add"
-     |   keyword      "const"
-     |   type         "T"
-     |   operator     "&"
-     |   variable     "item"
-     |   operator     "++"
-     |   variable     "counts_"
-     |   variable     "item"
-     |   punctuation  ";"
+     |   type         "void"           storage.type.built-in.primitive.cpp
+     |   function     "add"            entity.name.function.cpp
+     |   keyword      "const"          storage.modifier.cpp
+     |   type         "T"              entity.name.type.cpp
+     |   operator     "&"              keyword.operator.cpp
+     |   variable     "item"           variable.parameter.cpp
+     |   operator     "++"             keyword.operator.cpp
+     |   variable     "counts_"        source.cpp
+     |   variable     "item"           source.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   13 | 
   14 |     std::vector<std::pair<T, int>> top(std::size_t n) const {
-     |   type         "vector"
-     |   operator     "<"
-     |   type         "pair"
-     |   operator     "<"
-     |   type         "T"
-     |   type         "int"
-     |   operator     ">>"
-     |   function     "top"
-     |   type         "size_t"
-     |   variable     "n"
-     |   keyword      "const"
+     |   type         "vector"         entity.name.type.cpp
+     |   operator     "<"              keyword.operator.cpp
+     |   type         "pair"           entity.name.type.cpp
+     |   operator     "<"              keyword.operator.cpp
+     |   type         "T"              entity.name.type.cpp
+     |   type         "int"            storage.type.built-in.primitive.cpp
+     |   operator     ">>"             keyword.operator.cpp
+     |   function     "top"            entity.name.function.cpp
+     |   type         "size_t"         entity.name.type.cpp
+     |   variable     "n"              variable.parameter.cpp
+     |   keyword      "const"          storage.modifier.cpp
   15 |         std::vector<std::pair<T, int>> out(counts_.begin(), counts_.end());
-     |   type         "vector"
-     |   operator     "<"
-     |   type         "pair"
-     |   operator     "<"
-     |   type         "T"
-     |   type         "int"
-     |   operator     ">>"
-     |   variable     "out"
-     |   variable     "counts_"
-     |   punctuation  "."
-     |   function     "begin"
-     |   variable     "counts_"
-     |   punctuation  "."
-     |   function     "end"
-     |   punctuation  ";"
+     |   type         "vector"         entity.name.type.cpp
+     |   operator     "<"              keyword.operator.cpp
+     |   type         "pair"           entity.name.type.cpp
+     |   operator     "<"              keyword.operator.cpp
+     |   type         "T"              entity.name.type.cpp
+     |   type         "int"            storage.type.built-in.primitive.cpp
+     |   operator     ">>"             keyword.operator.cpp
+     |   variable     "out"            source.cpp
+     |   variable     "counts_"        source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   function     "begin"          entity.name.function.cpp
+     |   variable     "counts_"        source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   function     "end"            entity.name.function.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   16 |         std::sort(out.begin(), out.end(),
-     |   function     "sort"
-     |   variable     "out"
-     |   punctuation  "."
-     |   function     "begin"
-     |   variable     "out"
-     |   punctuation  "."
-     |   function     "end"
+     |   function     "sort"           entity.name.function.cpp
+     |   variable     "out"            source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   function     "begin"          entity.name.function.cpp
+     |   variable     "out"            source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   function     "end"            entity.name.function.cpp
   17 |                   [](const auto& a, const auto& b) { return a.second > b.second; });
-     |   keyword      "const"
-     |   type         "auto"
-     |   operator     "&"
-     |   variable     "a"
-     |   keyword      "const"
-     |   type         "auto"
-     |   operator     "&"
-     |   variable     "b"
-     |   keyword      "return"
-     |   variable     "a"
-     |   punctuation  "."
-     |   property     "second"
-     |   operator     ">"
-     |   variable     "b"
-     |   punctuation  "."
-     |   property     "second"
-     |   punctuation  ";"
-     |   punctuation  ";"
+     |   keyword      "const"          storage.modifier.cpp
+     |   type         "auto"           storage.type.built-in.primitive.cpp
+     |   operator     "&"              keyword.operator.cpp
+     |   variable     "a"              variable.parameter.cpp
+     |   keyword      "const"          storage.modifier.cpp
+     |   type         "auto"           storage.type.built-in.primitive.cpp
+     |   operator     "&"              keyword.operator.cpp
+     |   variable     "b"              variable.parameter.cpp
+     |   keyword      "return"         keyword.control.cpp
+     |   variable     "a"              source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   property     "second"         variable.other.property.cpp
+     |   operator     ">"              keyword.operator.cpp
+     |   variable     "b"              source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   property     "second"         variable.other.property.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   18 |         if (out.size() > n) out.resize(n);
-     |   keyword      "if"
-     |   variable     "out"
-     |   punctuation  "."
-     |   function     "size"
-     |   operator     ">"
-     |   variable     "n"
-     |   variable     "out"
-     |   punctuation  "."
-     |   function     "resize"
-     |   variable     "n"
-     |   punctuation  ";"
+     |   keyword      "if"             keyword.control.cpp
+     |   variable     "out"            source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   function     "size"           entity.name.function.cpp
+     |   operator     ">"              keyword.operator.cpp
+     |   variable     "n"              source.cpp
+     |   variable     "out"            source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   function     "resize"         entity.name.function.cpp
+     |   variable     "n"              source.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   19 |         return out;
-     |   keyword      "return"
-     |   variable     "out"
-     |   punctuation  ";"
+     |   keyword      "return"         keyword.control.cpp
+     |   variable     "out"            source.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   20 |     }
   21 | 
   22 | private:
-     |   keyword      "private"
+     |   keyword      "private"        storage.modifier.cpp
   23 |     std::map<T, int> counts_;
-     |   type         "map"
-     |   operator     "<"
-     |   type         "T"
-     |   type         "int"
-     |   operator     ">"
-     |   property     "counts_"
-     |   punctuation  ";"
+     |   type         "map"            entity.name.type.cpp
+     |   operator     "<"              keyword.operator.cpp
+     |   type         "T"              entity.name.type.cpp
+     |   type         "int"            storage.type.built-in.primitive.cpp
+     |   operator     ">"              keyword.operator.cpp
+     |   property     "counts_"        variable.other.property.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   24 | };
-     |   punctuation  ";"
+     |   punctuation  ";"              punctuation.terminator.cpp
   25 | 
   26 | }  // namespace stats
-     |   comment      "// namespace stats"
+     |   comment      "// namespace stats" comment.line.cpp
   27 | 
   28 | int main() {
-     |   type         "int"
-     |   function     "main"
+     |   type         "int"            storage.type.built-in.primitive.cpp
+     |   function     "main"           entity.name.function.cpp
   29 |     stats::Counter<std::string> words;
-     |   type         "Counter"
-     |   operator     "<"
-     |   type         "string"
-     |   operator     ">"
-     |   variable     "words"
-     |   punctuation  ";"
+     |   type         "Counter"        entity.name.type.cpp
+     |   operator     "<"              keyword.operator.cpp
+     |   type         "string"         entity.name.type.cpp
+     |   operator     ">"              keyword.operator.cpp
+     |   variable     "words"          source.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   30 |     for (std::string w; std::cin >> w;) words.add(w);
-     |   keyword      "for"
-     |   type         "string"
-     |   variable     "w"
-     |   punctuation  ";"
-     |   variable     "cin"
-     |   variable     "w"
-     |   punctuation  ";"
-     |   variable     "words"
-     |   punctuation  "."
-     |   function     "add"
-     |   variable     "w"
-     |   punctuation  ";"
+     |   keyword      "for"            keyword.control.cpp
+     |   type         "string"         entity.name.type.cpp
+     |   variable     "w"              source.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
+     |   variable     "cin"            source.cpp
+     |   variable     "w"              source.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
+     |   variable     "words"          source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   function     "add"            entity.name.function.cpp
+     |   variable     "w"              source.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   31 |     for (const auto& [word, count] : words.top(3)) {
-     |   keyword      "for"
-     |   keyword      "const"
-     |   type         "auto"
-     |   operator     "&"
-     |   variable     "word"
-     |   variable     "count"
-     |   variable     "words"
-     |   punctuation  "."
-     |   function     "top"
-     |   number       "3"
+     |   keyword      "for"            keyword.control.cpp
+     |   keyword      "const"          storage.modifier.cpp
+     |   type         "auto"           storage.type.built-in.primitive.cpp
+     |   operator     "&"              keyword.operator.cpp
+     |   variable     "word"           source.cpp
+     |   variable     "count"          source.cpp
+     |   variable     "words"          source.cpp
+     |   punctuation  "."              punctuation.accessor.cpp
+     |   function     "top"            entity.name.function.cpp
+     |   number       "3"              constant.numeric.cpp
   32 |         std::cout << word << ": " << count << '\n';
-     |   variable     "cout"
-     |   variable     "word"
-     |   string       "\": \""
-     |   variable     "count"
-     |   number       "'\\n'"
-     |   punctuation  ";"
+     |   variable     "cout"           source.cpp
+     |   variable     "word"           source.cpp
+     |   string       "\""             punctuation.definition.string.begin.cpp
+     |   string       ": "             string.quoted.double.cpp
+     |   string       "\""             punctuation.definition.string.end.cpp
+     |   variable     "count"          source.cpp
+     |   number       "'\\n'"          constant.numeric.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   33 |     }
   34 |     return 0;
-     |   keyword      "return"
-     |   number       "0"
-     |   punctuation  ";"
+     |   keyword      "return"         keyword.control.cpp
+     |   number       "0"              constant.numeric.cpp
+     |   punctuation  ";"              punctuation.terminator.cpp
   35 | }

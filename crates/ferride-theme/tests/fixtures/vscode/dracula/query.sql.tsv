@@ -1,0 +1,122 @@
+# line	start	end	foreground	fontStyle	text	scope (VS Code)
+0	0	2	#6272A4	0	"--"	punctuation.definition.comment.sql
+0	2	53	#6272A4	0	" Ferride sample: the most common words per document"	comment.line.double-dash.sql
+1	0	6	#FF79C6	0	"CREATE"	keyword.other.create.sql
+1	7	12	#FF79C6	0	"TABLE"	keyword.other.sql
+1	13	15	#50FA7B	0	"IF"	entity.name.function.sql
+1	16	19	#FF79C6	0	"NOT"	keyword.other.sql
+1	20	26	#FF79C6	0	"EXISTS"	keyword.other.sql
+1	26	35	#F8F8F2	0	" words ("	source.sql
+2	0	7	#F8F8F2	0	"    id "	source.sql
+2	7	14	#FF79C6	0	"INTEGER"	storage.type.sql
+2	15	26	#FF79C6	0	"PRIMARY KEY"	storage.modifier.sql
+2	26	28	#F8F8F2	0	","	source.sql
+3	0	16	#F8F8F2	0	"    document_id "	source.sql
+3	16	23	#FF79C6	0	"INTEGER"	storage.type.sql
+3	24	32	#FF79C6	0	"NOT NULL"	keyword.other.DDL.create.II.sql
+3	33	43	#FF79C6	0	"REFERENCES"	storage.modifier.sql
+3	43	60	#F8F8F2	0	" documents (id),"	source.sql
+4	0	9	#F8F8F2	0	"    word "	source.sql
+4	9	13	#FF79C6	0	"TEXT"	storage.type.sql
+4	14	22	#FF79C6	0	"NOT NULL"	keyword.other.DDL.create.II.sql
+4	22	24	#F8F8F2	0	","	source.sql
+5	0	15	#F8F8F2	0	"    created_at "	source.sql
+5	15	24	#FF79C6	0	"TIMESTAMP"	storage.type.sql
+5	25	32	#FF79C6	0	"DEFAULT"	storage.modifier.sql
+5	32	51	#F8F8F2	0	" CURRENT_TIMESTAMP"	source.sql
+6	0	3	#F8F8F2	0	");"	source.sql
+8	0	11	#FF79C6	0	"INSERT INTO"	keyword.other.DML.sql
+8	11	38	#F8F8F2	0	" words (document_id, word) "	source.sql
+8	38	44	#FF79C6	0	"VALUES"	keyword.other.DML.II.sql
+8	44	46	#F8F8F2	0	" ("	source.sql
+8	46	47	#BD93F9	0	"1"	constant.numeric.sql
+8	47	49	#F8F8F2	0	", "	source.sql
+8	49	50	#E9F284	0	"'"	punctuation.definition.string.begin.sql
+8	50	55	#F1FA8C	0	"quick"	string.quoted.single.sql
+8	55	56	#E9F284	0	"'"	punctuation.definition.string.end.sql
+8	56	60	#F8F8F2	0	"), ("	source.sql
+8	60	61	#BD93F9	0	"1"	constant.numeric.sql
+8	61	63	#F8F8F2	0	", "	source.sql
+8	63	64	#E9F284	0	"'"	punctuation.definition.string.begin.sql
+8	64	67	#F1FA8C	0	"fox"	string.quoted.single.sql
+8	67	68	#E9F284	0	"'"	punctuation.definition.string.end.sql
+8	68	71	#F8F8F2	0	");"	source.sql
+10	0	6	#FF79C6	0	"SELECT"	keyword.other.DML.sql
+10	7	8	#BD93F9	0	"d"	constant.other.database-name.sql
+10	8	9	#F8F8F2	0	"."	source.sql
+10	9	14	#BD93F9	0	"title"	constant.other.table-name.sql
+10	14	16	#F8F8F2	0	","	source.sql
+11	7	8	#BD93F9	0	"w"	constant.other.database-name.sql
+11	8	9	#F8F8F2	0	"."	source.sql
+11	9	13	#BD93F9	0	"word"	constant.other.table-name.sql
+11	13	15	#F8F8F2	0	","	source.sql
+12	7	12	#8BE9FD	0	"COUNT"	support.function.aggregate.sql
+12	12	13	#F8F8F2	0	"("	source.sql
+12	13	14	#FF79C6	0	"*"	keyword.operator.star.sql
+12	14	16	#F8F8F2	0	") "	source.sql
+12	16	18	#FF79C6	0	"AS"	keyword.other.alias.sql
+12	18	32	#F8F8F2	0	" occurrences,"	source.sql
+13	7	12	#8BE9FD	0	"ROUND"	support.function.mathematical.sql
+13	12	13	#F8F8F2	0	"("	source.sql
+13	13	16	#8BE9FD	0	"AVG"	support.function.aggregate.sql
+13	16	17	#F8F8F2	0	"("	source.sql
+13	17	23	#FF79C6	0	"LENGTH"	keyword.other.sql
+13	23	24	#F8F8F2	0	"("	source.sql
+13	24	25	#BD93F9	0	"w"	constant.other.database-name.sql
+13	25	26	#F8F8F2	0	"."	source.sql
+13	26	30	#BD93F9	0	"word"	constant.other.table-name.sql
+13	30	34	#F8F8F2	0	")), "	source.sql
+13	34	35	#BD93F9	0	"2"	constant.numeric.sql
+13	35	37	#F8F8F2	0	") "	source.sql
+13	37	39	#FF79C6	0	"AS"	keyword.other.alias.sql
+13	39	51	#F8F8F2	0	" avg_length"	source.sql
+14	0	4	#FF79C6	0	"FROM"	keyword.other.DML.sql
+14	4	11	#F8F8F2	0	" words "	source.sql
+14	11	13	#FF79C6	0	"AS"	keyword.other.alias.sql
+14	13	16	#F8F8F2	0	" w"	source.sql
+15	0	4	#FF79C6	0	"JOIN"	keyword.other.DML.sql
+15	4	15	#F8F8F2	0	" documents "	source.sql
+15	15	17	#FF79C6	0	"AS"	keyword.other.alias.sql
+15	17	20	#F8F8F2	0	" d "	source.sql
+15	20	22	#FF79C6	0	"ON"	keyword.other.DDL.create.II.sql
+15	23	24	#BD93F9	0	"d"	constant.other.database-name.sql
+15	24	25	#F8F8F2	0	"."	source.sql
+15	25	27	#BD93F9	0	"id"	constant.other.table-name.sql
+15	28	29	#FF79C6	0	"="	keyword.operator.comparison.sql
+15	30	31	#BD93F9	0	"w"	constant.other.database-name.sql
+15	31	32	#F8F8F2	0	"."	source.sql
+15	32	43	#BD93F9	0	"document_id"	constant.other.table-name.sql
+16	0	5	#FF79C6	0	"WHERE"	keyword.other.DML.sql
+16	6	7	#BD93F9	0	"w"	constant.other.database-name.sql
+16	7	8	#F8F8F2	0	"."	source.sql
+16	8	12	#BD93F9	0	"word"	constant.other.table-name.sql
+16	13	15	#FF79C6	0	"<>"	keyword.operator.comparison.sql
+16	16	17	#E9F284	0	"'"	punctuation.definition.string.begin.sql
+16	17	18	#E9F284	0	"'"	punctuation.definition.string.end.sql
+16	19	22	#FF79C6	0	"AND"	keyword.other.DML.sql
+16	23	24	#BD93F9	0	"d"	constant.other.database-name.sql
+16	24	25	#F8F8F2	0	"."	source.sql
+16	25	33	#BD93F9	0	"archived"	constant.other.table-name.sql
+16	34	35	#FF79C6	0	"="	keyword.operator.comparison.sql
+16	35	42	#F8F8F2	0	" FALSE"	source.sql
+17	0	8	#FF79C6	0	"GROUP BY"	keyword.other.DML.sql
+17	9	10	#BD93F9	0	"d"	constant.other.database-name.sql
+17	10	11	#F8F8F2	0	"."	source.sql
+17	11	16	#BD93F9	0	"title"	constant.other.table-name.sql
+17	16	18	#F8F8F2	0	", "	source.sql
+17	18	19	#BD93F9	0	"w"	constant.other.database-name.sql
+17	19	20	#F8F8F2	0	"."	source.sql
+17	20	24	#BD93F9	0	"word"	constant.other.table-name.sql
+18	0	6	#FF79C6	0	"HAVING"	keyword.other.DML.sql
+18	7	12	#8BE9FD	0	"COUNT"	support.function.aggregate.sql
+18	12	13	#F8F8F2	0	"("	source.sql
+18	13	14	#FF79C6	0	"*"	keyword.operator.star.sql
+18	14	16	#F8F8F2	0	") "	source.sql
+18	16	17	#FF79C6	0	">"	keyword.operator.comparison.sql
+18	18	19	#BD93F9	0	"1"	constant.numeric.sql
+19	0	8	#FF79C6	0	"ORDER BY"	keyword.other.DML.sql
+19	8	21	#F8F8F2	0	" occurrences "	source.sql
+19	21	25	#FF79C6	0	"DESC"	keyword.other.order.sql
+20	0	5	#FF79C6	0	"LIMIT"	keyword.other.DML.sql
+20	6	8	#BD93F9	0	"10"	constant.numeric.sql
+20	8	10	#F8F8F2	0	";"	source.sql

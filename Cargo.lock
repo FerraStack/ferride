@@ -515,6 +515,7 @@ dependencies = [
  "ferride-host",
  "ferride-lsp",
  "ferride-syntax",
+ "ferride-theme",
  "ferride-workspace",
  "lsp-types",
  "serde_json",
@@ -580,6 +581,16 @@ dependencies = [
  "tree-sitter-toml-ng",
  "tree-sitter-typescript",
  "tree-sitter-yaml",
+]
+
+[[package]]
+name = "ferride-theme"
+version = "0.1.0"
+dependencies = [
+ "ferride-buffer",
+ "ferride-syntax",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

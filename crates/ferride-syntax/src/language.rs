@@ -238,9 +238,10 @@ impl LanguageId {
 
     fn build_config(self) -> LanguageConfig {
         let (language, sources): (Language, Vec<&str>) = match self {
+            // Rust's grammar in VS Code scopes every identifier (`variable.other.rust`).
             Self::Rust => (
                 tree_sitter_rust::LANGUAGE.into(),
-                vec![tree_sitter_rust::HIGHLIGHTS_QUERY],
+                vec!["(identifier) @variable\n", tree_sitter_rust::HIGHLIGHTS_QUERY],
             ),
             Self::Python => (
                 tree_sitter_python::LANGUAGE.into(),
@@ -274,7 +275,10 @@ impl LanguageId {
             ),
             Self::Markdown => (
                 tree_sitter_md::LANGUAGE.into(),
-                vec![tree_sitter_md::HIGHLIGHT_QUERY_BLOCK],
+                vec![
+                    tree_sitter_md::HIGHLIGHT_QUERY_BLOCK,
+                    include_str!("../queries/markdown/highlights.scm"),
+                ],
             ),
             Self::MarkdownInline => (
                 tree_sitter_md::INLINE_LANGUAGE.into(),
@@ -303,7 +307,10 @@ impl LanguageId {
             ),
             Self::Html => (
                 tree_sitter_html::LANGUAGE.into(),
-                vec![tree_sitter_html::HIGHLIGHTS_QUERY],
+                vec![
+                    tree_sitter_html::HIGHLIGHTS_QUERY,
+                    include_str!("../queries/html/highlights.scm"),
+                ],
             ),
             Self::Css => (
                 tree_sitter_css::LANGUAGE.into(),
@@ -355,7 +362,7 @@ impl LanguageId {
             query,
             kinds,
             injections,
-            first_wins: matches!(self, Self::Go),
+            first_wins: matches!(self, Self::Go | Self::Json),
         }
     }
 }

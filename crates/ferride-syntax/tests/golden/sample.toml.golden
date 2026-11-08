@@ -1,87 +1,105 @@
    1 | # Ferride sample: a Cargo manifest
-     |   comment      "# Ferride sample: a Cargo manifest"
+     |   comment      "# Ferride sample: a Cargo manifest" comment.line.toml
    2 | [package]
-     |   punctuation  "["
-     |   type         "package"
-     |   punctuation  "]"
+     |   punctuation  "["              meta.brace.square.toml
+     |   type         "package"        entity.name.table.toml
+     |   punctuation  "]"              meta.brace.square.toml
    3 | name = "word-count"
-     |   property     "name"
-     |   operator     "="
-     |   string       "\"word-count\""
+     |   property     "name"           entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   string       "\""             punctuation.definition.string.begin.toml
+     |   string       "word-count"     string.quoted.double.toml
+     |   string       "\""             punctuation.definition.string.end.toml
    4 | version = "0.1.0"
-     |   property     "version"
-     |   operator     "="
-     |   string       "\"0.1.0\""
+     |   property     "version"        entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   string       "\""             punctuation.definition.string.begin.toml
+     |   string       "0.1.0"          string.quoted.double.toml
+     |   string       "\""             punctuation.definition.string.end.toml
    5 | edition = "2024"
-     |   property     "edition"
-     |   operator     "="
-     |   string       "\"2024\""
+     |   property     "edition"        entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   string       "\""             punctuation.definition.string.begin.toml
+     |   string       "2024"           string.quoted.double.toml
+     |   string       "\""             punctuation.definition.string.end.toml
    6 | authors = ["FerraStack contributors"]
-     |   property     "authors"
-     |   operator     "="
-     |   punctuation  "["
-     |   string       "\"FerraStack contributors\""
-     |   punctuation  "]"
+     |   property     "authors"        entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   punctuation  "["              meta.brace.square.toml
+     |   string       "\""             punctuation.definition.string.begin.toml
+     |   string       "FerraStack contributors" string.quoted.double.toml
+     |   string       "\""             punctuation.definition.string.end.toml
+     |   punctuation  "]"              meta.brace.square.toml
    7 | publish = false
-     |   property     "publish"
-     |   operator     "="
-     |   constant     "false"
+     |   property     "publish"        entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   constant     "false"          constant.language.boolean.toml
    8 | 
    9 | [dependencies]
-     |   punctuation  "["
-     |   type         "dependencies"
-     |   punctuation  "]"
+     |   punctuation  "["              meta.brace.square.toml
+     |   type         "dependencies"   entity.name.table.toml
+     |   punctuation  "]"              meta.brace.square.toml
   10 | serde = { version = "1.0", features = ["derive"] }
-     |   property     "serde"
-     |   operator     "="
-     |   punctuation  "{"
-     |   property     "version"
-     |   operator     "="
-     |   string       "\"1.0\""
-     |   punctuation  ","
-     |   property     "features"
-     |   operator     "="
-     |   punctuation  "["
-     |   string       "\"derive\""
-     |   punctuation  "]"
-     |   punctuation  "}"
+     |   property     "serde"          entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   punctuation  "{"              punctuation.definition.block.toml
+     |   property     "version"        entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   string       "\""             punctuation.definition.string.begin.toml
+     |   string       "1.0"            string.quoted.double.toml
+     |   string       "\""             punctuation.definition.string.end.toml
+     |   punctuation  ","              punctuation.separator.comma.toml
+     |   property     "features"       entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   punctuation  "["              meta.brace.square.toml
+     |   string       "\""             punctuation.definition.string.begin.toml
+     |   string       "derive"         string.quoted.double.toml
+     |   string       "\""             punctuation.definition.string.end.toml
+     |   punctuation  "]"              meta.brace.square.toml
+     |   punctuation  "}"              punctuation.definition.block.toml
   11 | regex = "1.11"
-     |   property     "regex"
-     |   operator     "="
-     |   string       "\"1.11\""
+     |   property     "regex"          entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   string       "\""             punctuation.definition.string.begin.toml
+     |   string       "1.11"           string.quoted.double.toml
+     |   string       "\""             punctuation.definition.string.end.toml
   12 | 
   13 | [profile.release]
-     |   punctuation  "["
-     |   type         "profile"
-     |   punctuation  "."
-     |   type         "release"
-     |   punctuation  "]"
+     |   punctuation  "["              meta.brace.square.toml
+     |   type         "profile"        entity.name.table.toml
+     |   punctuation  "."              punctuation.accessor.toml
+     |   type         "release"        entity.name.table.toml
+     |   punctuation  "]"              meta.brace.square.toml
   14 | lto = true
-     |   property     "lto"
-     |   operator     "="
-     |   constant     "true"
+     |   property     "lto"            entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   constant     "true"           constant.language.boolean.toml
   15 | opt-level = 3
-     |   property     "opt-level"
-     |   operator     "="
-     |   number       "3"
+     |   property     "opt-level"      entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   number       "3"              constant.numeric.toml
   16 | debug = 0.5
-     |   property     "debug"
-     |   operator     "="
-     |   number       "0.5"
+     |   property     "debug"          entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   number       "0.5"            constant.numeric.toml
   17 | released = 2026-11-08T10:30:00Z
-     |   property     "released"
-     |   operator     "="
-     |   number       "2026-11-08T10:30:00Z"
+     |   property     "released"       entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   number       "2026-11-08T10:30:00Z" constant.numeric.toml
   18 | 
   19 | [[bin]]
-     |   punctuation  "[["
-     |   type         "bin"
-     |   punctuation  "]]"
+     |   punctuation  "[["             punctuation.toml
+     |   type         "bin"            entity.name.table.toml
+     |   punctuation  "]]"             punctuation.toml
   20 | name = 'wc'
-     |   property     "name"
-     |   operator     "="
-     |   string       "'wc'"
+     |   property     "name"           entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   string       "'"              punctuation.definition.string.begin.toml
+     |   string       "wc"             string.quoted.single.toml
+     |   string       "'"              punctuation.definition.string.end.toml
   21 | path = "src/main.rs"
-     |   property     "path"
-     |   operator     "="
-     |   string       "\"src/main.rs\""
+     |   property     "path"           entity.name.tag.toml
+     |   operator     "="              keyword.operator.toml
+     |   string       "\""             punctuation.definition.string.begin.toml
+     |   string       "src/main.rs"    string.quoted.double.toml
+     |   string       "\""             punctuation.definition.string.end.toml

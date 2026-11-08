@@ -6,8 +6,8 @@
 //!
 //! ```text
 //!    4 | fn word_counts(text: &str) -> HashMap<&str, usize> {
-//!      |   keyword      "fn"
-//!      |   function     "word_counts"
+//!      |   keyword      "fn"             keyword.other.rust
+//!      |   function     "word_counts"    entity.name.function.rust
 //! ```
 //!
 //! After an intended change (new grammar version, query tweak), regenerate with
@@ -17,7 +17,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use ferride_buffer::Buffer;
-use ferride_syntax::{LanguageId, Syntax};
+use ferride_syntax::{LanguageId, Syntax, scope_stack};
 
 fn samples_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("samples")
@@ -44,7 +44,8 @@ fn render(language: LanguageId, text: &str) -> String {
         for s in spans {
             let token = String::from_utf16_lossy(&utf16[s.start_col..s.end_col]);
             let kind = format!("{:?}", s.kind).to_lowercase();
-            writeln!(out, "     |   {kind:<12} {token:?}").unwrap();
+            let scope = scope_stack(s.scope).pop().unwrap_or_default();
+            writeln!(out, "     |   {kind:<12} {:<16} {scope}", format!("{token:?}")).unwrap();
         }
     }
     out

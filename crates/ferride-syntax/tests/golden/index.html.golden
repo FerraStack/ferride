@@ -1,160 +1,185 @@
    1 | <!DOCTYPE html>
-     |   constant     "<!DOCTYPE html"
-     |   punctuation  ">"
+     |   constant     "<!DOCTYPE html" variable.other.constant.html
+     |   punctuation  ">"              punctuation.definition.tag.html
    2 | <html lang="en">
-     |   punctuation  "<"
-     |   tag          "html"
-     |   attribute    "lang"
-     |   string       "en"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "html"           entity.name.tag.html
+     |   attribute    "lang"           entity.other.attribute-name.html
+     |   string       "\""             punctuation.definition.string.begin.html
+     |   string       "en"             string.html
+     |   string       "\""             punctuation.definition.string.end.html
+     |   punctuation  ">"              punctuation.definition.tag.html
    3 | <head>
-     |   punctuation  "<"
-     |   tag          "head"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "head"           entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
    4 |   <meta charset="utf-8">
-     |   punctuation  "<"
-     |   tag          "meta"
-     |   attribute    "charset"
-     |   string       "utf-8"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "meta"           entity.name.tag.html
+     |   attribute    "charset"        entity.other.attribute-name.html
+     |   string       "\""             punctuation.definition.string.begin.html
+     |   string       "utf-8"          string.html
+     |   string       "\""             punctuation.definition.string.end.html
+     |   punctuation  ">"              punctuation.definition.tag.html
    5 |   <title>Word Counter</title>
-     |   punctuation  "<"
-     |   tag          "title"
-     |   punctuation  ">"
-     |   punctuation  "</"
-     |   tag          "title"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "title"          entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "title"          entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
    6 |   <style>
-     |   punctuation  "<"
-     |   tag          "style"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "style"          entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
    7 |     .app { max-width: 40rem; margin: 0 auto; }
-     |   punctuation  "."
-     |   attribute    "app"
-     |   punctuation  "{"
-     |   property     "max-width"
-     |   punctuation  ":"
-     |   number       "40"
-     |   type         "rem"
-     |   punctuation  ";"
-     |   property     "margin"
-     |   punctuation  ":"
-     |   number       "0"
-     |   punctuation  ";"
-     |   punctuation  "}"
+     |   punctuation  "."              punctuation.accessor.css
+     |   attribute    "app"            entity.other.attribute-name.class.css
+     |   punctuation  "{"              punctuation.definition.block.css
+     |   property     "max-width"      support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   number       "40"             constant.numeric.css
+     |   type         "rem"            keyword.other.unit.css
+     |   punctuation  ";"              punctuation.terminator.css
+     |   property     "margin"         support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   number       "0"              constant.numeric.css
+     |   constant     "auto"           support.constant.property-value.css
+     |   punctuation  ";"              punctuation.terminator.css
+     |   punctuation  "}"              punctuation.definition.block.css
    8 |     #count:hover { color: #0078d4; }
-     |   punctuation  "#"
-     |   attribute    "count"
-     |   punctuation  ":"
-     |   attribute    "hover"
-     |   punctuation  "{"
-     |   property     "color"
-     |   punctuation  ":"
-     |   punctuation  "#"
-     |   string       "0078d4"
-     |   punctuation  ";"
-     |   punctuation  "}"
+     |   punctuation  "#"              punctuation.separator.css
+     |   attribute    "count"          entity.other.attribute-name.class.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   attribute    "hover"          entity.other.attribute-name.class.css
+     |   punctuation  "{"              punctuation.definition.block.css
+     |   property     "color"          support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   punctuation  "#"              punctuation.separator.css
+     |   string       "0078d4"         constant.other.color.rgb-value.css
+     |   punctuation  ";"              punctuation.terminator.css
+     |   punctuation  "}"              punctuation.definition.block.css
    9 |   </style>
-     |   punctuation  "</"
-     |   tag          "style"
-     |   punctuation  ">"
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "style"          entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   10 | </head>
-     |   punctuation  "</"
-     |   tag          "head"
-     |   punctuation  ">"
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "head"           entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   11 | <body>
-     |   punctuation  "<"
-     |   tag          "body"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "body"           entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   12 |   <!-- Paste some text and press Count. -->
-     |   comment      "<!-- Paste some text and press Count. -->"
+     |   comment      "<!-- Paste some text and press Count. -->" comment.block.html
   13 |   <main class="app">
-     |   punctuation  "<"
-     |   tag          "main"
-     |   attribute    "class"
-     |   string       "app"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "main"           entity.name.tag.html
+     |   attribute    "class"          entity.other.attribute-name.html
+     |   string       "\""             punctuation.definition.string.begin.html
+     |   string       "app"            string.html
+     |   string       "\""             punctuation.definition.string.end.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   14 |     <h1>Word Counter</h1>
-     |   punctuation  "<"
-     |   tag          "h1"
-     |   punctuation  ">"
-     |   punctuation  "</"
-     |   tag          "h1"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "h1"             entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "h1"             entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   15 |     <textarea id="input" rows="8" placeholder="Paste text here"></textarea>
-     |   punctuation  "<"
-     |   tag          "textarea"
-     |   attribute    "id"
-     |   string       "input"
-     |   attribute    "rows"
-     |   string       "8"
-     |   attribute    "placeholder"
-     |   string       "Paste text here"
-     |   punctuation  "></"
-     |   tag          "textarea"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "textarea"       entity.name.tag.html
+     |   attribute    "id"             entity.other.attribute-name.html
+     |   string       "\""             punctuation.definition.string.begin.html
+     |   string       "input"          string.html
+     |   string       "\""             punctuation.definition.string.end.html
+     |   attribute    "rows"           entity.other.attribute-name.html
+     |   string       "\""             punctuation.definition.string.begin.html
+     |   string       "8"              string.html
+     |   string       "\""             punctuation.definition.string.end.html
+     |   attribute    "placeholder"    entity.other.attribute-name.html
+     |   string       "\""             punctuation.definition.string.begin.html
+     |   string       "Paste text here" string.html
+     |   string       "\""             punctuation.definition.string.end.html
+     |   punctuation  "></"            punctuation.definition.tag.html
+     |   tag          "textarea"       entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   16 |     <button type="button" id="count" disabled>Count &amp; sort</button>
-     |   punctuation  "<"
-     |   tag          "button"
-     |   attribute    "type"
-     |   string       "button"
-     |   attribute    "id"
-     |   string       "count"
-     |   attribute    "disabled"
-     |   punctuation  ">"
-     |   punctuation  "</"
-     |   tag          "button"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "button"         entity.name.tag.html
+     |   attribute    "type"           entity.other.attribute-name.html
+     |   string       "\""             punctuation.definition.string.begin.html
+     |   string       "button"         string.html
+     |   string       "\""             punctuation.definition.string.end.html
+     |   attribute    "id"             entity.other.attribute-name.html
+     |   string       "\""             punctuation.definition.string.begin.html
+     |   string       "count"          string.html
+     |   string       "\""             punctuation.definition.string.end.html
+     |   attribute    "disabled"       entity.other.attribute-name.html
+     |   punctuation  ">"              punctuation.definition.tag.html
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "button"         entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   17 |     <ol id="results"></ol>
-     |   punctuation  "<"
-     |   tag          "ol"
-     |   attribute    "id"
-     |   string       "results"
-     |   punctuation  "></"
-     |   tag          "ol"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "ol"             entity.name.tag.html
+     |   attribute    "id"             entity.other.attribute-name.html
+     |   string       "\""             punctuation.definition.string.begin.html
+     |   string       "results"        string.html
+     |   string       "\""             punctuation.definition.string.end.html
+     |   punctuation  "></"            punctuation.definition.tag.html
+     |   tag          "ol"             entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   18 |   </main>
-     |   punctuation  "</"
-     |   tag          "main"
-     |   punctuation  ">"
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "main"           entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   19 |   <script>
-     |   punctuation  "<"
-     |   tag          "script"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "script"         entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   20 |     const button = document.getElementById("count");
-     |   keyword      "const"
-     |   variable     "button"
-     |   operator     "="
-     |   builtin      "document"
-     |   punctuation  "."
-     |   function     "getElementById"
-     |   punctuation  "("
-     |   string       "\"count\""
-     |   punctuation  ");"
+     |   keyword      "const"          storage.modifier.js
+     |   variable     "button"         variable.other.constant.js
+     |   operator     "="              keyword.operator.js
+     |   builtin      "document"       variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "getElementById" entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   string       "\""             punctuation.definition.string.begin.js
+     |   string       "count"          string.quoted.double.js
+     |   string       "\""             punctuation.definition.string.end.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   punctuation  ";"              punctuation.terminator.js
   21 |     button.addEventListener("click", () => console.log(42));
-     |   variable     "button"
-     |   punctuation  "."
-     |   function     "addEventListener"
-     |   punctuation  "("
-     |   string       "\"click\""
-     |   punctuation  ","
-     |   punctuation  "()"
-     |   operator     "=>"
-     |   builtin      "console"
-     |   punctuation  "."
-     |   function     "log"
-     |   punctuation  "("
-     |   number       "42"
-     |   punctuation  "));"
+     |   variable     "button"         variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "addEventListener" entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   string       "\""             punctuation.definition.string.begin.js
+     |   string       "click"          string.quoted.double.js
+     |   string       "\""             punctuation.definition.string.end.js
+     |   punctuation  ","              punctuation.separator.comma.js
+     |   punctuation  "()"             meta.brace.round.js
+     |   operator     "=>"             keyword.operator.js
+     |   builtin      "console"        variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "log"            entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   number       "42"             constant.numeric.js
+     |   punctuation  "))"             meta.brace.round.js
+     |   punctuation  ";"              punctuation.terminator.js
   22 |   </script>
-     |   punctuation  "</"
-     |   tag          "script"
-     |   punctuation  ">"
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "script"         entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   23 | </body>
-     |   punctuation  "</"
-     |   tag          "body"
-     |   punctuation  ">"
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "body"           entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
   24 | </html>
-     |   punctuation  "</"
-     |   tag          "html"
-     |   punctuation  ">"
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "html"           entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html

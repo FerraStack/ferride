@@ -1,85 +1,90 @@
    1 | #!/usr/bin/env python3
-     |   comment      "#!/usr/bin/env python3"
+     |   comment      "#!/usr/bin/env python3" comment.line.python
    2 | from dataclasses import dataclass
-     |   keyword      "from"
-     |   variable     "dataclasses"
-     |   keyword      "import"
-     |   variable     "dataclass"
+     |   keyword      "from"           keyword.control.import.python
+     |   variable     "dataclasses"    source.python
+     |   keyword      "import"         keyword.control.import.python
+     |   variable     "dataclass"      source.python
    3 | from statistics import mean, median
-     |   keyword      "from"
-     |   variable     "statistics"
-     |   keyword      "import"
-     |   variable     "mean"
-     |   variable     "median"
+     |   keyword      "from"           keyword.control.import.python
+     |   variable     "statistics"     source.python
+     |   keyword      "import"         keyword.control.import.python
+     |   variable     "mean"           source.python
+     |   variable     "median"         source.python
    4 | 
    5 | 
    6 | @dataclass
-     |   function     "@dataclass"
+     |   function     "@"              entity.name.function.python
+     |   function     "dataclass"      entity.name.function.python
    7 | class Summary:
-     |   keyword      "class"
-     |   type         "Summary"
+     |   keyword      "class"          storage.type.python
+     |   type         "Summary"        entity.name.type.class.python
    8 |     """Basic statistics for a list of numbers."""
-     |   string       "\"\"\"Basic statistics for a list of numbers.\"\"\""
+     |   string       "\""             punctuation.definition.string.begin.python
+     |   string       "\"\"Basic statistics for a list of numbers.\"\"" string.quoted.docstring.multi.python
+     |   string       "\""             punctuation.definition.string.end.python
    9 |     mean: float
-     |   variable     "mean"
-     |   type         "float"
+     |   variable     "mean"           source.python
+     |   type         "float"          support.type.python
   10 |     median: float
-     |   variable     "median"
-     |   type         "float"
+     |   variable     "median"         source.python
+     |   type         "float"          support.type.python
   11 |     maximum: float = 0.0
-     |   variable     "maximum"
-     |   type         "float"
-     |   operator     "="
-     |   number       "0.0"
+     |   variable     "maximum"        source.python
+     |   type         "float"          support.type.python
+     |   operator     "="              keyword.operator.python
+     |   number       "0.0"            constant.numeric.python
   12 | 
   13 | 
   14 | def summarize(values: list[float]) -> Summary:
-     |   keyword      "def"
-     |   function     "summarize"
-     |   variable     "values"
-     |   variable     "list"
-     |   type         "float"
-     |   operator     "->"
-     |   type         "Summary"
+     |   keyword      "def"            storage.type.python
+     |   function     "summarize"      entity.name.function.python
+     |   variable     "values"         source.python
+     |   variable     "list"           source.python
+     |   type         "float"          support.type.python
+     |   operator     "->"             keyword.operator.python
+     |   type         "Summary"        entity.name.type.python
   15 |     if not values:
-     |   keyword      "if"
-     |   operator     "not"
-     |   variable     "values"
+     |   keyword      "if"             keyword.control.python
+     |   operator     "not"            keyword.operator.expression.python
+     |   variable     "values"         source.python
   16 |         raise ValueError(f"empty input: {values!r}")
-     |   keyword      "raise"
-     |   function     "ValueError"
-     |   string       "f\"empty input: "
-     |   punctuation  "{"
-     |   variable     "values"
-     |   string       "!r"
-     |   punctuation  "}"
-     |   string       "\""
+     |   keyword      "raise"          keyword.control.python
+     |   function     "ValueError"     support.type.exception.python
+     |   string       "f\"empty input: " string.quoted.double.python
+     |   punctuation  "{"              punctuation.definition.python
+     |   variable     "values"         string.quoted.double.python
+     |   string       "!r"             string.quoted.double.python
+     |   punctuation  "}"              punctuation.definition.template-expression.python
+     |   string       "\""             string.quoted.double.python
   17 |     return Summary(mean(values), median(values), max(values))
-     |   keyword      "return"
-     |   function     "Summary"
-     |   function     "mean"
-     |   variable     "values"
-     |   function     "median"
-     |   variable     "values"
-     |   builtin      "max"
-     |   variable     "values"
+     |   keyword      "return"         keyword.control.python
+     |   function     "Summary"        meta.function-call.generic.python
+     |   function     "mean"           meta.function-call.generic.python
+     |   variable     "values"         source.python
+     |   function     "median"         meta.function-call.generic.python
+     |   variable     "values"         source.python
+     |   builtin      "max"            meta.function-call.generic.python
+     |   variable     "values"         source.python
   18 | 
   19 | 
   20 | if __name__ == "__main__":
-     |   keyword      "if"
-     |   variable     "__name__"
-     |   operator     "=="
-     |   string       "\"__main__\""
+     |   keyword      "if"             keyword.control.python
+     |   variable     "__name__"       source.python
+     |   operator     "=="             keyword.operator.python
+     |   string       "\""             punctuation.definition.string.begin.python
+     |   string       "__main__"       string.quoted.double.python
+     |   string       "\""             punctuation.definition.string.end.python
   21 |     print(summarize([3, 1, 4, 1, 5, 9, 2, 6]), None, True)
-     |   builtin      "print"
-     |   function     "summarize"
-     |   number       "3"
-     |   number       "1"
-     |   number       "4"
-     |   number       "1"
-     |   number       "5"
-     |   number       "9"
-     |   number       "2"
-     |   number       "6"
-     |   constant     "None"
-     |   constant     "True"
+     |   builtin      "print"          meta.function-call.generic.python
+     |   function     "summarize"      meta.function-call.generic.python
+     |   number       "3"              constant.numeric.python
+     |   number       "1"              constant.numeric.python
+     |   number       "4"              constant.numeric.python
+     |   number       "1"              constant.numeric.python
+     |   number       "5"              constant.numeric.python
+     |   number       "9"              constant.numeric.python
+     |   number       "2"              constant.numeric.python
+     |   number       "6"              constant.numeric.python
+     |   constant     "None"           constant.language.null.python
+     |   constant     "True"           constant.language.boolean.python

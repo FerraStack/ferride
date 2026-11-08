@@ -13,6 +13,7 @@
 mod highlight;
 mod injection;
 mod language;
+mod scope;
 
 use std::cell::RefCell;
 use std::ops::ControlFlow;
@@ -29,6 +30,7 @@ pub const INITIAL_PARSE_BUDGET: Duration = Duration::from_millis(1500);
 /// Time budget for an incremental reparse after an edit (runs on the UI thread).
 pub const EDIT_PARSE_BUDGET: Duration = Duration::from_millis(40);
 pub use language::LanguageId;
+pub use scope::{ScopeId, root_scope, scope_stack};
 
 /// Incremental parser + tree for one document.
 pub struct Syntax {
@@ -201,10 +203,20 @@ impl Syntax {
         if window.is_empty() {
             return Vec::new();
         }
-        let mut paint = vec![HighlightKind::Plain; window.len()];
+        let mut paint: Vec<ScopeId> = vec![0; window.len()];
         let mut cache = self.injections.borrow_mut();
         cache.sync(self.generation);
-        paint_layer(self.language, tree, rope, &window, &mut paint, &mut cache, 0);
+        let layer = scope::root_layer(self.language);
+        paint_layer(
+            self.language,
+            layer,
+            tree,
+            rope,
+            &window,
+            &mut paint,
+            &mut cache,
+            0,
+        );
         highlight::spans(&paint, window.start)
     }
 
@@ -225,17 +237,19 @@ impl Syntax {
 }
 
 /// Paints `tree`'s highlights over `window`, then each injection on top.
+#[allow(clippy::too_many_arguments)]
 fn paint_layer(
     language: LanguageId,
+    layer: scope::LayerId,
     tree: &Tree,
     rope: &Rope,
     window: &std::ops::Range<usize>,
-    paint: &mut [HighlightKind],
+    paint: &mut [ScopeId],
     cache: &mut injection::InjectionCache,
     depth: usize,
 ) {
     let config = language.config();
-    highlight::paint(config, tree, rope, window.clone(), paint);
+    highlight::paint(language, layer, tree, rope, window.clone(), paint);
     let Some(query) = &config.injections else {
         return;
     };
@@ -254,10 +268,20 @@ fn paint_layer(
         for r in inj.ranges.iter().filter(|_| !refines_host) {
             let (a, b) = (r.start_byte.max(window.start), r.end_byte.min(window.end));
             if a < b {
-                paint[a - window.start..b - window.start].fill(HighlightKind::Plain);
+                paint[a - window.start..b - window.start].fill(0);
             }
         }
-        paint_layer(inj.language, &child, rope, window, paint, cache, depth + 1);
+        let child_layer = scope::embedded_layer(layer, inj.language);
+        paint_layer(
+            inj.language,
+            child_layer,
+            &child,
+            rope,
+            window,
+            paint,
+            cache,
+            depth + 1,
+        );
     }
 }
 

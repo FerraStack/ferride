@@ -64,6 +64,9 @@ pub struct StyleSpan {
     pub start: i32,
     pub end: i32,
     pub kind: StyleKind,
+    /// Interned TextMate scope stack ([`crate::scope_stack`]); a
+    /// [`crate::TokenTheme`] turns it into the VS Code theme's style.
+    pub scope: i32,
 }
 
 /// One line prepared for drawing.
@@ -285,6 +288,7 @@ impl Document {
                                 start: s.start_col as i32,
                                 end: s.end_col as i32,
                                 kind: s.kind.into(),
+                                scope: s.scope as i32,
                             })
                             .collect()
                     })

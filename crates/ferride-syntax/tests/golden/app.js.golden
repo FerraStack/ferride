@@ -1,235 +1,254 @@
    1 | import { readFile } from "node:fs/promises";
-     |   keyword      "import"
-     |   punctuation  "{"
-     |   variable     "readFile"
-     |   punctuation  "}"
-     |   keyword      "from"
-     |   string       "\"node:fs/promises\""
-     |   punctuation  ";"
+     |   keyword      "import"         keyword.control.import.js
+     |   punctuation  "{"              punctuation.definition.block.js
+     |   variable     "readFile"       variable.other.readwrite.js
+     |   punctuation  "}"              punctuation.definition.block.js
+     |   keyword      "from"           keyword.control.import.js
+     |   string       "\""             punctuation.definition.string.begin.js
+     |   string       "node:fs/promises" string.quoted.double.js
+     |   string       "\""             punctuation.definition.string.end.js
+     |   punctuation  ";"              punctuation.terminator.js
    2 | 
    3 | const TOP = 3;
-     |   keyword      "const"
-     |   constant     "TOP"
-     |   operator     "="
-     |   number       "3"
-     |   punctuation  ";"
+     |   keyword      "const"          storage.modifier.js
+     |   constant     "TOP"            variable.other.constant.js
+     |   operator     "="              keyword.operator.js
+     |   number       "3"              constant.numeric.js
+     |   punctuation  ";"              punctuation.terminator.js
    4 | 
    5 | /** Counts words and returns the most common ones. */
-     |   comment      "/** Counts words and returns the most common ones. */"
+     |   comment      "/** Counts words and returns the most common ones. */" comment.block.documentation.js
    6 | export async function topWords(path, n = TOP) {
-     |   keyword      "export"
-     |   keyword      "async"
-     |   keyword      "function"
-     |   function     "topWords"
-     |   punctuation  "("
-     |   variable     "path"
-     |   punctuation  ","
-     |   variable     "n"
-     |   operator     "="
-     |   constant     "TOP"
-     |   punctuation  ")"
-     |   punctuation  "{"
+     |   keyword      "export"         keyword.control.import.js
+     |   keyword      "async"          storage.modifier.js
+     |   keyword      "function"       storage.type.js
+     |   function     "topWords"       entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   variable     "path"           variable.other.readwrite.js
+     |   punctuation  ","              punctuation.separator.comma.js
+     |   variable     "n"              variable.other.readwrite.js
+     |   operator     "="              keyword.operator.js
+     |   constant     "TOP"            variable.other.constant.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   punctuation  "{"              punctuation.definition.block.js
    7 |   const text = await readFile(path, "utf8");
-     |   keyword      "const"
-     |   variable     "text"
-     |   operator     "="
-     |   keyword      "await"
-     |   function     "readFile"
-     |   punctuation  "("
-     |   variable     "path"
-     |   punctuation  ","
-     |   string       "\"utf8\""
-     |   punctuation  ");"
+     |   keyword      "const"          storage.modifier.js
+     |   variable     "text"           variable.other.constant.js
+     |   operator     "="              keyword.operator.js
+     |   keyword      "await"          keyword.control.js
+     |   function     "readFile"       entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   variable     "path"           variable.other.readwrite.js
+     |   punctuation  ","              punctuation.separator.comma.js
+     |   string       "\""             punctuation.definition.string.begin.js
+     |   string       "utf8"           string.quoted.double.js
+     |   string       "\""             punctuation.definition.string.end.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   punctuation  ";"              punctuation.terminator.js
    8 |   const counts = new Map();
-     |   keyword      "const"
-     |   variable     "counts"
-     |   operator     "="
-     |   keyword      "new"
-     |   type         "Map"
-     |   punctuation  "();"
+     |   keyword      "const"          storage.modifier.js
+     |   variable     "counts"         variable.other.constant.js
+     |   operator     "="              keyword.operator.js
+     |   keyword      "new"            keyword.operator.expression.js
+     |   type         "Map"            entity.name.type.class.js
+     |   punctuation  "()"             meta.brace.round.js
+     |   punctuation  ";"              punctuation.terminator.js
    9 |   for (const word of text.toLowerCase().split(/\s+/)) {
-     |   keyword      "for"
-     |   punctuation  "("
-     |   keyword      "const"
-     |   variable     "word"
-     |   keyword      "of"
-     |   variable     "text"
-     |   punctuation  "."
-     |   function     "toLowerCase"
-     |   punctuation  "()."
-     |   function     "split"
-     |   punctuation  "("
-     |   operator     "/"
-     |   string       "\\s+"
-     |   operator     "/"
-     |   punctuation  "))"
-     |   punctuation  "{"
+     |   keyword      "for"            keyword.control.js
+     |   punctuation  "("              meta.brace.round.js
+     |   keyword      "const"          storage.modifier.js
+     |   variable     "word"           variable.other.readwrite.js
+     |   keyword      "of"             storage.type.js
+     |   variable     "text"           variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "toLowerCase"    entity.name.function.js
+     |   punctuation  "()"             meta.brace.round.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "split"          entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   operator     "/"              keyword.operator.js
+     |   string       "\\s+"           string.other.js
+     |   operator     "/"              keyword.operator.js
+     |   punctuation  "))"             meta.brace.round.js
+     |   punctuation  "{"              punctuation.definition.block.js
   10 |     if (word) counts.set(word, (counts.get(word) ?? 0) + 1);
-     |   keyword      "if"
-     |   punctuation  "("
-     |   variable     "word"
-     |   punctuation  ")"
-     |   variable     "counts"
-     |   punctuation  "."
-     |   function     "set"
-     |   punctuation  "("
-     |   variable     "word"
-     |   punctuation  ","
-     |   punctuation  "("
-     |   variable     "counts"
-     |   punctuation  "."
-     |   function     "get"
-     |   punctuation  "("
-     |   variable     "word"
-     |   punctuation  ")"
-     |   operator     "??"
-     |   number       "0"
-     |   punctuation  ")"
-     |   operator     "+"
-     |   number       "1"
-     |   punctuation  ");"
+     |   keyword      "if"             keyword.control.js
+     |   punctuation  "("              meta.brace.round.js
+     |   variable     "word"           variable.other.readwrite.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   variable     "counts"         variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "set"            entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   variable     "word"           variable.other.readwrite.js
+     |   punctuation  ","              punctuation.separator.comma.js
+     |   punctuation  "("              meta.brace.round.js
+     |   variable     "counts"         variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "get"            entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   variable     "word"           variable.other.readwrite.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   operator     "??"             keyword.operator.js
+     |   number       "0"              constant.numeric.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   operator     "+"              keyword.operator.js
+     |   number       "1"              constant.numeric.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   punctuation  ";"              punctuation.terminator.js
   11 |   }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.js
   12 |   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
-     |   keyword      "return"
-     |   punctuation  "["
-     |   variable     "counts"
-     |   punctuation  "."
-     |   function     "entries"
-     |   punctuation  "()]."
-     |   function     "sort"
-     |   punctuation  "(("
-     |   variable     "a"
-     |   punctuation  ","
-     |   variable     "b"
-     |   punctuation  ")"
-     |   operator     "=>"
-     |   variable     "b"
-     |   punctuation  "["
-     |   number       "1"
-     |   punctuation  "]"
-     |   operator     "-"
-     |   variable     "a"
-     |   punctuation  "["
-     |   number       "1"
-     |   punctuation  "])."
-     |   function     "slice"
-     |   punctuation  "("
-     |   number       "0"
-     |   punctuation  ","
-     |   variable     "n"
-     |   punctuation  ");"
+     |   keyword      "return"         keyword.control.js
+     |   punctuation  "["              meta.brace.square.js
+     |   variable     "counts"         variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "entries"        entity.name.function.js
+     |   punctuation  "()"             meta.brace.round.js
+     |   punctuation  "]"              meta.brace.square.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "sort"           entity.name.function.js
+     |   punctuation  "(("             meta.brace.round.js
+     |   variable     "a"              variable.other.readwrite.js
+     |   punctuation  ","              punctuation.separator.comma.js
+     |   variable     "b"              variable.other.readwrite.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   operator     "=>"             keyword.operator.js
+     |   variable     "b"              variable.other.readwrite.js
+     |   punctuation  "["              meta.brace.square.js
+     |   number       "1"              constant.numeric.js
+     |   punctuation  "]"              meta.brace.square.js
+     |   operator     "-"              keyword.operator.js
+     |   variable     "a"              variable.other.readwrite.js
+     |   punctuation  "["              meta.brace.square.js
+     |   number       "1"              constant.numeric.js
+     |   punctuation  "]"              meta.brace.square.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "slice"          entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   number       "0"              constant.numeric.js
+     |   punctuation  ","              punctuation.separator.comma.js
+     |   variable     "n"              variable.other.readwrite.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   punctuation  ";"              punctuation.terminator.js
   13 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.js
   14 | 
   15 | class Counter extends EventTarget {
-     |   keyword      "class"
-     |   type         "Counter"
-     |   keyword      "extends"
-     |   type         "EventTarget"
-     |   punctuation  "{"
+     |   keyword      "class"          storage.type.js
+     |   type         "Counter"        entity.name.type.class.js
+     |   keyword      "extends"        storage.type.js
+     |   type         "EventTarget"    entity.name.type.class.js
+     |   punctuation  "{"              punctuation.definition.block.js
   16 |   #count = 0;
-     |   operator     "="
-     |   number       "0"
-     |   punctuation  ";"
+     |   operator     "="              keyword.operator.js
+     |   number       "0"              constant.numeric.js
+     |   punctuation  ";"              punctuation.terminator.js
   17 |   increment() {
-     |   function     "increment"
-     |   punctuation  "()"
-     |   punctuation  "{"
+     |   function     "increment"      entity.name.function.js
+     |   punctuation  "()"             meta.brace.round.js
+     |   punctuation  "{"              punctuation.definition.block.js
   18 |     this.#count++;
-     |   builtin      "this"
-     |   punctuation  "."
-     |   operator     "++"
-     |   punctuation  ";"
+     |   builtin      "this"           variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   operator     "++"             keyword.operator.js
+     |   punctuation  ";"              punctuation.terminator.js
   19 |     this.dispatchEvent(new Event(`changed:${this.#count}`));
-     |   builtin      "this"
-     |   punctuation  "."
-     |   function     "dispatchEvent"
-     |   punctuation  "("
-     |   keyword      "new"
-     |   type         "Event"
-     |   punctuation  "("
-     |   string       "`changed:"
-     |   punctuation  "${"
-     |   builtin      "this"
-     |   punctuation  "."
-     |   string       "#count"
-     |   punctuation  "}"
-     |   string       "`"
-     |   punctuation  "));"
+     |   builtin      "this"           variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "dispatchEvent"  entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   keyword      "new"            keyword.operator.expression.js
+     |   type         "Event"          entity.name.type.class.js
+     |   punctuation  "("              meta.brace.round.js
+     |   string       "`changed:"      string.template.js
+     |   punctuation  "${"             punctuation.definition.template-expression.js
+     |   builtin      "this"           variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   string       "#count"         string.template.js
+     |   punctuation  "}"              punctuation.definition.template-expression.js
+     |   string       "`"              string.template.js
+     |   punctuation  "))"             meta.brace.round.js
+     |   punctuation  ";"              punctuation.terminator.js
   20 |   }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.js
   21 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.js
   22 | 
   23 | const query = sql`SELECT word, COUNT(*) FROM words WHERE length(word) > ${TOP} GROUP BY word`;
-     |   keyword      "const"
-     |   variable     "query"
-     |   operator     "="
-     |   function     "sql"
-     |   string       "`"
-     |   keyword      "SELECT"
-     |   property     "word"
-     |   punctuation  ","
-     |   function     "COUNT"
-     |   punctuation  "("
-     |   operator     "*"
-     |   punctuation  ")"
-     |   keyword      "FROM"
-     |   type         "words"
-     |   keyword      "WHERE"
-     |   function     "length"
-     |   punctuation  "("
-     |   property     "word"
-     |   punctuation  ")"
-     |   operator     ">"
-     |   punctuation  "${"
-     |   constant     "TOP"
-     |   punctuation  "}"
-     |   property     "word"
-     |   string       "`"
-     |   punctuation  ";"
+     |   keyword      "const"          storage.modifier.js
+     |   variable     "query"          variable.other.constant.js
+     |   operator     "="              keyword.operator.js
+     |   function     "sql"            entity.name.function.js
+     |   string       "`"              string.template.js
+     |   keyword      "SELECT"         keyword.other.sql
+     |   property     "word"           source.sql
+     |   punctuation  ","              punctuation.separator.comma.sql
+     |   function     "COUNT"          support.function.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   operator     "*"              keyword.operator.sql
+     |   punctuation  ")"              meta.brace.round.sql
+     |   keyword      "FROM"           keyword.other.sql
+     |   type         "words"          source.sql
+     |   keyword      "WHERE"          keyword.other.sql
+     |   function     "length"         support.function.sql
+     |   punctuation  "("              meta.brace.round.sql
+     |   property     "word"           source.sql
+     |   punctuation  ")"              meta.brace.round.sql
+     |   operator     ">"              keyword.operator.sql
+     |   punctuation  "${"             punctuation.definition.template-expression.js
+     |   constant     "TOP"            variable.other.constant.js
+     |   punctuation  "}"              punctuation.definition.template-expression.js
+     |   property     "word"           source.sql
+     |   string       "`"              string.template.js
+     |   punctuation  ";"              punctuation.terminator.js
   24 | const styles = css`
-     |   keyword      "const"
-     |   variable     "styles"
-     |   operator     "="
-     |   function     "css"
-     |   string       "`"
+     |   keyword      "const"          storage.modifier.js
+     |   variable     "styles"         variable.other.constant.js
+     |   operator     "="              keyword.operator.js
+     |   function     "css"            entity.name.function.js
+     |   string       "`"              string.template.js
   25 |   .counter { color: red; }
-     |   punctuation  "."
-     |   attribute    "counter"
-     |   punctuation  "{"
-     |   property     "color"
-     |   punctuation  ":"
-     |   punctuation  ";"
-     |   punctuation  "}"
+     |   punctuation  "."              punctuation.accessor.css
+     |   attribute    "counter"        entity.other.attribute-name.class.css
+     |   punctuation  "{"              punctuation.definition.block.css
+     |   property     "color"          support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   constant     "red"            support.constant.property-value.css
+     |   punctuation  ";"              punctuation.terminator.css
+     |   punctuation  "}"              punctuation.definition.block.css
   26 | `;
-     |   string       "`"
-     |   punctuation  ";"
+     |   string       "`"              string.template.js
+     |   punctuation  ";"              punctuation.terminator.js
   27 | 
   28 | topWords(process.argv[2]).then(console.log).catch((err) => console.error(err));
-     |   function     "topWords"
-     |   punctuation  "("
-     |   variable     "process"
-     |   punctuation  "."
-     |   property     "argv"
-     |   punctuation  "["
-     |   number       "2"
-     |   punctuation  "])."
-     |   function     "then"
-     |   punctuation  "("
-     |   builtin      "console"
-     |   punctuation  "."
-     |   property     "log"
-     |   punctuation  ")."
-     |   function     "catch"
-     |   punctuation  "(("
-     |   variable     "err"
-     |   punctuation  ")"
-     |   operator     "=>"
-     |   builtin      "console"
-     |   punctuation  "."
-     |   function     "error"
-     |   punctuation  "("
-     |   variable     "err"
-     |   punctuation  "));"
+     |   function     "topWords"       entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   variable     "process"        variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   property     "argv"           variable.other.property.js
+     |   punctuation  "["              meta.brace.square.js
+     |   number       "2"              constant.numeric.js
+     |   punctuation  "]"              meta.brace.square.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "then"           entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   builtin      "console"        variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   property     "log"            variable.other.property.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "catch"          entity.name.function.js
+     |   punctuation  "(("             meta.brace.round.js
+     |   variable     "err"            variable.other.readwrite.js
+     |   punctuation  ")"              meta.brace.round.js
+     |   operator     "=>"             keyword.operator.js
+     |   builtin      "console"        variable.other.object.js
+     |   punctuation  "."              punctuation.accessor.js
+     |   function     "error"          entity.name.function.js
+     |   punctuation  "("              meta.brace.round.js
+     |   variable     "err"            variable.other.readwrite.js
+     |   punctuation  "))"             meta.brace.round.js
+     |   punctuation  ";"              punctuation.terminator.js

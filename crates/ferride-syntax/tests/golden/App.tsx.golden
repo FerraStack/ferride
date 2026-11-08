@@ -1,104 +1,118 @@
    1 | import { useState } from "react";
-     |   keyword      "import"
-     |   punctuation  "{"
-     |   variable     "useState"
-     |   punctuation  "}"
-     |   keyword      "from"
-     |   string       "\"react\""
-     |   punctuation  ";"
+     |   keyword      "import"         keyword.control.import.tsx
+     |   punctuation  "{"              punctuation.definition.block.tsx
+     |   variable     "useState"       variable.other.readwrite.tsx
+     |   punctuation  "}"              punctuation.definition.block.tsx
+     |   keyword      "from"           keyword.control.import.tsx
+     |   string       "\""             punctuation.definition.string.begin.tsx
+     |   string       "react"          string.quoted.double.tsx
+     |   string       "\""             punctuation.definition.string.end.tsx
+     |   punctuation  ";"              punctuation.terminator.tsx
    2 | 
    3 | type Props = { initial?: number; label: string };
-     |   keyword      "type"
-     |   type         "Props"
-     |   operator     "="
-     |   punctuation  "{"
-     |   property     "initial"
-     |   builtin      "number"
-     |   punctuation  ";"
-     |   property     "label"
-     |   builtin      "string"
-     |   punctuation  "};"
+     |   keyword      "type"           storage.type.tsx
+     |   type         "Props"          entity.name.type.tsx
+     |   operator     "="              keyword.operator.tsx
+     |   punctuation  "{"              punctuation.definition.block.tsx
+     |   property     "initial"        variable.other.property.tsx
+     |   builtin      "number"         support.type.primitive.tsx
+     |   punctuation  ";"              punctuation.terminator.tsx
+     |   property     "label"          variable.other.property.tsx
+     |   builtin      "string"         support.type.primitive.tsx
+     |   punctuation  "}"              punctuation.definition.block.tsx
+     |   punctuation  ";"              punctuation.terminator.tsx
    4 | 
    5 | export function Counter({ initial = 0, label }: Props) {
-     |   keyword      "export"
-     |   keyword      "function"
-     |   type         "Counter"
-     |   punctuation  "({"
-     |   operator     "="
-     |   number       "0"
-     |   punctuation  ","
-     |   punctuation  "}"
-     |   type         "Props"
-     |   punctuation  ")"
-     |   punctuation  "{"
+     |   keyword      "export"         keyword.control.import.tsx
+     |   keyword      "function"       storage.type.tsx
+     |   type         "Counter"        entity.name.type.tsx
+     |   punctuation  "("              meta.brace.round.tsx
+     |   punctuation  "{"              punctuation.definition.block.tsx
+     |   operator     "="              keyword.operator.tsx
+     |   number       "0"              constant.numeric.tsx
+     |   punctuation  ","              punctuation.separator.comma.tsx
+     |   punctuation  "}"              punctuation.definition.block.tsx
+     |   type         "Props"          entity.name.type.tsx
+     |   punctuation  ")"              meta.brace.round.tsx
+     |   punctuation  "{"              punctuation.definition.block.tsx
    6 |   const [count, setCount] = useState<number>(initial);
-     |   keyword      "const"
-     |   punctuation  "["
-     |   variable     "count"
-     |   punctuation  ","
-     |   variable     "setCount"
-     |   punctuation  "]"
-     |   operator     "="
-     |   function     "useState"
-     |   punctuation  "<"
-     |   builtin      "number"
-     |   punctuation  ">("
-     |   variable     "initial"
-     |   punctuation  ");"
+     |   keyword      "const"          storage.modifier.tsx
+     |   punctuation  "["              meta.brace.square.tsx
+     |   variable     "count"          variable.other.readwrite.tsx
+     |   punctuation  ","              punctuation.separator.comma.tsx
+     |   variable     "setCount"       variable.other.readwrite.tsx
+     |   punctuation  "]"              meta.brace.square.tsx
+     |   operator     "="              keyword.operator.tsx
+     |   function     "useState"       entity.name.function.tsx
+     |   punctuation  "<"              punctuation.tsx
+     |   builtin      "number"         support.type.primitive.tsx
+     |   punctuation  ">"              punctuation.tsx
+     |   punctuation  "("              meta.brace.round.tsx
+     |   variable     "initial"        variable.other.readwrite.tsx
+     |   punctuation  ")"              meta.brace.round.tsx
+     |   punctuation  ";"              punctuation.terminator.tsx
    7 |   return (
-     |   keyword      "return"
-     |   punctuation  "("
+     |   keyword      "return"         keyword.control.tsx
+     |   punctuation  "("              meta.brace.round.tsx
    8 |     <div className="counter">
-     |   punctuation  "<"
-     |   tag          "div"
-     |   attribute    "className"
-     |   operator     "="
-     |   string       "\"counter\""
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.tsx
+     |   tag          "div"            entity.name.tag.tsx
+     |   attribute    "className"      entity.other.attribute-name.tsx
+     |   operator     "="              keyword.operator.tsx
+     |   string       "\""             punctuation.definition.string.begin.tsx
+     |   string       "counter"        string.quoted.double.tsx
+     |   string       "\""             punctuation.definition.string.end.tsx
+     |   punctuation  ">"              punctuation.tsx
    9 |       <span>{label}: {count}</span>
-     |   punctuation  "<"
-     |   tag          "span"
-     |   punctuation  ">{"
-     |   variable     "label"
-     |   punctuation  "}"
-     |   punctuation  "{"
-     |   variable     "count"
-     |   punctuation  "}</"
-     |   tag          "span"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.tsx
+     |   tag          "span"           entity.name.tag.tsx
+     |   punctuation  ">"              punctuation.tsx
+     |   punctuation  "{"              punctuation.definition.block.tsx
+     |   variable     "label"          variable.other.readwrite.tsx
+     |   punctuation  "}"              punctuation.definition.block.tsx
+     |   punctuation  "{"              punctuation.definition.block.tsx
+     |   variable     "count"          variable.other.readwrite.tsx
+     |   punctuation  "}"              punctuation.definition.block.tsx
+     |   punctuation  "</"             punctuation.tsx
+     |   tag          "span"           entity.name.tag.tsx
+     |   punctuation  ">"              punctuation.tsx
   10 |       <button onClick={() => setCount((c) => c + 1)} disabled={count >= 10}>
-     |   punctuation  "<"
-     |   tag          "button"
-     |   attribute    "onClick"
-     |   operator     "="
-     |   punctuation  "{()"
-     |   operator     "=>"
-     |   function     "setCount"
-     |   punctuation  "(("
-     |   variable     "c"
-     |   punctuation  ")"
-     |   operator     "=>"
-     |   variable     "c"
-     |   operator     "+"
-     |   number       "1"
-     |   punctuation  ")}"
-     |   attribute    "disabled"
-     |   operator     "="
-     |   punctuation  "{"
-     |   variable     "count"
-     |   operator     ">="
-     |   number       "10"
-     |   punctuation  "}>"
+     |   punctuation  "<"              punctuation.tsx
+     |   tag          "button"         entity.name.tag.tsx
+     |   attribute    "onClick"        entity.other.attribute-name.tsx
+     |   operator     "="              keyword.operator.tsx
+     |   punctuation  "{"              punctuation.definition.block.tsx
+     |   punctuation  "()"             meta.brace.round.tsx
+     |   operator     "=>"             keyword.operator.tsx
+     |   function     "setCount"       entity.name.function.tsx
+     |   punctuation  "(("             meta.brace.round.tsx
+     |   variable     "c"              variable.parameter.tsx
+     |   punctuation  ")"              meta.brace.round.tsx
+     |   operator     "=>"             keyword.operator.tsx
+     |   variable     "c"              variable.other.readwrite.tsx
+     |   operator     "+"              keyword.operator.tsx
+     |   number       "1"              constant.numeric.tsx
+     |   punctuation  ")"              meta.brace.round.tsx
+     |   punctuation  "}"              punctuation.definition.block.tsx
+     |   attribute    "disabled"       entity.other.attribute-name.tsx
+     |   operator     "="              keyword.operator.tsx
+     |   punctuation  "{"              punctuation.definition.block.tsx
+     |   variable     "count"          variable.other.readwrite.tsx
+     |   operator     ">="             keyword.operator.tsx
+     |   number       "10"             constant.numeric.tsx
+     |   punctuation  "}"              punctuation.definition.block.tsx
+     |   punctuation  ">"              punctuation.tsx
   11 |         Increment
   12 |       </button>
-     |   punctuation  "</"
-     |   tag          "button"
-     |   punctuation  ">"
+     |   punctuation  "</"             punctuation.tsx
+     |   tag          "button"         entity.name.tag.tsx
+     |   punctuation  ">"              punctuation.tsx
   13 |     </div>
-     |   punctuation  "</"
-     |   tag          "div"
-     |   punctuation  ">"
+     |   punctuation  "</"             punctuation.tsx
+     |   tag          "div"            entity.name.tag.tsx
+     |   punctuation  ">"              punctuation.tsx
   14 |   );
-     |   punctuation  ");"
+     |   punctuation  ")"              meta.brace.round.tsx
+     |   punctuation  ";"              punctuation.terminator.tsx
   15 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.tsx

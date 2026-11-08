@@ -212,7 +212,7 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
         fun add(range: IntRange, kind: StyleKind) {
             if (range.isEmpty() || range.any { taken[it] }) return
             range.forEach { taken[it] = true }
-            spans += StyleSpan(range.first, range.last + 1, kind)
+            spans += StyleSpan(range.first, range.last + 1, kind, 0)
         }
         val commentStart = when (language) {
             "python" -> line.indexOf('#')

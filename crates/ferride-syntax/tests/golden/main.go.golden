@@ -1,140 +1,151 @@
    1 | package main
-     |   keyword      "package"
+     |   keyword      "package"        keyword.control.import.go
    2 | 
    3 | import (
-     |   keyword      "import"
+     |   keyword      "import"         keyword.control.import.go
    4 | 	"fmt"
-     |   string       "\"fmt\""
+     |   string       "\""             punctuation.definition.string.begin.go
+     |   string       "fmt"            string.quoted.double.go
+     |   string       "\""             punctuation.definition.string.end.go
    5 | 	"sort"
-     |   string       "\"sort\""
+     |   string       "\""             punctuation.definition.string.begin.go
+     |   string       "sort"           string.quoted.double.go
+     |   string       "\""             punctuation.definition.string.end.go
    6 | 	"strings"
-     |   string       "\"strings\""
+     |   string       "\""             punctuation.definition.string.begin.go
+     |   string       "strings"        string.quoted.double.go
+     |   string       "\""             punctuation.definition.string.end.go
    7 | )
    8 | 
    9 | // WordCount is a word and how often it appears.
-     |   comment      "// WordCount is a word and how often it appears."
+     |   comment      "// WordCount is a word and how often it appears." comment.line.go
   10 | type WordCount struct {
-     |   keyword      "type"
-     |   type         "WordCount"
-     |   keyword      "struct"
+     |   keyword      "type"           storage.type.go
+     |   type         "WordCount"      entity.name.type.go
+     |   keyword      "struct"         storage.type.go
   11 | 	Word  string
-     |   property     "Word"
-     |   type         "string"
+     |   property     "Word"           variable.other.property.go
+     |   type         "string"         storage.type.go
   12 | 	Count int
-     |   property     "Count"
-     |   type         "int"
+     |   property     "Count"          variable.other.property.go
+     |   type         "int"            storage.type.go
   13 | }
   14 | 
   15 | func countWords(text string) []WordCount {
-     |   keyword      "func"
-     |   function     "countWords"
-     |   variable     "text"
-     |   type         "string"
-     |   type         "WordCount"
+     |   keyword      "func"           storage.type.go
+     |   function     "countWords"     entity.name.function.go
+     |   variable     "text"           variable.other.readwrite.go
+     |   type         "string"         storage.type.go
+     |   type         "WordCount"      entity.name.type.go
   16 | 	counts := make(map[string]int)
-     |   variable     "counts"
-     |   operator     ":="
-     |   function     "make"
-     |   keyword      "map"
-     |   type         "string"
-     |   type         "int"
+     |   variable     "counts"         variable.other.readwrite.go
+     |   operator     ":="             keyword.operator.go
+     |   function     "make"           entity.name.function.go
+     |   keyword      "map"            storage.type.go
+     |   type         "string"         storage.type.go
+     |   type         "int"            storage.type.go
   17 | 	for _, w := range strings.Fields(strings.ToLower(text)) {
-     |   keyword      "for"
-     |   variable     "_"
-     |   variable     "w"
-     |   operator     ":="
-     |   keyword      "range"
-     |   variable     "strings"
-     |   function     "Fields"
-     |   variable     "strings"
-     |   function     "ToLower"
-     |   variable     "text"
+     |   keyword      "for"            keyword.control.go
+     |   variable     "_"              variable.other.readwrite.go
+     |   variable     "w"              variable.other.readwrite.go
+     |   operator     ":="             keyword.operator.go
+     |   keyword      "range"          keyword.control.go
+     |   variable     "strings"        variable.other.readwrite.go
+     |   function     "Fields"         entity.name.function.go
+     |   variable     "strings"        variable.other.readwrite.go
+     |   function     "ToLower"        entity.name.function.go
+     |   variable     "text"           variable.other.readwrite.go
   18 | 		counts[w]++
-     |   variable     "counts"
-     |   variable     "w"
-     |   operator     "++"
+     |   variable     "counts"         variable.other.readwrite.go
+     |   variable     "w"              variable.other.readwrite.go
+     |   operator     "++"             keyword.operator.go
   19 | 	}
   20 | 	out := make([]WordCount, 0, len(counts))
-     |   variable     "out"
-     |   operator     ":="
-     |   function     "make"
-     |   type         "WordCount"
-     |   number       "0"
-     |   function     "len"
-     |   variable     "counts"
+     |   variable     "out"            variable.other.readwrite.go
+     |   operator     ":="             keyword.operator.go
+     |   function     "make"           entity.name.function.go
+     |   type         "WordCount"      entity.name.type.go
+     |   number       "0"              constant.numeric.go
+     |   function     "len"            entity.name.function.go
+     |   variable     "counts"         variable.other.readwrite.go
   21 | 	for w, c := range counts {
-     |   keyword      "for"
-     |   variable     "w"
-     |   variable     "c"
-     |   operator     ":="
-     |   keyword      "range"
-     |   variable     "counts"
+     |   keyword      "for"            keyword.control.go
+     |   variable     "w"              variable.other.readwrite.go
+     |   variable     "c"              variable.other.readwrite.go
+     |   operator     ":="             keyword.operator.go
+     |   keyword      "range"          keyword.control.go
+     |   variable     "counts"         variable.other.readwrite.go
   22 | 		out = append(out, WordCount{Word: w, Count: c})
-     |   variable     "out"
-     |   operator     "="
-     |   function     "append"
-     |   variable     "out"
-     |   type         "WordCount"
-     |   variable     "Word"
-     |   variable     "w"
-     |   variable     "Count"
-     |   variable     "c"
+     |   variable     "out"            variable.other.readwrite.go
+     |   operator     "="              keyword.operator.go
+     |   function     "append"         entity.name.function.go
+     |   variable     "out"            variable.other.readwrite.go
+     |   type         "WordCount"      entity.name.type.go
+     |   variable     "Word"           variable.other.readwrite.go
+     |   variable     "w"              variable.other.readwrite.go
+     |   variable     "Count"          variable.other.readwrite.go
+     |   variable     "c"              variable.other.readwrite.go
   23 | 	}
   24 | 	sort.Slice(out, func(i, j int) bool { return out[i].Count > out[j].Count })
-     |   variable     "sort"
-     |   function     "Slice"
-     |   variable     "out"
-     |   keyword      "func"
-     |   variable     "i"
-     |   variable     "j"
-     |   type         "int"
-     |   type         "bool"
-     |   keyword      "return"
-     |   variable     "out"
-     |   variable     "i"
-     |   property     "Count"
-     |   operator     ">"
-     |   variable     "out"
-     |   variable     "j"
-     |   property     "Count"
+     |   variable     "sort"           variable.other.readwrite.go
+     |   function     "Slice"          entity.name.function.go
+     |   variable     "out"            variable.other.readwrite.go
+     |   keyword      "func"           storage.type.go
+     |   variable     "i"              variable.other.readwrite.go
+     |   variable     "j"              variable.other.readwrite.go
+     |   type         "int"            storage.type.go
+     |   type         "bool"           storage.type.go
+     |   keyword      "return"         keyword.control.go
+     |   variable     "out"            variable.other.readwrite.go
+     |   variable     "i"              variable.other.readwrite.go
+     |   property     "Count"          variable.other.property.go
+     |   operator     ">"              keyword.operator.go
+     |   variable     "out"            variable.other.readwrite.go
+     |   variable     "j"              variable.other.readwrite.go
+     |   property     "Count"          variable.other.property.go
   25 | 	return out
-     |   keyword      "return"
-     |   variable     "out"
+     |   keyword      "return"         keyword.control.go
+     |   variable     "out"            variable.other.readwrite.go
   26 | }
   27 | 
   28 | func main() {
-     |   keyword      "func"
-     |   function     "main"
+     |   keyword      "func"           storage.type.go
+     |   function     "main"           entity.name.function.go
   29 | 	const text = "the quick brown fox jumps over the lazy dog"
-     |   keyword      "const"
-     |   variable     "text"
-     |   operator     "="
-     |   string       "\"the quick brown fox jumps over the lazy dog\""
+     |   keyword      "const"          storage.modifier.go
+     |   variable     "text"           variable.other.readwrite.go
+     |   operator     "="              keyword.operator.go
+     |   string       "\""             punctuation.definition.string.begin.go
+     |   string       "the quick brown fox jumps over the lazy dog" string.quoted.double.go
+     |   string       "\""             punctuation.definition.string.end.go
   30 | 	for i, wc := range countWords(text) {
-     |   keyword      "for"
-     |   variable     "i"
-     |   variable     "wc"
-     |   operator     ":="
-     |   keyword      "range"
-     |   function     "countWords"
-     |   variable     "text"
+     |   keyword      "for"            keyword.control.go
+     |   variable     "i"              variable.other.readwrite.go
+     |   variable     "wc"             variable.other.readwrite.go
+     |   operator     ":="             keyword.operator.go
+     |   keyword      "range"          keyword.control.go
+     |   function     "countWords"     entity.name.function.go
+     |   variable     "text"           variable.other.readwrite.go
   31 | 		if i >= 3 {
-     |   keyword      "if"
-     |   variable     "i"
-     |   operator     ">="
-     |   number       "3"
+     |   keyword      "if"             keyword.control.go
+     |   variable     "i"              variable.other.readwrite.go
+     |   operator     ">="             keyword.operator.go
+     |   number       "3"              constant.numeric.go
   32 | 			break
-     |   keyword      "break"
+     |   keyword      "break"          keyword.control.go
   33 | 		}
   34 | 		fmt.Printf("%s: %d\n", wc.Word, wc.Count)
-     |   variable     "fmt"
-     |   function     "Printf"
-     |   string       "\"%s: %d"
-     |   escape       "\\n"
-     |   string       "\""
-     |   variable     "wc"
-     |   property     "Word"
-     |   variable     "wc"
-     |   property     "Count"
+     |   variable     "fmt"            variable.other.readwrite.go
+     |   function     "Printf"         entity.name.function.go
+     |   string       "\""             punctuation.definition.string.begin.go
+     |   string       "%s"             constant.other.placeholder.go
+     |   string       ": "             string.quoted.double.go
+     |   string       "%d"             constant.other.placeholder.go
+     |   escape       "\\n"            constant.character.escape.go
+     |   string       "\""             punctuation.definition.string.end.go
+     |   variable     "wc"             variable.other.readwrite.go
+     |   property     "Word"           variable.other.property.go
+     |   variable     "wc"             variable.other.readwrite.go
+     |   property     "Count"          variable.other.property.go
   35 | 	}
   36 | }
