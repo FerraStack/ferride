@@ -25,6 +25,7 @@ import dev.ferride.core.StyleKind
 import dev.ferride.editor.EditorStyle
 import dev.ferride.theme.LocalWorkbenchColors
 import dev.ferride.theme.WorkbenchColors
+import dev.ferride.workbench.Languages
 import dev.ferride.workbench.Settings
 
 /** A square, touch-friendly icon button without Material's ripple container styling. */
@@ -62,30 +63,38 @@ fun FileIcon(name: String, modifier: Modifier = Modifier) {
     }
 }
 
-fun fileBadge(name: String): Pair<String, Color> = when (name.substringAfterLast('.', "").lowercase()) {
-    "rs" -> "RS" to Color(0xFFDEA584)
-    "py" -> "PY" to Color(0xFF4B8BBE)
-    "ts", "mts", "cts" -> "TS" to Color(0xFF3178C6)
-    "tsx" -> "TSX" to Color(0xFF3178C6)
-    "js", "mjs", "cjs" -> "JS" to Color(0xFFE8D44D)
-    "jsx" -> "JSX" to Color(0xFFE8D44D)
-    "json" -> "{}" to Color(0xFFCBCB41)
-    "md", "markdown" -> "M↓" to Color(0xFF519ABA)
-    "toml" -> "⚙" to Color(0xFF9C9C9C)
-    else -> "≡" to Color(0xFF9C9C9C)
+fun fileBadge(name: String): Pair<String, Color> {
+    when (name) {
+        ".bashrc", ".zshrc", ".profile", ".bash_profile", "PKGBUILD" -> return ">_" to Color(0xFF8DC149)
+        "Cargo.lock" -> return "⚙" to Color(0xFF9C9C9C)
+    }
+    return when (name.substringAfterLast('.', "").lowercase()) {
+        "rs" -> "RS" to Color(0xFFDEA584)
+        "py" -> "PY" to Color(0xFF4B8BBE)
+        "ts", "mts", "cts" -> "TS" to Color(0xFF3178C6)
+        "tsx" -> "TSX" to Color(0xFF3178C6)
+        "js", "mjs", "cjs" -> "JS" to Color(0xFFE8D44D)
+        "jsx" -> "JSX" to Color(0xFFE8D44D)
+        "json" -> "{}" to Color(0xFFCBCB41)
+        "md", "markdown" -> "M↓" to Color(0xFF519ABA)
+        "toml" -> "⚙" to Color(0xFF9C9C9C)
+        "c" -> "C" to Color(0xFF519ABA)
+        "h" -> "H" to Color(0xFFA074C4)
+        "cpp", "cc", "cxx", "hpp", "hh", "hxx" -> "C++" to Color(0xFF519ABA)
+        "go" -> "GO" to Color(0xFF519ABA)
+        "java" -> "J" to Color(0xFFCC3E44)
+        "kt", "kts" -> "K" to Color(0xFFA074C4)
+        "html", "htm" -> "<>" to Color(0xFFE37933)
+        "css" -> "#" to Color(0xFF519ABA)
+        "yaml", "yml" -> "!" to Color(0xFFA074C4)
+        "sh", "bash", "zsh" -> ">_" to Color(0xFF8DC149)
+        "sql" -> "DB" to Color(0xFFF55385)
+        else -> "≡" to Color(0xFF9C9C9C)
+    }
 }
 
-fun languageDisplayName(id: String?): String = when (id) {
-    "rust" -> "Rust"
-    "python" -> "Python"
-    "javascript" -> "JavaScript"
-    "typescript" -> "TypeScript"
-    "typescriptreact" -> "TypeScript JSX"
-    "json" -> "JSON"
-    "markdown" -> "Markdown"
-    null -> "Plain Text"
-    else -> id
-}
+/** The status bar's language mode label for a language id (`null` = Plain Text). */
+fun languageDisplayName(id: String?): String = Languages.displayName(id)
 
 /** Workbench colors + settings → what the editor view draws with. */
 fun editorStyle(colors: WorkbenchColors, settings: Settings, wordWrap: Boolean = settings.wordWrap ?: false) = EditorStyle(

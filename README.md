@@ -12,8 +12,8 @@ Running real VS Code on Android works (see [VSCodroid](https://github.com/rmyndh
 
 ## What works today
 
-- Rust core: `ropey` buffer with undo/redo (typing and IME compositions coalesce), multi-cursor-ready selections, UTF-16/char/byte offset conversions; incremental tree-sitter highlighting for Rust, Python, JavaScript/JSX, TypeScript/TSX, JSON, Markdown; LSP client (tested against a mock server over a socket fd); workspace tree, fuzzy file finder and gitignore-aware text search.
-- App: VS Code-style workbench that adapts from phone portrait to tablet landscape; custom editor view with gutter, current line, indent guides, bracket pair colors, selection and an `InputConnection` that handles composing text; symbols row; Command Palette (`>`, `:`, `@`) with VS Code keybindings on hardware keyboards; settings UI backed by `settings.json`; Dark/Light Modern themes and VS Code color theme loading.
+- Rust core: `ropey` buffer with undo/redo (typing and IME compositions coalesce), multi-cursor-ready selections, UTF-16/char/byte offset conversions; incremental tree-sitter highlighting for Rust, Python, JavaScript/JSX, TypeScript/TSX, JSON, Markdown, C, C++, Go, Java, Kotlin, HTML, CSS, YAML, TOML, Shell Script and SQL, with language detection by file name, extension and `#!` line; LSP client (tested against a mock server over a socket fd); workspace tree, fuzzy file finder and gitignore-aware text search.
+- App: VS Code-style workbench that adapts from phone portrait to tablet landscape; custom editor view with gutter, current line, indent guides, bracket pair colors, selection and an `InputConnection` that handles composing text; symbols row; Command Palette (`>`, `:`, `@`) with VS Code keybindings on hardware keyboards; Change Language Mode from the status bar; settings UI backed by `settings.json`; Dark/Light Modern themes and VS Code color theme loading.
 - Stubbed: terminal panel ("Requires Ferrux"), language servers, git, symbol search, find/replace widget.
 
 ## Architecture

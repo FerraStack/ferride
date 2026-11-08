@@ -1,0 +1,87 @@
+   1 | # Ferride sample: a CI workflow
+     |   comment      "# Ferride sample: a CI workflow"
+   2 | name: CI
+     |   property     "name"
+     |   punctuation  ":"
+     |   string       "CI"
+   3 | on:
+     |   property     "on"
+     |   punctuation  ":"
+   4 |   push:
+     |   property     "push"
+     |   punctuation  ":"
+   5 |     branches: [main]
+     |   property     "branches"
+     |   punctuation  ":"
+     |   punctuation  "["
+     |   string       "main"
+     |   punctuation  "]"
+   6 |   pull_request:
+     |   property     "pull_request"
+     |   punctuation  ":"
+   7 | 
+   8 | env:
+     |   property     "env"
+     |   punctuation  ":"
+   9 |   CARGO_TERM_COLOR: always
+     |   property     "CARGO_TERM_COLOR"
+     |   punctuation  ":"
+     |   string       "always"
+  10 |   RETRIES: 3
+     |   property     "RETRIES"
+     |   punctuation  ":"
+     |   number       "3"
+  11 |   DEBUG: false
+     |   property     "DEBUG"
+     |   punctuation  ":"
+     |   constant     "false"
+  12 | 
+  13 | jobs:
+     |   property     "jobs"
+     |   punctuation  ":"
+  14 |   test: &defaults
+     |   property     "test"
+     |   punctuation  ":"
+     |   punctuation  "&"
+     |   label        "defaults"
+  15 |     runs-on: ubuntu-latest
+     |   property     "runs-on"
+     |   punctuation  ":"
+     |   string       "ubuntu-latest"
+  16 |     timeout-minutes: 30
+     |   property     "timeout-minutes"
+     |   punctuation  ":"
+     |   number       "30"
+  17 |     steps:
+     |   property     "steps"
+     |   punctuation  ":"
+  18 |       - uses: actions/checkout@v4
+     |   punctuation  "-"
+     |   property     "uses"
+     |   punctuation  ":"
+     |   string       "actions/checkout@v4"
+  19 |       - name: Run tests
+     |   punctuation  "-"
+     |   property     "name"
+     |   punctuation  ":"
+     |   string       "Run tests"
+  20 |         run: |
+     |   property     "run"
+     |   punctuation  ":"
+     |   punctuation  "|"
+  21 |           cargo fmt --check
+     |   string       "          cargo fmt --check"
+  22 |           cargo test --locked
+     |   string       "          cargo test --locked"
+  23 |   lint:
+     |   property     "lint"
+     |   punctuation  ":"
+  24 |     <<: *defaults
+     |   property     "<<"
+     |   punctuation  ":"
+     |   punctuation  "*"
+     |   label        "defaults"
+  25 |     steps: ~
+     |   property     "steps"
+     |   punctuation  ":"
+     |   constant     "~"

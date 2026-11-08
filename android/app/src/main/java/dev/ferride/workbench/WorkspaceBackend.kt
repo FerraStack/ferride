@@ -110,6 +110,8 @@ class FakeWorkspaceBackend(
     private val onSearch: (String, SearchToken) -> Unit = { _, _ -> },
     override val kind: WorkspaceKind = WorkspaceKind.LOCAL,
     override val root: String = if (kind == WorkspaceKind.SAF) "content://sample.documents/tree/$name" else "/sample/$name",
+    /** Editor models for opened files (tests pass `RustEditorModel::create` for real highlighting). */
+    private val modelFactory: (text: String, fileName: String) -> EditorModel = ::FakeEditorModel,
 ) : WorkspaceBackend {
     override val supportsTextSearch: Boolean get() = kind != WorkspaceKind.SAF
 
@@ -206,7 +208,7 @@ class FakeWorkspaceBackend(
         return SearchReport(hits, files.size, false, false)
     }
 
-    override fun createModel(text: String, fileName: String): EditorModel = FakeEditorModel(text, fileName)
+    override fun createModel(text: String, fileName: String): EditorModel = modelFactory(text, fileName)
     override fun ferrux(): FerruxStatus = FerruxStatus.NotInstalled
     override fun gitBranch(): String? = branch
     override fun copyInto(dest: String): String = dest

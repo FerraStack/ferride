@@ -60,7 +60,7 @@ import kotlinx.coroutines.withContext
 /**
  * Quick Open / Command Palette, VS Code's quick input: a top-anchored sheet
  * over a dimmed workbench. Prefixes: none = files, `>` = commands,
- * `:` = go to line, `@` = symbols. Matched characters are bold, command
+ * `:` = go to line, `@` = symbols; or a command's own quick pick. Matched characters are bold, command
  * categories dimmed, keybindings right-aligned.
  */
 @Composable
@@ -108,7 +108,7 @@ fun CommandPalette(state: WorkbenchState, maxWidth: Dp, autoFocus: Boolean = tru
                     Text(
                         buildAnnotatedString {
                             withStyle(SpanStyle(color = Color.Transparent)) { append(mode.prefix) }
-                            append(mode.placeholder)
+                            append(state.palettePlaceholder())
                         },
                         color = c.descriptionForeground,
                         fontSize = 14.sp,
@@ -140,7 +140,11 @@ fun CommandPalette(state: WorkbenchState, maxWidth: Dp, autoFocus: Boolean = tru
                 if (items.isEmpty()) {
                     item {
                         Text(
-                            if (mode == PaletteMode.Files) "No matching files" else "No matching commands",
+                            when (mode) {
+                                PaletteMode.Files -> "No matching files"
+                                PaletteMode.QuickPick -> "No matching results"
+                                else -> "No matching commands"
+                            },
                             color = c.descriptionForeground,
                             fontSize = 13.sp,
                             modifier = Modifier.padding(10.dp),
@@ -177,6 +181,10 @@ private fun PaletteRow(item: PaletteItem, selected: Boolean, files: Boolean, c: 
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
+            if (!item.description.isNullOrEmpty()) {
+                Spacer(Modifier.width(8.dp))
+                Text(item.description, color = c.descriptionForeground, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             if (files && !item.detail.isNullOrEmpty()) {
                 Spacer(Modifier.width(8.dp))
                 Text(item.detail, color = c.descriptionForeground, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

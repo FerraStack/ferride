@@ -1,0 +1,177 @@
+   1 | #include <iostream>
+     |   keyword      "#include"
+     |   string       "<iostream>"
+   2 | #include <map>
+     |   keyword      "#include"
+     |   string       "<map>"
+   3 | #include <string>
+     |   keyword      "#include"
+     |   string       "<string>"
+   4 | #include <vector>
+     |   keyword      "#include"
+     |   string       "<vector>"
+   5 | 
+   6 | namespace stats {
+     |   keyword      "namespace"
+   7 | 
+   8 | // Counts how often each word appears.
+     |   comment      "// Counts how often each word appears."
+   9 | template <typename T>
+     |   keyword      "template"
+     |   operator     "<"
+     |   keyword      "typename"
+     |   type         "T"
+     |   operator     ">"
+  10 | class Counter {
+     |   keyword      "class"
+     |   type         "Counter"
+  11 | public:
+     |   keyword      "public"
+  12 |     void add(const T& item) { ++counts_[item]; }
+     |   type         "void"
+     |   function     "add"
+     |   keyword      "const"
+     |   type         "T"
+     |   operator     "&"
+     |   variable     "item"
+     |   operator     "++"
+     |   variable     "counts_"
+     |   variable     "item"
+     |   punctuation  ";"
+  13 | 
+  14 |     std::vector<std::pair<T, int>> top(std::size_t n) const {
+     |   type         "vector"
+     |   operator     "<"
+     |   type         "pair"
+     |   operator     "<"
+     |   type         "T"
+     |   type         "int"
+     |   operator     ">>"
+     |   function     "top"
+     |   type         "size_t"
+     |   variable     "n"
+     |   keyword      "const"
+  15 |         std::vector<std::pair<T, int>> out(counts_.begin(), counts_.end());
+     |   type         "vector"
+     |   operator     "<"
+     |   type         "pair"
+     |   operator     "<"
+     |   type         "T"
+     |   type         "int"
+     |   operator     ">>"
+     |   variable     "out"
+     |   variable     "counts_"
+     |   punctuation  "."
+     |   function     "begin"
+     |   variable     "counts_"
+     |   punctuation  "."
+     |   function     "end"
+     |   punctuation  ";"
+  16 |         std::sort(out.begin(), out.end(),
+     |   function     "sort"
+     |   variable     "out"
+     |   punctuation  "."
+     |   function     "begin"
+     |   variable     "out"
+     |   punctuation  "."
+     |   function     "end"
+  17 |                   [](const auto& a, const auto& b) { return a.second > b.second; });
+     |   keyword      "const"
+     |   type         "auto"
+     |   operator     "&"
+     |   variable     "a"
+     |   keyword      "const"
+     |   type         "auto"
+     |   operator     "&"
+     |   variable     "b"
+     |   keyword      "return"
+     |   variable     "a"
+     |   punctuation  "."
+     |   property     "second"
+     |   operator     ">"
+     |   variable     "b"
+     |   punctuation  "."
+     |   property     "second"
+     |   punctuation  ";"
+     |   punctuation  ";"
+  18 |         if (out.size() > n) out.resize(n);
+     |   keyword      "if"
+     |   variable     "out"
+     |   punctuation  "."
+     |   function     "size"
+     |   operator     ">"
+     |   variable     "n"
+     |   variable     "out"
+     |   punctuation  "."
+     |   function     "resize"
+     |   variable     "n"
+     |   punctuation  ";"
+  19 |         return out;
+     |   keyword      "return"
+     |   variable     "out"
+     |   punctuation  ";"
+  20 |     }
+  21 | 
+  22 | private:
+     |   keyword      "private"
+  23 |     std::map<T, int> counts_;
+     |   type         "map"
+     |   operator     "<"
+     |   type         "T"
+     |   type         "int"
+     |   operator     ">"
+     |   property     "counts_"
+     |   punctuation  ";"
+  24 | };
+     |   punctuation  ";"
+  25 | 
+  26 | }  // namespace stats
+     |   comment      "// namespace stats"
+  27 | 
+  28 | int main() {
+     |   type         "int"
+     |   function     "main"
+  29 |     stats::Counter<std::string> words;
+     |   type         "Counter"
+     |   operator     "<"
+     |   type         "string"
+     |   operator     ">"
+     |   variable     "words"
+     |   punctuation  ";"
+  30 |     for (std::string w; std::cin >> w;) words.add(w);
+     |   keyword      "for"
+     |   type         "string"
+     |   variable     "w"
+     |   punctuation  ";"
+     |   variable     "cin"
+     |   variable     "w"
+     |   punctuation  ";"
+     |   variable     "words"
+     |   punctuation  "."
+     |   function     "add"
+     |   variable     "w"
+     |   punctuation  ";"
+  31 |     for (const auto& [word, count] : words.top(3)) {
+     |   keyword      "for"
+     |   keyword      "const"
+     |   type         "auto"
+     |   operator     "&"
+     |   variable     "word"
+     |   variable     "count"
+     |   variable     "words"
+     |   punctuation  "."
+     |   function     "top"
+     |   number       "3"
+  32 |         std::cout << word << ": " << count << '\n';
+     |   variable     "cout"
+     |   variable     "word"
+     |   string       "\": \""
+     |   variable     "count"
+     |   number       "'\\n'"
+     |   punctuation  ";"
+  33 |     }
+  34 |     return 0;
+     |   keyword      "return"
+     |   number       "0"
+     |   punctuation  ";"
+  35 | }

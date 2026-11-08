@@ -1,0 +1,85 @@
+   1 | #!/usr/bin/env python3
+     |   comment      "#!/usr/bin/env python3"
+   2 | from dataclasses import dataclass
+     |   keyword      "from"
+     |   variable     "dataclasses"
+     |   keyword      "import"
+     |   variable     "dataclass"
+   3 | from statistics import mean, median
+     |   keyword      "from"
+     |   variable     "statistics"
+     |   keyword      "import"
+     |   variable     "mean"
+     |   variable     "median"
+   4 | 
+   5 | 
+   6 | @dataclass
+     |   function     "@dataclass"
+   7 | class Summary:
+     |   keyword      "class"
+     |   type         "Summary"
+   8 |     """Basic statistics for a list of numbers."""
+     |   string       "\"\"\"Basic statistics for a list of numbers.\"\"\""
+   9 |     mean: float
+     |   variable     "mean"
+     |   type         "float"
+  10 |     median: float
+     |   variable     "median"
+     |   type         "float"
+  11 |     maximum: float = 0.0
+     |   variable     "maximum"
+     |   type         "float"
+     |   operator     "="
+     |   number       "0.0"
+  12 | 
+  13 | 
+  14 | def summarize(values: list[float]) -> Summary:
+     |   keyword      "def"
+     |   function     "summarize"
+     |   variable     "values"
+     |   variable     "list"
+     |   type         "float"
+     |   operator     "->"
+     |   type         "Summary"
+  15 |     if not values:
+     |   keyword      "if"
+     |   operator     "not"
+     |   variable     "values"
+  16 |         raise ValueError(f"empty input: {values!r}")
+     |   keyword      "raise"
+     |   function     "ValueError"
+     |   string       "f\"empty input: "
+     |   punctuation  "{"
+     |   variable     "values"
+     |   string       "!r"
+     |   punctuation  "}"
+     |   string       "\""
+  17 |     return Summary(mean(values), median(values), max(values))
+     |   keyword      "return"
+     |   function     "Summary"
+     |   function     "mean"
+     |   variable     "values"
+     |   function     "median"
+     |   variable     "values"
+     |   builtin      "max"
+     |   variable     "values"
+  18 | 
+  19 | 
+  20 | if __name__ == "__main__":
+     |   keyword      "if"
+     |   variable     "__name__"
+     |   operator     "=="
+     |   string       "\"__main__\""
+  21 |     print(summarize([3, 1, 4, 1, 5, 9, 2, 6]), None, True)
+     |   builtin      "print"
+     |   function     "summarize"
+     |   number       "3"
+     |   number       "1"
+     |   number       "4"
+     |   number       "1"
+     |   number       "5"
+     |   number       "9"
+     |   number       "2"
+     |   number       "6"
+     |   constant     "None"
+     |   constant     "True"

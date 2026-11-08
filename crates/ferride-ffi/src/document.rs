@@ -115,6 +115,17 @@ fn ix(v: i32) -> usize {
 struct Inner {
     buffer: Buffer,
     syntax: Option<Syntax>,
+    /// File name the document was opened with (for language auto-detection).
+    file_name: Option<String>,
+}
+
+/// Language for a file name, falling back to a `#!` line at the top of `buffer`.
+fn detect_language(file_name: Option<&str>, buffer: &Buffer) -> Option<LanguageId> {
+    let first_line = (buffer.len_lines() > 0).then(|| buffer.line_text(0));
+    match file_name {
+        Some(name) => LanguageId::detect(name, first_line.as_deref()),
+        None => first_line.as_deref().and_then(LanguageId::from_shebang),
+    }
 }
 
 impl Inner {
@@ -168,16 +179,30 @@ impl Document {
 
 #[uniffi::export]
 impl Document {
-    /// Creates a document. `file_name` picks the grammar by extension.
+    /// Creates a document. The grammar is picked from `file_name` (well-known
+    /// names, then the extension) or else a `#!` first line.
     #[uniffi::constructor]
     pub fn new(text: String, file_name: Option<String>) -> Arc<Self> {
         let buffer = Buffer::new(&text);
-        let syntax = file_name
-            .and_then(LanguageId::from_path)
-            .map(|l| Syntax::new(l, buffer.rope()));
+        let syntax = detect_language(file_name.as_deref(), &buffer).map(|l| Syntax::new(l, buffer.rope()));
         Arc::new(Self {
-            inner: Mutex::new(Inner { buffer, syntax }),
+            inner: Mutex::new(Inner {
+                buffer,
+                syntax,
+                file_name,
+            }),
         })
+    }
+
+    /// Re-runs language detection on the current file name and first line
+    /// ("Auto Detect" in Change Language Mode) and returns the language id.
+    pub fn detect_language(&self) -> Option<String> {
+        let mut inner = self.lock();
+        let lang = detect_language(inner.file_name.as_deref(), &inner.buffer);
+        if inner.syntax.as_ref().map(Syntax::language) != lang {
+            inner.syntax = lang.map(|l| Syntax::new(l, inner.buffer.rope()));
+        }
+        lang.map(|l| l.name().to_owned())
     }
 
     /// LSP language id of the active grammar, if any.
@@ -192,7 +217,9 @@ impl Document {
     pub fn set_language(&self, language: Option<String>) {
         let mut inner = self.lock();
         let lang = language.as_deref().and_then(LanguageId::from_name);
-        inner.syntax = lang.map(|l| Syntax::new(l, inner.buffer.rope()));
+        if inner.syntax.as_ref().map(Syntax::language) != lang {
+            inner.syntax = lang.map(|l| Syntax::new(l, inner.buffer.rope()));
+        }
     }
 
     pub fn text(&self) -> String {
@@ -232,7 +259,7 @@ impl Document {
     /// Lines `first_line .. first_line + count` with highlight spans.
     pub fn viewport(&self, first_line: i32, count: i32) -> Vec<ViewLine> {
         let mut guard = self.lock();
-        let Inner { buffer, syntax } = &mut *guard;
+        let Inner { buffer, syntax, .. } = &mut *guard;
         let b = &*buffer;
         let first = ix(first_line).min(b.len_lines());
         let end = (first + ix(count)).min(b.len_lines());

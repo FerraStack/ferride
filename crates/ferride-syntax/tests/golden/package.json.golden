@@ -1,0 +1,37 @@
+   1 | {
+   2 |   "name": "hello-web",
+     |   string       "\"name\""
+     |   string       "\"hello-web\""
+   3 |   "version": "1.0.0",
+     |   string       "\"version\""
+     |   string       "\"1.0.0\""
+   4 |   "private": true,
+     |   string       "\"private\""
+     |   constant     "true"
+   5 |   "scripts": { "build": "tsc -p .", "test": "vitest" },
+     |   string       "\"scripts\""
+     |   string       "\"build\""
+     |   string       "\"tsc -p .\""
+     |   string       "\"test\""
+     |   string       "\"vitest\""
+   6 |   "dependencies": { "react": "^19.0.0" },
+     |   string       "\"dependencies\""
+     |   string       "\"react\""
+     |   string       "\"^19.0.0\""
+   7 |   "engines": { "node": ">=22" },
+     |   string       "\"engines\""
+     |   string       "\"node\""
+     |   string       "\">=22\""
+   8 |   "workspaces": ["packages/*"],
+     |   string       "\"workspaces\""
+     |   string       "\"packages/*\""
+   9 |   "sideEffects": false,
+     |   string       "\"sideEffects\""
+     |   constant     "false"
+  10 |   "funding": null,
+     |   string       "\"funding\""
+     |   constant     "null"
+  11 |   "port": 8080
+     |   string       "\"port\""
+     |   number       "8080"
+  12 | }

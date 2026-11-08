@@ -1,0 +1,28 @@
+   1 | # hello-ferride
+     |   punctuation  "#"
+     |   heading      "hello-ferride"
+   2 | 
+   3 | A tiny sample project. Open files from the **Explorer**, search with the
+   4 | magnifier, or press the command button to open the *Command Palette*.
+   5 | 
+   6 | ## Files
+     |   punctuation  "##"
+     |   heading      "Files"
+   7 | 
+   8 | - `src/main.rs` — Rust
+     |   punctuation  "- "
+   9 | - `scripts/stats.py` — Python
+     |   punctuation  "- "
+  10 | - [web/app.ts](web/app.ts) — TypeScript
+     |   punctuation  "- "
+  11 | 
+  12 | > Ferride runs language servers inside Ferrux.
+     |   punctuation  "> "
+  13 | 
+  14 | ```sh
+     |   punctuation  "```"
+     |   string       "sh"
+  15 | cargo run --release
+     |   string       "cargo run --release"
+  16 | ```
+     |   punctuation  "```"

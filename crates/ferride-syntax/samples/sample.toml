@@ -1,0 +1,21 @@
+# Ferride sample: a Cargo manifest
+[package]
+name = "word-count"
+version = "0.1.0"
+edition = "2024"
+authors = ["FerraStack contributors"]
+publish = false
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+regex = "1.11"
+
+[profile.release]
+lto = true
+opt-level = 3
+debug = 0.5
+released = 2026-11-08T10:30:00Z
+
+[[bin]]
+name = 'wc'
+path = "src/main.rs"

@@ -1,0 +1,140 @@
+   1 | package main
+     |   keyword      "package"
+   2 | 
+   3 | import (
+     |   keyword      "import"
+   4 | 	"fmt"
+     |   string       "\"fmt\""
+   5 | 	"sort"
+     |   string       "\"sort\""
+   6 | 	"strings"
+     |   string       "\"strings\""
+   7 | )
+   8 | 
+   9 | // WordCount is a word and how often it appears.
+     |   comment      "// WordCount is a word and how often it appears."
+  10 | type WordCount struct {
+     |   keyword      "type"
+     |   type         "WordCount"
+     |   keyword      "struct"
+  11 | 	Word  string
+     |   property     "Word"
+     |   type         "string"
+  12 | 	Count int
+     |   property     "Count"
+     |   type         "int"
+  13 | }
+  14 | 
+  15 | func countWords(text string) []WordCount {
+     |   keyword      "func"
+     |   function     "countWords"
+     |   variable     "text"
+     |   type         "string"
+     |   type         "WordCount"
+  16 | 	counts := make(map[string]int)
+     |   variable     "counts"
+     |   operator     ":="
+     |   function     "make"
+     |   keyword      "map"
+     |   type         "string"
+     |   type         "int"
+  17 | 	for _, w := range strings.Fields(strings.ToLower(text)) {
+     |   keyword      "for"
+     |   variable     "_"
+     |   variable     "w"
+     |   operator     ":="
+     |   keyword      "range"
+     |   variable     "strings"
+     |   function     "Fields"
+     |   variable     "strings"
+     |   function     "ToLower"
+     |   variable     "text"
+  18 | 		counts[w]++
+     |   variable     "counts"
+     |   variable     "w"
+     |   operator     "++"
+  19 | 	}
+  20 | 	out := make([]WordCount, 0, len(counts))
+     |   variable     "out"
+     |   operator     ":="
+     |   function     "make"
+     |   type         "WordCount"
+     |   number       "0"
+     |   function     "len"
+     |   variable     "counts"
+  21 | 	for w, c := range counts {
+     |   keyword      "for"
+     |   variable     "w"
+     |   variable     "c"
+     |   operator     ":="
+     |   keyword      "range"
+     |   variable     "counts"
+  22 | 		out = append(out, WordCount{Word: w, Count: c})
+     |   variable     "out"
+     |   operator     "="
+     |   function     "append"
+     |   variable     "out"
+     |   type         "WordCount"
+     |   variable     "Word"
+     |   variable     "w"
+     |   variable     "Count"
+     |   variable     "c"
+  23 | 	}
+  24 | 	sort.Slice(out, func(i, j int) bool { return out[i].Count > out[j].Count })
+     |   variable     "sort"
+     |   function     "Slice"
+     |   variable     "out"
+     |   keyword      "func"
+     |   variable     "i"
+     |   variable     "j"
+     |   type         "int"
+     |   type         "bool"
+     |   keyword      "return"
+     |   variable     "out"
+     |   variable     "i"
+     |   property     "Count"
+     |   operator     ">"
+     |   variable     "out"
+     |   variable     "j"
+     |   property     "Count"
+  25 | 	return out
+     |   keyword      "return"
+     |   variable     "out"
+  26 | }
+  27 | 
+  28 | func main() {
+     |   keyword      "func"
+     |   function     "main"
+  29 | 	const text = "the quick brown fox jumps over the lazy dog"
+     |   keyword      "const"
+     |   variable     "text"
+     |   operator     "="
+     |   string       "\"the quick brown fox jumps over the lazy dog\""
+  30 | 	for i, wc := range countWords(text) {
+     |   keyword      "for"
+     |   variable     "i"
+     |   variable     "wc"
+     |   operator     ":="
+     |   keyword      "range"
+     |   function     "countWords"
+     |   variable     "text"
+  31 | 		if i >= 3 {
+     |   keyword      "if"
+     |   variable     "i"
+     |   operator     ">="
+     |   number       "3"
+  32 | 			break
+     |   keyword      "break"
+  33 | 		}
+  34 | 		fmt.Printf("%s: %d\n", wc.Word, wc.Count)
+     |   variable     "fmt"
+     |   function     "Printf"
+     |   string       "\"%s: %d"
+     |   escape       "\\n"
+     |   string       "\""
+     |   variable     "wc"
+     |   property     "Word"
+     |   variable     "wc"
+     |   property     "Count"
+  35 | 	}
+  36 | }

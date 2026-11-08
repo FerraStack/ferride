@@ -1,0 +1,29 @@
+@import url("fonts.css");
+
+:root {
+  --accent: #0078d4;
+  --radius: 6px;
+}
+
+/* Layout */
+.app {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5em;
+  font-family: system-ui, sans-serif;
+}
+
+#input:focus,
+button:hover:not([disabled]) {
+  outline: 2px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+ol > li::marker {
+  color: rgba(0, 120, 212, 0.8);
+  font-weight: bold !important;
+}
+
+@media (max-width: 600px) {
+  .app { padding: calc(1em + 2px); }
+}

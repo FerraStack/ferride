@@ -30,6 +30,51 @@ fn language_detection() {
     assert_eq!(LanguageId::from_path("a/b/App.TSX"), Some(LanguageId::Tsx));
     assert_eq!(LanguageId::from_path("README.md"), Some(LanguageId::Markdown));
     assert_eq!(LanguageId::from_path("Makefile"), None);
+    // New grammars, VS Code's choices (`.h` is C++).
+    for (path, lang) in [
+        ("a.c", LanguageId::C),
+        ("include/a.h", LanguageId::Cpp),
+        ("a.cc", LanguageId::Cpp),
+        ("main.go", LanguageId::Go),
+        ("Main.java", LanguageId::Java),
+        ("build.gradle.kts", LanguageId::Kotlin),
+        ("index.HTML", LanguageId::Html),
+        ("style.css", LanguageId::Css),
+        (".github/workflows/ci.yml", LanguageId::Yaml),
+        ("Cargo.toml", LanguageId::Toml),
+        ("Cargo.lock", LanguageId::Toml),
+        ("run.sh", LanguageId::Bash),
+        ("/home/me/.bashrc", LanguageId::Bash),
+        ("PKGBUILD", LanguageId::Bash),
+        ("schema.sql", LanguageId::Sql),
+        (".clang-format", LanguageId::Yaml),
+    ] {
+        assert_eq!(LanguageId::from_path(path), Some(lang), "{path}");
+    }
+}
+
+#[test]
+fn shebang_detection() {
+    use LanguageId as L;
+    for (line, lang) in [
+        ("#!/bin/sh", Some(L::Bash)),
+        ("#!/bin/bash -e", Some(L::Bash)),
+        ("#!/usr/bin/env bash", Some(L::Bash)),
+        ("#! /usr/bin/env zsh", Some(L::Bash)),
+        ("#!/usr/bin/env -S python3 -u", Some(L::Python)),
+        ("#!/usr/bin/python3.12", Some(L::Python)),
+        ("#!/usr/bin/env node", Some(L::JavaScript)),
+        ("#!/usr/bin/env -i FOO=1 deno run", Some(L::JavaScript)),
+        ("#!/usr/bin/env perl", None),
+        ("# just a comment", None),
+        ("", None),
+    ] {
+        assert_eq!(L::from_shebang(line), lang, "{line:?}");
+    }
+    // Name and extension win over the shebang; the shebang covers bare names.
+    assert_eq!(L::detect("bin/deploy", Some("#!/bin/bash")), Some(L::Bash));
+    assert_eq!(L::detect("tool.py", Some("#!/bin/bash")), Some(L::Python));
+    assert_eq!(L::detect("notes", Some("hello")), None);
 }
 
 #[test]

@@ -95,10 +95,11 @@ pub fn supported_languages() -> Vec<String> {
         .collect()
 }
 
-/// Language id for a file name, if a grammar is bundled for it.
+/// Language id for a file name (well-known names, then the extension), or
+/// else for a `#!` `first_line`, if a grammar is bundled for it.
 #[uniffi::export]
-pub fn language_for_file(file_name: String) -> Option<String> {
-    ferride_syntax::LanguageId::from_path(file_name).map(|l| l.name().to_owned())
+pub fn language_for_file(file_name: String, first_line: Option<String>) -> Option<String> {
+    ferride_syntax::LanguageId::detect(file_name, first_line.as_deref()).map(|l| l.name().to_owned())
 }
 
 #[cfg(test)]

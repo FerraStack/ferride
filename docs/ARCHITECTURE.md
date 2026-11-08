@@ -32,7 +32,7 @@ Ferride is a phone-first code editor for Android: a **Rust core** for everything
 | Crate | Role | Key dependencies |
 |---|---|---|
 | `ferride-buffer` | Text model: `ropey` rope, batched edits, undo/redo with typing/IME coalescing, multi-cursor `Selections`, offset conversions char ↔ byte ↔ UTF-16 ↔ line/column, CRLF awareness, grapheme cluster boundaries (cursor Left/Right and Delete skip whole clusters; Backspace removes a whole emoji sequence, otherwise one code point, like VS Code's `deleteLeft`). Emits `ByteEdit`s for tree-sitter. | `ropey`, `unicode-segmentation` |
-| `ferride-syntax` | One `Syntax` per document: tree-sitter parser, incremental reparse from the rope (no copy), highlight queries → viewport-scoped style spans (bytes or per-line UTF-16 columns). Grammars: Rust, Python, JavaScript/JSX, TypeScript, TSX, JSON, Markdown (block). | `tree-sitter`, `tree-sitter-*` |
+| `ferride-syntax` | One `Syntax` per document: tree-sitter parser, incremental reparse from the rope (no copy), highlight queries → viewport-scoped style spans (bytes or per-line UTF-16 columns). Grammars: Rust, Python, JavaScript/JSX, TypeScript, TSX, JSON, Markdown (block), C, C++, Go, Java, Kotlin, HTML, CSS, YAML, TOML, Shell Script (Bash), SQL. Language detection by file name, extension and `#!` line. | `tree-sitter`, `tree-sitter-*` |
 | `ferride-lsp` | LSP client: `Content-Length` codec, request/response correlation with timeouts and `$/cancelRequest`, default answers to server→client requests, events for diagnostics/messages, typed helpers (initialize, didOpen/didChange/didSave/didClose, completion, hover, shutdown). Transport is any `Read` + `Write`. | `lsp-types`, `serde_json` |
 | `ferride-workspace` | Opened folder: path confinement, directory listing, atomic writes, create/rename/delete, gitignore-aware walk, fuzzy file finder, full-text search with ripgrep's engine. | `ignore`, `grep-searcher`, `grep-regex` |
 | `ferride-host` | `ProcessHost` / `HostProcess` traits (spawn, take I/O streams, resize PTY, kill, wait). `UnavailableHost` stub (what the app uses today), `LocalHost` for desktop dev/tests. `FerruxHost` comes with the Ferrux Host API. | — |
@@ -115,10 +115,14 @@ Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already 
 
 ## Syntax highlighting
 
-1. The document creates `Syntax::new(language, rope)` on open (language from the file extension).
+1. The document creates `Syntax::new(language, rope)` on open. The language comes from `LanguageId::detect`, like VS Code: well-known file names first (`.bashrc`, `PKGBUILD`, `Cargo.lock`, `.clang-format`), then the extension (`.h` is C++, as in VS Code), then a `#!` line (`#!/usr/bin/env -S python3` → Python). Ids are VS Code's language ids (`shellscript`, `typescriptreact`, …). **Change Language Mode** (`workbench.action.editor.changeLanguageMode`, also the status bar's language item) lists Auto Detect and every language by name with its id; Plain Text turns highlighting off.
 2. Each edit returns `ByteEdit`s (start/old end/new end in bytes and rows/byte-columns); `Syntax::update` calls `Tree::edit` for each and reparses with the old tree, reading the rope chunk by chunk.
-3. `line_spans(first..last)` runs a `QueryCursor` restricted to the visible byte range and flattens nested captures: **inner nodes win over outer ones; for the same node the later pattern wins**, so the generic patterns at the top of upstream queries are refined by specific ones below. Capture names map to a small fixed set of `StyleKind`s; the app's theme picks colors.
-4. Next: injections (Markdown fenced code, JS in HTML), the Markdown inline grammar, folding ranges and indentation from tree-sitter, more grammars (C/C++, Go, Kotlin, Java, TOML, YAML, HTML/CSS, Bash).
+3. `line_spans(first..last)` runs a `QueryCursor` restricted to the visible byte range and flattens nested captures: **inner nodes win over outer ones; for the same node the later pattern wins**, so the generic patterns at the top of upstream queries are refined by specific ones below. Go's upstream query is written the other way round (generic patterns last, tree-sitter-highlight's first-match rule), so it is flagged `first_wins`. Capture names map to a small fixed set of `StyleKind`s; the app's theme picks colors.
+4. Queries are upstream's where they work as-is. Ferride's own live in `crates/ferride-syntax/queries/<lang>/`: Kotlin (tree-sitter-kotlin-ng ships none), TOML (upstream relies on Neovim painting a whole `pair` over its key), plus small appended fixes for CSS (class/id selectors as attribute names like VS Code; `--custom` properties as variables) and SQL (upstream's number patterns use Lua `%d`).
+5. **Golden tests:** every file in `crates/ferride-syntax/samples/` (one per language) is highlighted and compared with `tests/golden/<file>.golden`, which lists each line and its tokens with their class. `FERRIDE_BLESS=1 cargo test -p ferride-syntax --test golden` regenerates them after an intended change. The same samples are the app's per-language screenshots.
+6. Next: injections (Markdown fenced code, JS in HTML), the Markdown inline grammar, folding ranges and indentation from tree-sitter.
+
+**Grammar size.** Grammars are compiled C parse tables and are most of `libferride_ffi.so`; CI's "Native size report" step lists the `.so` per ABI, the APK and each grammar's arm64 objects. Parse tables are static data that the OS pages in on first use, so a grammar that's never opened costs disk/APK size but no RAM; queries are compiled lazily per language on first open.
 
 ## LSP
 
@@ -180,7 +184,7 @@ Decision (2026-11-08). Google Play's All files access policy (`MANAGE_EXTERNAL_S
 - Toolchains are pinned: Rust in `rust-toolchain.toml`, NDK r30 (`30.0.16248370`) in CI, third-party actions by commit SHA; cargo runs with `--locked`.
 - 16 KB page alignment: NDK r28+ links with 16 KB max page size by default; CI checks `zipalign -c -P 16`.
 - Heavy builds run in GitHub Actions (see `.github/workflows/ci.yml`); local work is limited to fmt/clippy/tests of single crates.
-- **Screenshots:** Robolectric + Roborazzi render the main screens on the JVM with the fake backend (phone and tablet, light and dark); an emulator job installs the real APK, opens the sample file and captures it. On pull requests CI pushes the PNGs to the `ci-screenshots` branch and keeps one PR comment with a light/dark table up to date.
+- **Screenshots:** Robolectric + Roborazzi render the main screens on the JVM with the fake backend (phone and tablet, light and dark); an emulator job installs the real APK, opens the sample file and captures it. JVM tests can also use the **real Rust core**: the Gradle task `cargoHostBuild` builds `libferride_ffi` for the build machine and the unit tests load it through JNA (`jna.library.path`), so the per-language screenshots (`lang_<id>_dark`, `lang_<id>_night_owl`) show actual tree-sitter highlighting. On pull requests CI pushes the PNGs to the `ci-screenshots` branch and keeps one PR comment with a light/dark table up to date.
 
 ## MVP milestones
 

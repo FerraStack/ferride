@@ -1,0 +1,142 @@
+   1 | package dev.ferride.sample;
+     |   keyword      "package"
+     |   variable     "dev"
+     |   variable     "ferride"
+     |   variable     "sample"
+   2 | 
+   3 | import java.util.HashMap;
+     |   keyword      "import"
+     |   variable     "java"
+     |   variable     "util"
+     |   variable     "HashMap"
+   4 | import java.util.List;
+     |   keyword      "import"
+     |   variable     "java"
+     |   variable     "util"
+     |   variable     "List"
+   5 | import java.util.Map;
+     |   keyword      "import"
+     |   variable     "java"
+     |   variable     "util"
+     |   variable     "Map"
+   6 | 
+   7 | /** Counts words and prints the most common ones. */
+     |   comment      "/** Counts words and prints the most common ones. */"
+   8 | public final class Main {
+     |   keyword      "public"
+     |   keyword      "final"
+     |   keyword      "class"
+     |   type         "Main"
+   9 |     private static final int TOP = 3;
+     |   keyword      "private"
+     |   keyword      "static"
+     |   keyword      "final"
+     |   builtin      "int"
+     |   constant     "TOP"
+     |   number       "3"
+  10 | 
+  11 |     record WordCount(String word, int count) {}
+     |   keyword      "record"
+     |   variable     "WordCount"
+     |   type         "String"
+     |   variable     "word"
+     |   builtin      "int"
+     |   variable     "count"
+  12 | 
+  13 |     static List<WordCount> countWords(String text) {
+     |   keyword      "static"
+     |   type         "List"
+     |   type         "WordCount"
+     |   function     "countWords"
+     |   type         "String"
+     |   variable     "text"
+  14 |         Map<String, Integer> counts = new HashMap<>();
+     |   type         "Map"
+     |   type         "String"
+     |   type         "Integer"
+     |   variable     "counts"
+     |   keyword      "new"
+     |   type         "HashMap"
+  15 |         for (String w : text.toLowerCase().split("\\s+")) {
+     |   keyword      "for"
+     |   type         "String"
+     |   variable     "w"
+     |   variable     "text"
+     |   function     "toLowerCase"
+     |   function     "split"
+     |   string       "\""
+     |   escape       "\\\\"
+     |   string       "s+\""
+  16 |             counts.merge(w, 1, Integer::sum);
+     |   variable     "counts"
+     |   function     "merge"
+     |   variable     "w"
+     |   number       "1"
+     |   type         "Integer"
+     |   variable     "sum"
+  17 |         }
+  18 |         return counts.entrySet().stream()
+     |   keyword      "return"
+     |   variable     "counts"
+     |   function     "entrySet"
+     |   function     "stream"
+  19 |                 .map(e -> new WordCount(e.getKey(), e.getValue()))
+     |   function     "map"
+     |   variable     "e"
+     |   keyword      "new"
+     |   type         "WordCount"
+     |   variable     "e"
+     |   function     "getKey"
+     |   variable     "e"
+     |   function     "getValue"
+  20 |                 .sorted((a, b) -> Integer.compare(b.count(), a.count()))
+     |   function     "sorted"
+     |   variable     "a"
+     |   variable     "b"
+     |   type         "Integer"
+     |   function     "compare"
+     |   variable     "b"
+     |   function     "count"
+     |   variable     "a"
+     |   function     "count"
+  21 |                 .toList();
+     |   function     "toList"
+  22 |     }
+  23 | 
+  24 |     @SuppressWarnings("unused")
+     |   operator     "@"
+     |   attribute    "SuppressWarnings"
+     |   string       "\"unused\""
+  25 |     public static void main(String[] args) {
+     |   keyword      "public"
+     |   keyword      "static"
+     |   builtin      "void"
+     |   function     "main"
+     |   type         "String"
+     |   variable     "args"
+  26 |         var text = "the quick brown fox jumps over the lazy dog";
+     |   type         "var"
+     |   variable     "text"
+     |   string       "\"the quick brown fox jumps over the lazy dog\""
+  27 |         for (WordCount wc : countWords(text).subList(0, TOP)) {
+     |   keyword      "for"
+     |   type         "WordCount"
+     |   variable     "wc"
+     |   function     "countWords"
+     |   variable     "text"
+     |   function     "subList"
+     |   number       "0"
+     |   constant     "TOP"
+  28 |             System.out.printf("%s: %d%n", wc.word(), wc.count()); // 1.5x faster
+     |   type         "System"
+     |   variable     "out"
+     |   function     "printf"
+     |   string       "\"%s: %d%n\""
+     |   variable     "wc"
+     |   function     "word"
+     |   variable     "wc"
+     |   function     "count"
+     |   comment      "// 1.5x faster"
+  29 |         }
+  30 |     }
+  31 | }
