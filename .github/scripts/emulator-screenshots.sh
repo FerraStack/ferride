@@ -23,6 +23,8 @@ shoot() {
     adb logcat -d -t 400 | tee "$out/logcat.txt"
     exit 1
   fi
+  # The launcher's ANR dialog sometimes covers the app right after launch.
+  dismiss_system_dialogs
   adb exec-out screencap -p > "$out/emulator_editor_${mode}.png"
 }
 
