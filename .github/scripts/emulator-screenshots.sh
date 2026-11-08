@@ -8,6 +8,9 @@ out="$2"
 mkdir -p "$out"
 
 adb install -r "$apk"
+# The slow CI emulator often shows "Pixel Launcher isn't responding" over the
+# app under test; hide system crash/ANR dialogs (Settings.Global.HIDE_ERROR_DIALOGS).
+adb shell settings put global hide_error_dialogs 1 || true
 
 shoot() {
   local mode="$1"

@@ -24,6 +24,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -35,10 +37,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -111,9 +115,18 @@ fun CommandPalette(state: WorkbenchState, maxWidth: Dp, autoFocus: Boolean = tru
                         maxLines = 1,
                     )
                 }
+                // A TextFieldValue so a query set from outside (">" from Show All Commands)
+                // gets the caret at its end, like VS Code; typing then goes after the prefix.
+                var field by remember { mutableStateOf(TextFieldValue(state.paletteQuery, TextRange(state.paletteQuery.length))) }
+                if (field.text != state.paletteQuery) {
+                    field = TextFieldValue(state.paletteQuery, TextRange(state.paletteQuery.length))
+                }
                 BasicTextField(
-                    value = state.paletteQuery,
-                    onValueChange = { state.paletteQuery = it },
+                    value = field,
+                    onValueChange = {
+                        field = it
+                        state.paletteQuery = it.text
+                    },
                     singleLine = true,
                     textStyle = TextStyle(color = c.inputForeground, fontSize = 14.sp),
                     cursorBrush = SolidColor(c.editorCursor),
