@@ -34,7 +34,7 @@ class ScmScreenshotTest {
     val compose = createComposeRule()
 
     private fun shoot(name: String, dark: Boolean, repo: Boolean = true, setup: (WorkbenchState) -> Unit) {
-        val backend = FakeWorkspaceBackend()
+        val backend = if (saf) FakeWorkspaceBackend(kind = dev.ferride.core.WorkspaceKind.SAF) else FakeWorkspaceBackend()
         val provider = FakeScmProvider(if (repo) FakeScmRepo(backend.root) else null)
         val state = WorkbenchState(
             backend,
@@ -102,6 +102,18 @@ class ScmScreenshotTest {
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
     fun tabletScmBranchesLight() = shoot("tablet_scm_branches", false, setup = ::branches)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneScmSafDark() = shoot("phone_scm_saf", true, saf = true) { it.showView(SideView.SourceControl) }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneScmSafLight() = shoot("phone_scm_saf", false, saf = true) { it.showView(SideView.SourceControl) }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletScmSafDark() = shoot("tablet_scm_saf", true, saf = true) { it.showView(SideView.SourceControl) }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletScmSafLight() = shoot("tablet_scm_saf", false, saf = true) { it.showView(SideView.SourceControl) }
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
     fun phoneScmEmptyDark() = shoot("phone_scm_empty", true, repo = false) { it.showView(SideView.SourceControl) }

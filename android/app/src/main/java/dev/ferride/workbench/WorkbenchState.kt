@@ -347,6 +347,7 @@ class WorkbenchState(
         log("Opened workspace ${next.name} (${next.root})")
         rememberRecent(next)
         onWorkspaceOpened?.invoke(next)
+        scm.start()
         if (settings.startupEditor == "welcomePage") openWelcome()
         scope.launch {
             branch = withContext(io) { runCatching { next.gitBranch() }.getOrNull() }

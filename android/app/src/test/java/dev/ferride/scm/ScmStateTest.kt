@@ -172,4 +172,19 @@ class ScmStateTest {
         assertTrue(s.gitEnableSmartCommit)
         assertEquals(s, Settings.parse(s.toJson()))
     }
+
+    @Test
+    fun safFoldersAreUnsupportedAndSwitchingFoldersRestartsGit() {
+        val wb = WorkbenchState(
+            FakeWorkspaceBackend(kind = dev.ferride.core.WorkspaceKind.SAF),
+            CoroutineScope(Dispatchers.Unconfined),
+            Dispatchers.Unconfined,
+            scmProvider = FakeScmProvider(FakeScmRepo("/sample/sample")),
+        )
+        wb.start(openFirst = null)
+        assertEquals(ScmMode.Unsupported, wb.scm.mode)
+        assertTrue(wb.openWorkspace(FakeWorkspaceBackend()))
+        assertEquals(ScmMode.Ready, wb.scm.mode)
+        assertEquals(6, wb.scm.count)
+    }
 }

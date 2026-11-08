@@ -183,6 +183,7 @@ alive "close tabs with Ctrl+W"
 palette_command() {
   adb shell input keycombination 113 59 44
   sleep 1
+  adb shell input keyevent 123   # MOVE_END: type after the ">" prefix
   adb shell input text "$1"
   sleep 1
   adb shell input keyevent 66

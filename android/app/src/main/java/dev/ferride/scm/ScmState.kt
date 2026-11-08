@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ferride.core.GitException
+import dev.ferride.core.WorkspaceKind
 import dev.ferride.core.ScmChange
 import dev.ferride.core.ScmCredential
 import dev.ferride.core.ScmGroup
@@ -159,10 +160,17 @@ class ScmState(
 
     private val root: String get() = wb.backend.root
 
-    /** Git needs a real directory: SAF (`content://`) folders can't hold a `.git`. */
-    private val rootSupported: Boolean get() = !root.startsWith("content://")
+    /** Git needs a real directory: system-picker (SAF) folders can't hold a usable `.git`. */
+    private val rootSupported: Boolean get() = wb.backend.kind != WorkspaceKind.SAF
 
+    /** Where clones go: [projectsDir], else the app's projects folder. */
+    private val clonesDir: String? get() = projectsDir ?: wb.host?.projectsDir
+
+    /** (Re)reads the repository of the current workspace folder; called on start and after a folder switch. */
     fun start() {
+        repo = null
+        changes = emptyList()
+        head = null
         if (!rootSupported) {
             mode = ScmMode.Unsupported
             return
@@ -404,7 +412,7 @@ class ScmState(
 
     /** "Git: Clone": asks for the URL, clones into Ferride's projects with progress, offers to open it. */
     fun promptClone() {
-        val parent = projectsDir ?: run {
+        val parent = clonesDir ?: run {
             wb.message = "Cloning needs a projects folder"
             return
         }
@@ -432,13 +440,22 @@ class ScmState(
             operation = null
             result.onSuccess {
                 wb.log("git: cloned $url into $dest")
-                val open = openFolder
+                val open = openFolder ?: wb.host?.let { host -> { path: String -> openLocalFolder(host, path) } }
                 confirm = if (open != null) {
                     Confirm("Would you like to open the cloned repository?", dest, listOf("Open" to { open(dest) }))
                 } else {
                     Confirm("Cloned into $dest", null, emptyList())
                 }
             }.onFailure { handleError(it) }
+        }
+    }
+
+    /** Opens a cloned folder as the workspace (#26's folder switching). */
+    private fun openLocalFolder(host: dev.ferride.workbench.WorkspaceHost, path: String) {
+        scope.launch {
+            withContext(io) { runCatching { host.openLocal(path) } }
+                .onSuccess { wb.openWorkspace(it) }
+                .onFailure { wb.message = "Couldn't open ${File(path).name}: ${it.message}" }
         }
     }
 
@@ -533,7 +550,7 @@ class ScmState(
         cmd(GitCommandIds.FETCH, "Fetch") { fetch() }
         cmd(GitCommandIds.PUBLISH, "Publish Branch...") { publish() }
         cmd(GitCommandIds.INIT, "Initialize Repository", enabled = { mode == ScmMode.NoRepository }) { initRepository() }
-        cmd(GitCommandIds.CLONE, "Clone", enabled = { projectsDir != null }) { promptClone() }
+        cmd(GitCommandIds.CLONE, "Clone", enabled = { clonesDir != null }) { promptClone() }
     }
 
     companion object {

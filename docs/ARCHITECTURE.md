@@ -162,7 +162,7 @@ Decision (2026-11-08). Google Play's All files access policy (`MANAGE_EXTERNAL_S
 
 ## Git
 
-`ferride-scm` is built on **gix** and is path based: it works on a working tree on a real file system path (app-private projects, Ferrux's home). SAF folders can't host a `.git` directory, so the Source Control view offers to copy such a folder into Ferride's projects instead.
+`ferride-scm` is built on **gix** and is path based: it works on a working tree on a real file system path (app-private projects, folders with all-files access, later Ferrux's home). System-picker (SAF) folders can't host a usable `.git`, so the Source Control view shows the "Copy into Ferride Projects" welcome (the VFS command `ferride.workspace.copyIntoProjects`); Git starts again whenever the workspace folder changes. Clones go into `files/projects/<name>` and "Would you like to open the cloned repository?" switches the workspace to it.
 
 - **Repositories** are opened *isolated*: only `.git/config` counts (no `~/.gitconfig`, `/etc/gitconfig` or `GIT_*` variables), so behaviour doesn't depend on the device. The commit identity comes from the `git.user.name` / `git.user.email` settings, else the repository's `user.name` / `user.email`; without either, commit fails with VS Code's "Make sure you configure your user.name and user.email in git."
 - **Status** = `git status -uall` without renames: `HEAD`↔index ("Staged Changes"), index↔working tree plus untracked files ("Changes"), unmerged paths ("Merge Changes"). Letters and tooltips are VS Code's (`M`, `A`, `D`, `U`, `T`, `!`, "Index Modified", "Conflict: Both Modified", …).

@@ -149,13 +149,7 @@ fun SourceControlView(state: WorkbenchState) {
         }
         when (scm.mode) {
             ScmMode.Loading -> {}
-            ScmMode.Unsupported -> WelcomeText(
-                listOf(
-                    "This folder was opened through Android's file picker, where Git can't work.",
-                    "Copy this folder into Ferride projects to enable Git.",
-                ),
-                emptyList(),
-            )
+            ScmMode.Unsupported -> CopyIntoProjectsWelcome(state, "Git")
             ScmMode.NoRepository -> WelcomeText(
                 listOf(
                     "The folder currently open doesn't have a git repository. You can initialize a repository " +
