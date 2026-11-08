@@ -65,12 +65,26 @@ jobs:
       - name: Build Rust core, unit + screenshot tests, debug APKs (play + foss)
         working-directory: android
         run: ./gradlew --max-workers=4 testPlayDebugUnitTest -Proborazzi.test.record=true assemblePlayDebug assembleFossDebug
-      - name: Native size report (per ABI, APK, per grammar)
-        run: bash .github/scripts/native-size-report.sh . || true
+      # Release variant (unsigned) to measure what users download. Separate Gradle
+      # runs: `assemble*Release` splits APKs per ABI; the bundle keeps abiFilters.
+      - name: Release APKs per ABI and App Bundle (play)
+        working-directory: android
+        run: |
+          ./gradlew --max-workers=4 assemblePlayRelease
+          ./gradlew --max-workers=4 bundlePlayRelease
+      - name: Release size report (APK per ABI, Play download, grammars)
+        env:
+          BUNDLETOOL_VERSION: 1.18.3
+          BUNDLETOOL_SHA256: a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/bundletool.jar" \
+            "https://github.com/google/bundletool/releases/download/$BUNDLETOOL_VERSION/bundletool-all-$BUNDLETOOL_VERSION.jar"
+          echo "$BUNDLETOOL_SHA256  $RUNNER_TEMP/bundletool.jar" | sha256sum -c -
+          BUNDLETOOL="$RUNNER_TEMP/bundletool.jar" bash .github/scripts/native-size-report.sh .
       - name: Check 16 KB alignment
         run: |
           zipalign="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/zipalign"
-          for apk in android/app/build/outputs/apk/play/debug/app-play-debug.apk android/app/build/outputs/apk/foss/debug/app-foss-debug.apk; do
+          for apk in android/app/build/outputs/apk/play/debug/app-play-debug.apk android/app/build/outputs/apk/foss/debug/app-foss-debug.apk android/app/build/outputs/apk/play/release/*.apk; do
             "$zipalign" -c -P 16 -v 4 "$apk" | tail -n 3
           done
       - name: APK sizes
@@ -84,6 +98,11 @@ jobs:
         with:
           name: ferride-foss-debug-apk
           path: android/app/build/outputs/apk/foss/debug/app-foss-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ferride-release-apks-unsigned
+          path: android/app/build/outputs/apk/play/release/*.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
