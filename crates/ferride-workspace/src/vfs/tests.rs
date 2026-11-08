@@ -301,3 +301,43 @@ fn ferrux_is_a_clear_stub() {
     let err = vfs.list("").unwrap_err().to_string();
     assert!(err.contains("Ferrux"), "{err}");
 }
+
+#[test]
+fn non_utf8_files_open_and_save_in_their_encoding() {
+    let dir = tempfile::tempdir().unwrap();
+    let vfs = LocalVfs::open(dir.path()).unwrap();
+    let latin1 = b"// caf\xe9 cr\xe8me, d\xe9j\xe0 vu, \xe0 bient\xf4t\nfn main() {}\n";
+    vfs.write("old.rs", latin1).unwrap();
+    // read_text still refuses (it's the strict UTF-8 path)…
+    assert!(matches!(
+        read_text(&vfs, "old.rs"),
+        Err(WorkspaceError::NotUtf8(_))
+    ));
+    // …read_decoded detects Windows 1252.
+    let d = read_decoded(&vfs, "old.rs", None).unwrap();
+    assert_eq!(d.encoding.id, "windows1252");
+    assert!(d.text.starts_with("// café crème"));
+    // Saving keeps the encoding byte for byte; characters it can't hold are refused.
+    write_encoded(&vfs, "old.rs", &d.text, "windows1252").unwrap();
+    assert_eq!(vfs.read("old.rs").unwrap(), latin1.to_vec());
+    assert!(matches!(
+        write_encoded(&vfs, "old.rs", "snow ☃", "windows1252"),
+        Err(WorkspaceError::Unencodable(..))
+    ));
+    // Reopen with another encoding.
+    let as_utf8 = read_decoded(&vfs, "old.rs", Some("utf8")).unwrap();
+    assert!(as_utf8.lossy);
+    assert!(matches!(
+        read_decoded(&vfs, "old.rs", Some("nope")),
+        Err(WorkspaceError::UnknownEncoding(_))
+    ));
+    // UTF-16 files contain NULs but aren't binary.
+    write_encoded(&vfs, "wide.txt", "hello", "utf16le").unwrap();
+    assert_eq!(read_decoded(&vfs, "wide.txt", None).unwrap().text, "hello");
+    // Real binaries are still refused.
+    vfs.write("blob.bin", b"\x00\x01\x02").unwrap();
+    assert!(matches!(
+        read_decoded(&vfs, "blob.bin", None),
+        Err(WorkspaceError::Binary(_))
+    ));
+}

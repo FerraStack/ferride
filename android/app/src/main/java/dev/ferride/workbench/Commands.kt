@@ -154,6 +154,7 @@ object CommandIds {
     const val GOTO_SYMBOL = "workbench.action.gotoSymbol"
     const val SHOW_ALL_SYMBOLS = "workbench.action.showAllSymbols"
     const val CHANGE_LANGUAGE_MODE = "workbench.action.editor.changeLanguageMode"
+    const val CHANGE_ENCODING = "workbench.action.editor.changeEncoding"
     const val SAVE = "workbench.action.files.save"
     const val SAVE_ALL = "workbench.action.files.saveAll"
     const val NEW_FILE = "workbench.action.files.newUntitledFile"

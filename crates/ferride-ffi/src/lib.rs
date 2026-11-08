@@ -23,8 +23,8 @@ pub use scm::{
 };
 pub use theme::{TokenStyle, TokenTheme, scope_stack};
 pub use workspace::{
-    FileHit, FileNode, MatchRange, SafDoc, SafError, SafTree, SearchCancellation, SearchHit, SearchReport,
-    SymbolHit, WorkspaceHandle, WorkspaceKind,
+    EncodingInfo, FileHit, FileNode, MatchRange, OpenedText, SafDoc, SafError, SafTree, SearchCancellation,
+    SearchHit, SearchReport, SymbolHit, WorkspaceHandle, WorkspaceKind, supported_encodings,
 };
 
 use ferride_host::{HostStatus, ProcessHost, UnavailableHost};
