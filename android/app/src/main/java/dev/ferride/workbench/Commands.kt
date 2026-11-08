@@ -30,6 +30,7 @@ data class KeyChord(
 
         private fun keyName(code: Int): String = when (code) {
             KeyEvent.KEYCODE_GRAVE -> "`"
+            KeyEvent.KEYCODE_BACKSLASH -> "\\"
             KeyEvent.KEYCODE_COMMA -> ","
             KeyEvent.KEYCODE_PAGE_UP -> "PageUp"
             KeyEvent.KEYCODE_PAGE_DOWN -> "PageDown"
@@ -157,6 +158,9 @@ object CommandIds {
     const val SAVE_ALL = "workbench.action.files.saveAll"
     const val NEW_FILE = "workbench.action.files.newUntitledFile"
     const val OPEN_FOLDER = "workbench.action.files.openFolder"
+    const val SPLIT_EDITOR = "workbench.action.splitEditor"
+    const val FOCUS_FIRST_GROUP = "workbench.action.focusFirstEditorGroup"
+    const val FOCUS_SECOND_GROUP = "workbench.action.focusSecondEditorGroup"
     /** VS Code's Help: Welcome. */
     const val WELCOME = "workbench.action.showWelcomePage"
     /** Registered by Source Control (lane 2); the Welcome page shows Clone only when it exists. */

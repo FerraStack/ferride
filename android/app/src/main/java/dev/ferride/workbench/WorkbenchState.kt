@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.setValue
 import dev.ferride.core.FerruxStatus
 import dev.ferride.core.FileHit
@@ -35,6 +36,19 @@ enum class SideView(val title: String) {
 enum class PanelTab(val title: String) { Problems("Problems"), Output("Output"), Terminal("Terminal") }
 
 enum class TabKind { File, Settings, SettingsJson, Welcome }
+
+/**
+ * An editor group (VS Code): its own tabs and active tab, shown side by side
+ * after Split Editor on wide screens. Tabs in different groups may share one
+ * [EditorModel] (the same file split), each view keeping its own selection.
+ */
+class EditorGroup {
+    val tabs = mutableStateListOf<EditorTab>()
+    var activeIndex by mutableIntStateOf(-1)
+    val activeTab: EditorTab? get() = tabs.getOrNull(activeIndex)
+    /** The editor view showing this group's active tab (set by the UI). */
+    var editor: EditorActions? = null
+}
 
 /** A folder on the Welcome page's Recent list (newest first). */
 data class RecentFolder(val kind: WorkspaceKind, val root: String, val name: String) {
@@ -240,9 +254,25 @@ class WorkbenchState(
     val tree = mutableStateMapOf<String, List<FileNode>>()
     val expanded = mutableStateListOf<String>()
 
-    val tabs = mutableStateListOf<EditorTab>()
-    var activeIndex by mutableIntStateOf(-1)
+    /** Editor groups, left to right (at most [MAX_GROUPS]); never empty. */
+    val groups = mutableStateListOf(EditorGroup())
+    var activeGroupIndex by mutableIntStateOf(0)
+    val activeGroup: EditorGroup get() = groups[activeGroupIndex.coerceIn(0, groups.lastIndex)]
+
+    /** Tabs of the active group (most actions work on the focused group, like VS Code). */
+    val tabs: SnapshotStateList<EditorTab> get() = activeGroup.tabs
+    var activeIndex: Int
+        get() = activeGroup.activeIndex
+        set(value) {
+            activeGroup.activeIndex = value
+        }
     val activeTab: EditorTab? get() = tabs.getOrNull(activeIndex)
+
+    /** Every open tab in every group. */
+    val allTabs: List<EditorTab> get() = groups.flatMap { it.tabs }
+
+    /** Split Editor needs room for two editors side by side (not on phones in portrait). */
+    val canSplit: Boolean get() = !compactWindow && groups.size < MAX_GROUPS
     val activeModel: EditorModel? get() = activeTab?.model
 
     var paletteOpen by mutableStateOf(false)
@@ -274,8 +304,12 @@ class WorkbenchState(
     var branch by mutableStateOf<String?>(null)
         private set
 
-    /** The editor view currently attached to the active tab (set by the UI). */
-    var editor: EditorActions? = null
+    /** The editor view of the active group (set by the UI). */
+    var editor: EditorActions?
+        get() = activeGroup.editor
+        set(value) {
+            activeGroup.editor = value
+        }
 
     val colors: WorkbenchColors
         get() {
@@ -319,13 +353,15 @@ class WorkbenchState(
      * unsaved changes. Returns whether it switched.
      */
     fun openWorkspace(next: WorkspaceBackend): Boolean {
-        if (tabs.any { it.dirty }) {
+        if (allTabs.any { it.dirty }) {
             message = "Save or close editors with unsaved changes before opening another folder"
             return false
         }
-        tabs.forEach { retire(it.model) }
-        tabs.clear()
-        activeIndex = -1
+        allTabs.forEach { retire(it.model) }
+        while (groups.size > 1) groups.removeAt(groups.lastIndex)
+        groups[0].tabs.clear()
+        groups[0].activeIndex = -1
+        activeGroupIndex = 0
         tree.clear()
         expanded.clear()
         searchResult = null
@@ -495,12 +531,14 @@ class WorkbenchState(
 
     /** Open editors follow a renamed file or folder. */
     private fun retarget(from: String, to: String) {
-        tabs.forEachIndexed { i, tab ->
-            if (tab.kind == TabKind.File && (tab.path == from || tab.path.startsWith("$from/"))) {
-                val moved = EditorTab(to + tab.path.removePrefix(from), tab.model, tab.kind)
-                moved.preview = tab.preview
-                moved.dirty = tab.dirty
-                tabs[i] = moved
+        for (group in groups) {
+            group.tabs.forEachIndexed { i, tab ->
+                if (tab.kind == TabKind.File && (tab.path == from || tab.path.startsWith("$from/"))) {
+                    val moved = EditorTab(to + tab.path.removePrefix(from), tab.model, tab.kind)
+                    moved.preview = tab.preview
+                    moved.dirty = tab.dirty
+                    group.tabs[i] = moved
+                }
             }
         }
         if (expanded.remove(from)) expanded += to
@@ -518,9 +556,11 @@ class WorkbenchState(
         scope.launch {
             val r = withContext(io) { runCatching { backend.delete(node.path) } }
             r.onFailure { message = it.message }.onSuccess {
-                for (i in tabs.indices.reversed()) {
-                    val t = tabs[i]
-                    if (t.kind == TabKind.File && (t.path == node.path || t.path.startsWith("${node.path}/"))) closeTab(i)
+                for (group in groups.toList()) {
+                    for (i in group.tabs.indices.reversed()) {
+                        val t = group.tabs[i]
+                        if (t.kind == TabKind.File && (t.path == node.path || t.path.startsWith("${node.path}/"))) closeTab(i, group)
+                    }
                 }
                 expanded.removeAll { it == node.path || it.startsWith("${node.path}/") }
                 tree.keys.filter { it == node.path || it.startsWith("${node.path}/") }.forEach { tree.remove(it) }
@@ -613,8 +653,9 @@ class WorkbenchState(
     private fun addTab(tab: EditorTab) {
         val previewIndex = tabs.indexOfFirst { it.preview && !it.dirty }
         if (tab.preview && previewIndex >= 0) {
-            retire(tabs[previewIndex].model)
+            val replaced = tabs[previewIndex]
             tabs[previewIndex] = tab
+            retireIfUnused(replaced.model)
             activeIndex = previewIndex
         } else {
             tabs += tab
@@ -642,19 +683,30 @@ class WorkbenchState(
     }
 
     private fun retire(model: EditorModel?) {
-        if (model != null) retired += model
+        if (model != null && retired.none { it === model }) retired += model
     }
 
+    /** A split file's model lives until its last tab (in any group) closes. */
+    private fun retireIfUnused(model: EditorModel?) {
+        if (model != null && allTabs.none { it.model === model }) retire(model)
+    }
+
+    /** What each group's editor view currently shows (never freed under it). */
+    private val displayed = HashMap<EditorGroup, EditorModel?>()
+
     /**
-     * Frees models of closed tabs except [inUse]. The UI calls this after the
-     * editor view has switched to the new model, so the view never touches a
-     * freed native document.
+     * Frees models of closed tabs. Each group's UI calls this after its editor
+     * view switched to [inUse], so no view ever touches a freed native document.
      */
-    fun disposeRetired(inUse: EditorModel?) {
+    fun disposeRetired(inUse: EditorModel?, group: EditorGroup = activeGroup) {
+        displayed[group] = inUse
+        // A closed group's view may still be on screen until it recomposes; forget it once released.
+        displayed.entries.removeAll { (g, m) -> m == null && groups.none { it === g } }
+        val shown = displayed.values.filterNotNull()
         val it = retired.iterator()
         while (it.hasNext()) {
             val m = it.next()
-            if (m !== inUse) {
+            if (shown.none { s -> s === m } && allTabs.none { t -> t.model === m }) {
                 m.close()
                 it.remove()
             }
@@ -665,9 +717,11 @@ class WorkbenchState(
     val retiredCount: Int get() = retired.size
 
     /** Close with VS Code's unsaved-changes prompt for dirty tabs. */
-    fun requestCloseTab(index: Int) {
-        val tab = tabs.getOrNull(index) ?: return
-        if (tab.dirty) closeRequest = tab else closeTab(index)
+    fun requestCloseTab(index: Int, group: EditorGroup = activeGroup) {
+        val tab = group.tabs.getOrNull(index) ?: return
+        // A dirty file still open in the other group closes without asking (VS Code).
+        val elsewhere = allTabs.any { it !== tab && it.model != null && it.model === tab.model }
+        if (tab.dirty && !elsewhere) closeRequest = tab else closeTab(index, group)
     }
 
     fun resolveCloseRequest(save: Boolean?) {
@@ -675,28 +729,71 @@ class WorkbenchState(
         closeRequest = null
         when (save) {
             null -> {}
-            true -> save(tab) { closeTab(tabs.indexOf(tab)) }
-            false -> closeTab(tabs.indexOf(tab))
+            true -> save(tab) { closeTab(tab) }
+            false -> closeTab(tab)
         }
     }
 
-    fun closeTab(index: Int) {
-        val tab = tabs.getOrNull(index) ?: return
-        retire(tab.model)
-        tabs.removeAt(index)
-        activeIndex = when {
-            tabs.isEmpty() -> -1
-            activeIndex >= tabs.size -> tabs.lastIndex
-            index < activeIndex -> activeIndex - 1
-            else -> activeIndex
+    private fun closeTab(tab: EditorTab) {
+        val group = groups.firstOrNull { g -> g.tabs.any { it === tab } } ?: return
+        closeTab(group.tabs.indexOfFirst { it === tab }, group)
+    }
+
+    fun closeTab(index: Int, group: EditorGroup = activeGroup) {
+        val tab = group.tabs.getOrNull(index) ?: return
+        group.tabs.removeAt(index)
+        group.activeIndex = when {
+            group.tabs.isEmpty() -> -1
+            group.activeIndex >= group.tabs.size -> group.tabs.lastIndex
+            index < group.activeIndex -> group.activeIndex - 1
+            else -> group.activeIndex
         }
+        retireIfUnused(tab.model)
+        // Empty groups close (VS Code's workbench.editor.closeEmptyGroups), except the last one.
+        if (group.tabs.isEmpty() && groups.size > 1) closeGroup(group)
+    }
+
+    private fun closeGroup(group: EditorGroup) {
+        val i = groups.indexOf(group)
+        if (i < 0 || groups.size == 1) return
+        val activeWasAfter = activeGroupIndex > i
+        groups.removeAt(i)
+        activeGroupIndex = (if (activeWasAfter) activeGroupIndex - 1 else activeGroupIndex).coerceIn(0, groups.lastIndex)
+    }
+
+    /**
+     * View: Split Editor: opens the active editor again in a new group to the
+     * right, sharing the document. Wide windows only, two groups at most.
+     */
+    fun splitEditor() {
+        val tab = activeTab ?: return
+        if (!canSplit) return
+        val copy = EditorTab(tab.path, tab.model, tab.kind).also {
+            it.preview = false
+            it.dirty = tab.dirty
+        }
+        tab.preview = false
+        val group = EditorGroup()
+        group.tabs += copy
+        group.activeIndex = 0
+        groups.add(activeGroupIndex + 1, group)
+        activeGroupIndex += 1
+    }
+
+    fun focusGroup(index: Int) {
+        if (index in groups.indices) activeGroupIndex = index
     }
 
     /** Called by the editor view after each edit or cursor move. */
     fun onEditorChanged(tab: EditorTab, contentChanged: Boolean) {
         if (contentChanged) tab.preview = false
-        tab.dirty = tab.model?.isDirty == true
-        tab.revision++
+        // Every tab showing this document (split editors) redraws and shows the dirty dot.
+        for (t in allTabs) {
+            if (t === tab || (t.model != null && t.model === tab.model)) {
+                t.dirty = t.model?.isDirty == true
+                t.revision++
+            }
+        }
     }
 
     /**
@@ -728,7 +825,7 @@ class WorkbenchState(
             r.onSuccess {
                 if (!model.isClosed) {
                     model.markSaved(version)
-                    tab.dirty = model.isDirty
+                    allTabs.filter { it.model === model }.forEach { it.dirty = model.isDirty }
                 }
                 log("Saved ${tab.name}")
                 then()
@@ -1009,6 +1106,13 @@ class WorkbenchState(
         cmd(CommandIds.OPEN_FOLDER, "Open Folder…", "File", enabled = { host != null }) { host?.pickFolder() }
         cmd(CommandIds.EXPLORER_NEW_FILE, "New File…", "File") { startNewFile() }
         cmd(CommandIds.WELCOME, "Welcome", "Help") { openWelcome() }
+        cmd(CommandIds.SPLIT_EDITOR, "Split Editor", "View", KeyChord.ctrl(KeyEvent.KEYCODE_BACKSLASH), { canSplit && activeTab != null }) {
+            splitEditor()
+        }
+        cmd(CommandIds.FOCUS_FIRST_GROUP, "Focus First Editor Group", "View", KeyChord.ctrl(KeyEvent.KEYCODE_1)) { focusGroup(0) }
+        cmd(CommandIds.FOCUS_SECOND_GROUP, "Focus Second Editor Group", "View", KeyChord.ctrl(KeyEvent.KEYCODE_2), { groups.size > 1 }) {
+            focusGroup(1)
+        }
         cmd(CommandIds.EXPLORER_NEW_FOLDER, "New Folder…", "File") { startNewFolder() }
         cmd(CommandIds.REFRESH_EXPLORER, "Refresh Explorer", "File") { refreshExplorer() }
         cmd(CommandIds.COLLAPSE_EXPLORER, "Collapse Folders in Explorer", "File") { collapseExplorer() }
@@ -1037,7 +1141,7 @@ class WorkbenchState(
         }
         cmd(CommandIds.SAVE, "Save", "File", KeyChord.ctrl(KeyEvent.KEYCODE_S), hasEditor) { save() }
         cmd(CommandIds.SAVE_ALL, "Save All", "File", KeyChord(KeyEvent.KEYCODE_S, ctrl = true, alt = true)) {
-            tabs.filter { it.dirty }.forEach { save(it) }
+            allTabs.filter { it.dirty }.distinctBy { System.identityHashCode(it.model) }.forEach { save(it) }
         }
         cmd(CommandIds.CLOSE_EDITOR, "Close Editor", "View", KeyChord.ctrl(KeyEvent.KEYCODE_W), { activeTab != null }) {
             requestCloseTab(activeIndex)
@@ -1147,6 +1251,7 @@ class WorkbenchState(
         const val SETTINGS_JSON_PATH = "ferride:settings.json"
         const val WELCOME_PATH = "ferride:welcome"
         private const val MAX_RECENT_FOLDERS = 10
+        const val MAX_GROUPS = 2
         private const val MAX_RECENT = 5
     }
 }

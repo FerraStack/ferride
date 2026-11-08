@@ -249,6 +249,20 @@ class WorkbenchScreenshotTest {
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
     fun tabletSearchSafLight() = shoot("tablet_search_saf", dark = false, backend = safBackend) { it.showView(SideView.Search) }
 
+    // ----- Split editor ---------------------------------------------------------------
+
+    /** main.rs on the left, app.ts opened next to a second view of main.rs on the right. */
+    private fun split(s: WorkbenchState) {
+        s.splitEditor()
+        s.openFile("${s.backend.root}/web/app.ts", preview = false)
+    }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletSplitDark() = shoot("tablet_split", dark = true, setup = ::split)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletSplitLight() = shoot("tablet_split", dark = false, setup = ::split)
+
     // ----- Welcome ---------------------------------------------------------------------
 
     /** A host with a few recent folders (local, system picker, app projects). */

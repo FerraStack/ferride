@@ -45,6 +45,7 @@ object Codicon {
     const val REPO_CLONE = '\uEB3E'
     const val ROCKET = '\uEB44'
     const val SEARCH = '\uEA6D'
+    const val SPLIT_HORIZONTAL = '\uEB56'
     const val SOURCE_CONTROL = '\uEA68'
     const val TRASH = '\uEA81'
 }

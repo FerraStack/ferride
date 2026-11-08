@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,44 +48,61 @@ import dev.ferride.editor.SelectionUi
 import dev.ferride.editor.Squiggle
 import dev.ferride.theme.LocalWorkbenchColors
 import dev.ferride.workbench.CommandIds
+import dev.ferride.workbench.EditorGroup
 import dev.ferride.workbench.EditorTab
 import dev.ferride.workbench.TabKind
 import dev.ferride.workbench.WorkbenchState
 
-/** Tabs, breadcrumbs and the editor (or Settings / the welcome page). */
+/**
+ * The editor area: one or two editor groups side by side (View: Split
+ * Editor). Each group has its own tabs, breadcrumbs and editor. Compact
+ * windows show only the active group.
+ */
 @Composable
 fun EditorArea(state: WorkbenchState, modifier: Modifier = Modifier) {
     val c = LocalWorkbenchColors.current
-    Column(modifier.fillMaxWidth().background(c.editorBackground)) {
-        val tab = state.activeTab
-        if (state.tabs.isNotEmpty()) TabStrip(state)
+    val visible = if (state.compactWindow) listOf(state.activeGroup) else state.groups.toList()
+    Row(modifier.fillMaxWidth().background(c.editorBackground)) {
+        visible.forEachIndexed { i, group ->
+            if (i > 0) Box(Modifier.width(1.dp).fillMaxHeight().background(c.tabBorder))
+            key(group) { EditorGroupView(state, group, Modifier.weight(1f).fillMaxHeight()) }
+        }
+    }
+}
+
+@Composable
+private fun EditorGroupView(state: WorkbenchState, group: EditorGroup, modifier: Modifier) {
+    Column(modifier) {
+        val tab = group.activeTab
+        if (group.tabs.isNotEmpty()) TabStrip(state, group)
         val model = tab?.model?.takeIf { !it.isClosed }
         when {
             tab == null -> {
                 Welcome(state, Modifier.weight(1f))
-                SideEffect { state.disposeRetired(null) }
+                SideEffect { state.disposeRetired(null, group) }
             }
             tab.kind == TabKind.Settings -> {
                 SettingsEditor(state, Modifier.weight(1f))
-                SideEffect { state.disposeRetired(null) }
+                SideEffect { state.disposeRetired(null, group) }
             }
             tab.kind == TabKind.Welcome -> {
                 WelcomePage(state, Modifier.weight(1f))
-                SideEffect { state.disposeRetired(null) }
+                SideEffect { state.disposeRetired(null, group) }
             }
             model != null -> {
                 Breadcrumbs(state, tab)
-                CodeEditor(state, tab, model, Modifier.weight(1f))
+                CodeEditor(state, group, tab, model, Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel, modifier: Modifier) {
+private fun CodeEditor(state: WorkbenchState, group: EditorGroup, tab: EditorTab, model: EditorModel, modifier: Modifier) {
     val c = LocalWorkbenchColors.current
     tab.revision // re-read decorations after edits
-    val matches = state.findMatchesInActive()
+    val focusedGroup = group === state.activeGroup
+    val matches = if (focusedGroup) state.findMatchesInActive() else emptyList()
     val squiggles = state.diagnostics[tab.path].orEmpty().map { d ->
         Squiggle(model.offsetAt(d.line, d.startColumn), model.offsetAt(d.endLine, d.endColumn), d.severity)
     }
@@ -99,26 +117,31 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
                 view.style = style
                 // Switch to the new model first, then free closed ones (never the reverse).
                 view.setModel(model)
-                state.disposeRetired(model)
+                state.disposeRetired(model, group)
+                // Edits from the other group's view of the same file redraw this one too.
+                view.invalidate()
                 view.onChange = { changed -> state.onEditorChanged(tab, changed) }
-                view.onFocus = { focused -> state.editorFocused = focused }
+                view.onFocus = { focused ->
+                    state.editorFocused = focused
+                    if (focused) state.focusGroup(state.groups.indexOf(group))
+                }
                 view.findMatches = matches
-                view.currentMatch = state.find.current
+                view.currentMatch = if (focusedGroup) state.find.current else -1
                 view.squiggles = squiggles
                 view.onSelectionUi = { selectionUi = it }
-                state.editor = view
+                group.editor = view
             },
             onRelease = { view ->
                 view.onSelectionUi = null
                 selectionUi = null
                 if (viewRef[0] === view) viewRef[0] = null
-                if (state.editor === view) state.editor = null
+                if (group.editor === view) group.editor = null
                 view.setModel(null)
-                state.disposeRetired(null)
+                state.disposeRetired(null, group)
                 state.editorFocused = false
             },
         )
-        if (state.find.visible) {
+        if (state.find.visible && focusedGroup) {
             FindWidget(state, matches.size, maxWidth, Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 14.dp))
         }
         selectionUi?.let { ui ->
@@ -129,22 +152,42 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
 }
 
 @Composable
-private fun TabStrip(state: WorkbenchState) {
+private fun TabStrip(state: WorkbenchState, group: EditorGroup) {
     val c = LocalWorkbenchColors.current
     val listState = rememberLazyListState()
-    LaunchedEffect(state.activeIndex) {
-        if (state.activeIndex >= 0) listState.animateScrollToItem(state.activeIndex)
+    LaunchedEffect(group.activeIndex) {
+        if (group.activeIndex >= 0) listState.animateScrollToItem(group.activeIndex)
     }
-    val tab = state.activeTab
+    val tab = group.activeTab
+    val focusedGroup = group === state.activeGroup
     Row(Modifier.fillMaxWidth().height(38.dp).background(c.editorGroupHeaderBackground)) {
         LazyRow(state = listState, modifier = Modifier.weight(1f).fillMaxHeight()) {
-            itemsIndexed(state.tabs, key = { _, t -> t.path }) { index, t ->
-                EditorTabItem(t, index == state.activeIndex, onSelect = { state.activeIndex = index }) {
-                    state.requestCloseTab(index)
+            itemsIndexed(group.tabs, key = { _, t -> t.path }) { index, t ->
+                EditorTabItem(
+                    t,
+                    active = index == group.activeIndex,
+                    focusedGroup = focusedGroup,
+                    onSelect = {
+                        state.focusGroup(state.groups.indexOf(group))
+                        group.activeIndex = index
+                    },
+                ) {
+                    state.requestCloseTab(index, group)
                 }
             }
         }
         // Editor title actions (VS Code shows these at the right of the tab bar).
+        if (state.canSplit && tab != null) {
+            Box(
+                Modifier.size(38.dp).clickable(onClickLabel = "Split Editor Right") {
+                    state.focusGroup(state.groups.indexOf(group))
+                    state.commands.execute(CommandIds.SPLIT_EDITOR)
+                },
+                contentAlignment = Alignment.Center,
+            ) {
+                CodiconIcon(Codicon.SPLIT_HORIZONTAL, c.tabActiveForeground, description = "Split Editor Right")
+            }
+        }
         if (tab?.kind == TabKind.Settings) {
             BarIcon(Icons.Outlined.DataObject, "Open Settings (JSON)", c.tabActiveForeground, size = 38.dp, iconSize = 18.dp) {
                 state.commands.execute(CommandIds.OPEN_SETTINGS_JSON)
@@ -154,9 +197,14 @@ private fun TabStrip(state: WorkbenchState) {
 }
 
 @Composable
-private fun EditorTabItem(tab: EditorTab, active: Boolean, onSelect: () -> Unit, onClose: () -> Unit) {
+private fun EditorTabItem(tab: EditorTab, active: Boolean, focusedGroup: Boolean, onSelect: () -> Unit, onClose: () -> Unit) {
     val c = LocalWorkbenchColors.current
-    val fg = if (active) c.tabActiveForeground else c.tabInactiveForeground
+    // The active tab of an unfocused group is dimmed and has no accent border (tab.unfocused*).
+    val fg = when {
+        active && focusedGroup -> c.tabActiveForeground
+        active -> c.tabActiveForeground.copy(alpha = 0.6f)
+        else -> c.tabInactiveForeground
+    }
     Box(
         Modifier
             .fillMaxHeight()
@@ -193,7 +241,9 @@ private fun EditorTabItem(tab: EditorTab, active: Boolean, onSelect: () -> Unit,
                 }
             }
         }
-        if (active) Box(Modifier.fillMaxWidth().height(1.5.dp).background(c.tabActiveBorderTop).align(Alignment.TopStart))
+        if (active && focusedGroup) {
+            Box(Modifier.fillMaxWidth().height(1.5.dp).background(c.tabActiveBorderTop).align(Alignment.TopStart))
+        }
         Box(Modifier.width(1.dp).fillMaxHeight().background(c.tabBorder).align(Alignment.CenterEnd))
     }
 }
