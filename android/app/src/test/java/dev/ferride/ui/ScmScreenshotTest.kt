@@ -68,9 +68,6 @@ class ScmScreenshotTest {
     }
 
     private fun signIn(s: WorkbenchState) {
-        s.showView(SideView.SourceControl)
-        // Determinate progress: an indeterminate bar animates forever and Compose never goes idle.
-        s.scm.operation = ScmOperation("Pulling...", "Connecting", current = 0, total = 100)
         s.scm.credentialPrompt = CredentialPrompt("https://github.com/ferrastack/sample.git", CompletableFuture()).apply {
             username = "ada"
         }

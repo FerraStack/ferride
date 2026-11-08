@@ -245,7 +245,8 @@ private fun CredentialDialog(prompt: CredentialPrompt) {
                     fontSize = 13.sp,
                 )
                 Spacer(Modifier.height(10.dp))
-                QuickField(prompt.username, "Username", { prompt.username = it }, autoFocus = true) {}
+                // No auto focus: the dialog opens while a network call waits; the user taps the field (and the keyboard opens).
+                QuickField(prompt.username, "Username", { prompt.username = it }, autoFocus = false) {}
                 Spacer(Modifier.height(8.dp))
                 QuickField(prompt.token, "Personal access token", { prompt.token = it }, autoFocus = false, password = true) {
                     if (prompt.token.isNotBlank()) prompt.submit()
