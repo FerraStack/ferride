@@ -38,6 +38,7 @@ class ScmScreenshotTest {
         dark: Boolean,
         repo: Boolean = true,
         saf: Boolean = false,
+        openFirst: String? = "src/main.rs",
         setup: (WorkbenchState) -> Unit,
     ) {
         val backend = if (saf) FakeWorkspaceBackend(kind = dev.ferride.core.WorkspaceKind.SAF) else FakeWorkspaceBackend()
@@ -51,7 +52,7 @@ class ScmScreenshotTest {
         )
         state.systemDark = dark
         state.scm.projectsDir = "/sample/projects"
-        state.start("src/main.rs")
+        state.start(openFirst)
         setup(state)
         compose.setContent { FerrideWorkbench(state, imeVisible = false, hardwareKeyboard = false) }
         compose.waitForIdle()
@@ -67,6 +68,7 @@ class ScmScreenshotTest {
         s.scm.showBranchPicker()
     }
 
+    /** Over the Welcome tab: with the editor behind the dialog, Robolectric's main looper never went idle on phones. */
     private fun signIn(s: WorkbenchState) {
         s.scm.credentialPrompt = CredentialPrompt("https://github.com/ferrastack/sample.git", CompletableFuture()).apply {
             username = "ada"
@@ -131,16 +133,16 @@ class ScmScreenshotTest {
     fun tabletScmEmptyLight() = shoot("tablet_scm_empty", false, repo = false) { it.showView(SideView.SourceControl) }
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
-    fun phoneScmSignInDark() = shoot("phone_scm_signin", true, setup = ::signIn)
+    fun phoneScmSignInDark() = shoot("phone_scm_signin", true, openFirst = null, setup = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
-    fun phoneScmSignInLight() = shoot("phone_scm_signin", false, setup = ::signIn)
+    fun phoneScmSignInLight() = shoot("phone_scm_signin", false, openFirst = null, setup = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
-    fun tabletScmSignInDark() = shoot("tablet_scm_signin", true, setup = ::signIn)
+    fun tabletScmSignInDark() = shoot("tablet_scm_signin", true, openFirst = null, setup = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
-    fun tabletScmSignInLight() = shoot("tablet_scm_signin", false, setup = ::signIn)
+    fun tabletScmSignInLight() = shoot("tablet_scm_signin", false, openFirst = null, setup = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
     fun phoneScmCloneDark() = shoot("phone_scm_clone", true, setup = ::cloning)
