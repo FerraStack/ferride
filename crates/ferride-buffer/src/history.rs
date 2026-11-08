@@ -116,10 +116,33 @@ fn is_word_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
+/// Merges `next` into `last` when every change continues the matching change
+/// (multi-cursor typing: one change per cursor, in the same order). All or nothing.
 fn try_merge(last: &mut Transaction, next: &Transaction, paused: bool) -> bool {
-    let ([l], [n]) = (last.changes.as_mut_slice(), next.changes.as_slice()) else {
+    if last.changes.len() != next.changes.len() || last.changes.is_empty() {
         return false;
-    };
+    }
+    // Changes are applied right to left, so a change's start is in the text
+    // before its own transaction. `next` sees the text after `last`: shift each
+    // of last's changes by what last's changes to its left (later in the list)
+    // inserted or removed, merge, and shift back.
+    let mut merged = last.changes.clone();
+    for (i, change) in merged.iter_mut().enumerate() {
+        let offset: isize = last.changes[i + 1..]
+            .iter()
+            .map(|c| c.inserted_len() as isize - c.removed_len() as isize)
+            .sum();
+        change.start = (change.start as isize + offset) as usize;
+        if !merge_change(change, &next.changes[i], paused) {
+            return false;
+        }
+        change.start = (change.start as isize - offset) as usize;
+    }
+    last.changes = merged;
+    true
+}
+
+fn merge_change(l: &mut Change, n: &Change, paused: bool) -> bool {
     if n.inserted.contains('\n') || l.inserted.contains('\n') {
         return false;
     }

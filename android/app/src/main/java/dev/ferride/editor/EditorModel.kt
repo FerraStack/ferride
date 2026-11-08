@@ -1,6 +1,7 @@
 package dev.ferride.editor
 
 import dev.ferride.core.Document
+import dev.ferride.core.SelectionRange
 import dev.ferride.core.ViewLine
 
 /** A selection in UTF-16 offsets. */
@@ -36,7 +37,14 @@ interface EditorModel {
     val lineCount: Int
     val length: Int
     val isDirty: Boolean
+    /** The primary selection (the IME, scrolling and single-cursor actions follow it). */
     var selection: Sel
+    /** All selections, sorted by position (multi-cursor); contains [selection]. */
+    val selections: List<Sel>
+    /** Index of [selection] in [selections]. */
+    val primaryIndex: Int
+    /** Replaces all selections; overlapping ones merge. [primary] indexes into [sels]. */
+    fun setSelections(sels: List<Sel>, primary: Int)
     val canUndo: Boolean
     val canRedo: Boolean
 
@@ -65,6 +73,11 @@ interface EditorModel {
     fun replace(start: Int, end: Int, text: String, typing: Boolean): Int
     /** Types at every selection (multi-cursor ready). */
     fun insert(text: String, typing: Boolean)
+    /**
+     * Multi-cursor IME input: at every selection, replaces the selection plus
+     * [before] chars before and [after] chars after it with [text].
+     */
+    fun replaceAroundSelections(before: Int, after: Int, text: String, typing: Boolean)
     /** Newline with auto-indent. */
     fun newline()
     fun backspace()
@@ -96,6 +109,10 @@ class RustEditorModel(private val doc: Document, override val fileName: String) 
     override var selection: Sel
         get() = doc.selection().let { Sel(it.anchor, it.head) }
         set(value) = doc.setSelection(value.anchor, value.head)
+    override val selections: List<Sel> get() = doc.selections().map { Sel(it.anchor, it.head) }
+    override val primaryIndex: Int get() = doc.primarySelectionIndex()
+    override fun setSelections(sels: List<Sel>, primary: Int) =
+        doc.setSelections(sels.map { SelectionRange(it.anchor, it.head) }, primary)
 
     override fun text(): String = doc.text()
     override fun viewport(firstLine: Int, count: Int): List<ViewLine> = doc.viewport(firstLine, count)
@@ -113,6 +130,10 @@ class RustEditorModel(private val doc: Document, override val fileName: String) 
 
     override fun insert(text: String, typing: Boolean) {
         doc.insert(text, typing)
+    }
+
+    override fun replaceAroundSelections(before: Int, after: Int, text: String, typing: Boolean) {
+        doc.replaceAroundSelections(before, after, text, typing)
     }
 
     override fun newline() {

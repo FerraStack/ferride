@@ -393,6 +393,57 @@ impl Document {
         inner.buffer.set_selection(sel);
     }
 
+    /// Replaces all selections (multi-cursor); `primary` indexes into
+    /// `ranges` (the one the IME and scrolling follow). Overlapping ranges merge.
+    pub fn set_selections(&self, ranges: Vec<SelectionRange>, primary: i32) {
+        let mut inner = self.lock();
+        let sels: Vec<Selection> = ranges
+            .iter()
+            .map(|r| Selection::new(inner.snap(r.anchor), inner.snap(r.head)))
+            .collect();
+        if let Some(sels) = Selections::new(sels, ix(primary)) {
+            inner.buffer.set_selections(sels);
+        }
+    }
+
+    /// Index of the primary selection in [`selections`](Self::selections).
+    pub fn primary_selection_index(&self) -> i32 {
+        self.lock().buffer.selections().primary_index() as i32
+    }
+
+    /// Multi-cursor typing from the IME: at every selection, replaces the
+    /// selection plus `before` UTF-16 units before it and `after` after it
+    /// with `text` (composition updates replace what was composed so far).
+    pub fn replace_around_selections(
+        &self,
+        before: i32,
+        after: i32,
+        text: String,
+        typing: bool,
+    ) -> EditOutcome {
+        let mut inner = self.lock();
+        let before_version = inner.buffer.version() as i64;
+        let b = &inner.buffer;
+        let text = b.normalize_eol(&text);
+        let len = b.len_chars();
+        let mut edits = Vec::new();
+        let mut prev_end = 0;
+        for s in b.selections().ranges() {
+            let start16 = b.char_to_utf16(s.start());
+            let end16 = b.char_to_utf16(s.end());
+            let a = b.utf16_to_char(start16.saturating_sub(ix(before))).max(prev_end);
+            let z = b.utf16_to_char(end16 + ix(after)).min(len).max(a);
+            let range = b.widen_crlf(a..z);
+            let range = range.start.max(prev_end)..range.end;
+            prev_end = range.end;
+            edits.push(Edit::new(range, text.clone()));
+        }
+        let kind = if typing { EditKind::Typing } else { EditKind::Other };
+        let edits = inner.buffer.apply(edits, kind).unwrap_or_default();
+        inner.after_edit(&edits);
+        inner.outcome(before_version)
+    }
+
     /// Adds a cursor/selection (multi-cursor) and makes it primary.
     pub fn add_selection(&self, anchor: i32, head: i32) {
         let mut inner = self.lock();

@@ -289,7 +289,15 @@ fun StatusBar(state: WorkbenchState, compact: Boolean) {
             val head = m.selection.head
             val line = m.lineOfOffset(head)
             val col = head - m.lineStart(line) + 1
-            StatusItem(null, "Ln ${line + 1}, Col $col") { state.commands.execute(CommandIds.GOTO_LINE) }
+            // VS Code: "Ln 3, Col 5 (12 selected)" or "3 selections (12 characters selected)".
+            val sels = m.selections
+            val chars = sels.sumOf { it.end - it.start }
+            val position = when {
+                sels.size > 1 -> "${sels.size} selections" + if (chars > 0) " ($chars characters selected)" else ""
+                chars > 0 -> "Ln ${line + 1}, Col $col ($chars selected)"
+                else -> "Ln ${line + 1}, Col $col"
+            }
+            StatusItem(null, position) { state.commands.execute(CommandIds.GOTO_LINE) }
             if (!compact) {
                 val s = state.settings
                 StatusItem(null, if (s.insertSpaces) "Spaces: ${s.tabSize}" else "Tab Size: ${s.tabSize}") {

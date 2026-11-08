@@ -462,3 +462,24 @@ fn slow_ime_composition_is_still_one_step() {
     b.undo().unwrap();
     assert_eq!(b.text(), "x ");
 }
+
+#[test]
+fn multi_cursor_typing_is_one_undo_step_and_redoes() {
+    let mut b = Buffer::new("a\nbb\nccc");
+    b.set_clock(Some(std::time::Instant::now()));
+    let sels = Selections::new(
+        vec![Selection::caret(1), Selection::caret(4), Selection::caret(8)],
+        0,
+    )
+    .unwrap();
+    b.set_selections(sels);
+    type_chars(&mut b, "xy");
+    b.delete_backward();
+    assert_eq!(b.text(), "ax\nbbx\ncccx");
+    b.undo().unwrap();
+    assert_eq!(b.text(), "a\nbb\nccc");
+    assert!(b.undo().is_none(), "one step");
+    b.redo().unwrap();
+    assert_eq!(b.text(), "ax\nbbx\ncccx");
+    assert_eq!(b.selections().len(), 3);
+}

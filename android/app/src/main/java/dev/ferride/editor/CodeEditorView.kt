@@ -479,6 +479,9 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         val lastLine = lineOfRow(lastRow)
         val lines = lines(firstLine, lastLine - firstLine + 1)
         val sel = displayedSelection(m)
+        // Multi-cursor: every selection is drawn; another view's document shows only this view's own.
+        val owner = selectionOwners[m]?.get()
+        val allSels = if (owner == null || owner === this) m.selections else listOf(sel)
         val caretLine = m.lineOfOffset(sel.head)
 
         canvas.save()
@@ -511,12 +514,13 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
                         canvas.drawRect(x(s - lineStart), top, x(e - lineStart), top + lineHeight, fillPaint)
                     }
                 }
-                // Selection.
-                if (!sel.isEmpty && sel.end >= lineStart + a && sel.start <= lineStart + b) {
-                    val s = max(sel.start, lineStart + a) - lineStart
-                    val e = min(sel.end, lineStart + b) - lineStart
+                // Selections.
+                for (cur in allSels) {
+                    if (cur.isEmpty || cur.end < lineStart + a || cur.start > lineStart + b) continue
+                    val s = max(cur.start, lineStart + a) - lineStart
+                    val e = min(cur.end, lineStart + b) - lineStart
                     var x1 = x(e)
-                    if (sel.end > lineEnd && r == breaks.size - 1) x1 += charWidth * 0.6f
+                    if (cur.end > lineEnd && r == breaks.size - 1) x1 += charWidth * 0.6f
                     fillPaint.color = style.selection
                     canvas.drawRect(x(s), top, x1, top + lineHeight, fillPaint)
                 }
@@ -534,12 +538,15 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
             }
             if (!wrapping) maxLineWidth = max(maxLineWidth, layout.width)
         }
-        // Caret.
+        // Carets (one per cursor).
         if (hasFocus() && caretVisible) {
-            val (cx, cy) = caretPoint(sel.head)
             fillPaint.color = style.cursor
-            val x = textLeft - sx + cx
-            canvas.drawRect(x, cy - sy, x + 2f * density, cy - sy + lineHeight, fillPaint)
+            for (cur in allSels) {
+                val (cx, cy) = caretPoint(cur.head)
+                if (cy - sy + lineHeight < 0 || cy - sy > height) continue
+                val x = textLeft - sx + cx
+                canvas.drawRect(x, cy - sy, x + 2f * density, cy - sy + lineHeight, fillPaint)
+            }
         }
         canvas.restore()
         drawGutter(canvas, firstRow, lastRow, caretLine)
@@ -713,6 +720,16 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
             val m = liveModel ?: return true
             val hadComposing = composingRange() != null
             val offset = offsetAt(e.x, e.y)
+            if (e.metaState and KeyEvent.META_ALT_ON != 0) {
+                // Alt+click (mouse/keyboard): add a cursor, like VS Code.
+                clearComposing()
+                m.sealUndoGroup()
+                m.setSelections(m.selections + Sel.caret(offset), m.selections.size)
+                requestFocus()
+                if (hadComposing) imeSink.restartInput(this@CodeEditorView)
+                afterSelectionChange(fromIme = false)
+                return true
+            }
             // Tapping the caret again toggles the Paste / Select All toolbar (Android's insertion menu).
             val tappedCaret = handlesShown && m.selection.isEmpty && m.selection.head == offset
             clearComposing()
@@ -1304,6 +1321,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     internal fun clearComposing() {
+        multiComposingLength = 0
         composingStart = -1
         composingEnd = -1
     }
@@ -1418,40 +1436,55 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         clearComposing()
         hideSelectionControls()
         m.sealUndoGroup()
-        val sel = m.selection
-        val head = sel.head
-        val line = m.lineOfOffset(head)
-        // Up/down move by visual rows.
-        fun vertical(rows: Int): Int {
-            val (cx, cy) = caretPoint(head)
-            if (preferredX < 0) preferredX = cx
-            val row = (cy / lineHeight).roundToInt()
-            val target = row + rows
-            if (target < 0) return 0
-            if (target >= totalRows()) return m.length
-            val y = target * lineHeight - sy + lineHeight / 2
-            return offsetAt(textLeft - sx + preferredX, y)
-        }
         val pageRows = max(1, (height / lineHeight).toInt() - 1)
-        val newHead = when (direction) {
-            EditorActions.Direction.Left -> if (!extend && !sel.isEmpty) sel.start else stepBack(m, head)
-            EditorActions.Direction.Right -> if (!extend && !sel.isEmpty) sel.end else stepForward(m, head)
-            EditorActions.Direction.Up -> vertical(-1)
-            EditorActions.Direction.Down -> vertical(1)
-            EditorActions.Direction.PageUp -> vertical(-pageRows)
-            EditorActions.Direction.PageDown -> vertical(pageRows)
-            EditorActions.Direction.LineStart -> {
-                // Smart home: first non-whitespace char, then column 0.
-                val start = m.lineStart(line)
-                val text = m.textRange(start, m.lineEnd(line))
-                val firstNonWs = start + text.indexOfFirst { !it.isWhitespace() }.let { if (it < 0) text.length else it }
-                if (head == firstNonWs) start else firstNonWs
+        val multi = m.selections.size > 1
+        // Every cursor moves (multi-cursor); the primary one keeps the remembered column.
+        fun move(sel: Sel, primary: Boolean): Sel {
+            val head = sel.head
+            val line = m.lineOfOffset(head)
+            // Up/down move by visual rows.
+            fun vertical(rows: Int): Int {
+                val (cx, cy) = caretPoint(head)
+                val wantX = if (primary) {
+                    if (preferredX < 0) preferredX = cx
+                    preferredX
+                } else {
+                    cx
+                }
+                val row = (cy / lineHeight).roundToInt()
+                val target = row + rows
+                if (target < 0) return 0
+                if (target >= totalRows()) return m.length
+                val y = target * lineHeight - sy + lineHeight / 2
+                return offsetAt(textLeft - sx + wantX, y)
             }
-            EditorActions.Direction.LineEnd -> m.lineEnd(line)
+            val newHead = when (direction) {
+                EditorActions.Direction.Left -> if (!extend && !sel.isEmpty) sel.start else stepBack(m, head)
+                EditorActions.Direction.Right -> if (!extend && !sel.isEmpty) sel.end else stepForward(m, head)
+                EditorActions.Direction.Up -> vertical(-1)
+                EditorActions.Direction.Down -> vertical(1)
+                EditorActions.Direction.PageUp -> vertical(-pageRows)
+                EditorActions.Direction.PageDown -> vertical(pageRows)
+                EditorActions.Direction.LineStart -> {
+                    // Smart home: first non-whitespace char, then column 0.
+                    val start = m.lineStart(line)
+                    val text = m.textRange(start, m.lineEnd(line))
+                    val firstNonWs = start + text.indexOfFirst { !it.isWhitespace() }.let { if (it < 0) text.length else it }
+                    if (head == firstNonWs) start else firstNonWs
+                }
+                EditorActions.Direction.LineEnd -> m.lineEnd(line)
+            }
+            return if (extend) Sel(sel.anchor, newHead) else Sel.caret(newHead)
         }
         val verticalMove = direction in VERTICAL
         if (!verticalMove) preferredX = -1f
-        m.selection = if (extend) Sel(sel.anchor, newHead) else Sel.caret(newHead)
+        if (multi) {
+            val primary = m.primaryIndex
+            val moved = m.selections.mapIndexed { i, s -> move(s, i == primary) }
+            m.setSelections(moved, primary)
+        } else {
+            m.selection = move(m.selection, true)
+        }
         val keepX = preferredX
         afterSelectionChange(fromIme = false)
         if (verticalMove) preferredX = keepX
@@ -1461,6 +1494,83 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     private fun stepBack(m: EditorModel, pos: Int): Int = if (pos <= 0) 0 else m.graphemeBefore(pos)
 
     private fun stepForward(m: EditorModel, pos: Int): Int = if (pos >= m.length) m.length else m.graphemeAfter(pos)
+
+    // ----- multi-cursor --------------------------------------------------------------------------
+
+    /**
+     * Ctrl+D (`editor.action.addSelectionToNextFindMatch`): an empty cursor
+     * selects its word; a selection adds the next occurrence of its text
+     * (wrapping around), which becomes the primary selection.
+     */
+    override fun addSelectionToNextFindMatch() {
+        claimSelection()
+        val m = liveModel ?: return
+        clearComposing()
+        m.sealUndoGroup()
+        val sels = m.selections
+        val primary = m.selection
+        if (primary.isEmpty) {
+            val word = m.wordAt(primary.head)
+            if (word.isEmpty) return
+            m.setSelections(sels.map { if (it == primary) word else it }, m.primaryIndex)
+        } else {
+            val needle = m.textRange(primary.start, primary.end)
+            val text = m.text()
+            val taken = sels.map { it.start }.toSet()
+            var from = primary.end
+            var found = -1
+            repeat(2) {
+                if (found >= 0) return@repeat
+                var i = text.indexOf(needle, from)
+                while (i >= 0 && i in taken) i = text.indexOf(needle, i + 1)
+                found = i
+                from = 0
+            }
+            if (found < 0) return
+            m.setSelections(sels + Sel(found, found + needle.length), sels.size)
+        }
+        afterSelectionChange(fromIme = false)
+    }
+
+    /** Ctrl+Shift+L (`editor.action.selectHighlights`): select every occurrence of the selection (or word). */
+    override fun selectAllOccurrences() {
+        claimSelection()
+        val m = liveModel ?: return
+        clearComposing()
+        m.sealUndoGroup()
+        val primary = m.selection.let { if (it.isEmpty) m.wordAt(it.head) else it }
+        if (primary.isEmpty) return
+        val needle = m.textRange(primary.start, primary.end)
+        val text = m.text()
+        val found = mutableListOf<Sel>()
+        var i = text.indexOf(needle)
+        while (i >= 0 && found.size < MAX_CURSORS) {
+            found += Sel(i, i + needle.length)
+            i = text.indexOf(needle, i + needle.length)
+        }
+        m.setSelections(found, found.indexOfFirst { it.start == primary.start }.coerceAtLeast(0))
+        afterSelectionChange(fromIme = false)
+    }
+
+    /** Ctrl+Alt+Up/Down (`editor.action.insertCursorAbove/Below`): a new cursor on the line above/below. */
+    override fun insertCursor(above: Boolean) {
+        claimSelection()
+        val m = liveModel ?: return
+        clearComposing()
+        m.sealUndoGroup()
+        val sels = m.selections
+        val edge = if (above) sels.first() else sels.last()
+        val line = m.lineOfOffset(edge.head)
+        val target = if (above) line - 1 else line + 1
+        if (target !in 0 until m.lineCount) return
+        val col = edge.head - m.lineStart(line)
+        val offset = m.offsetAt(target, col)
+        m.setSelections(sels + Sel.caret(offset), sels.size)
+        afterSelectionChange(fromIme = false)
+    }
+
+    /** Multi-cursor composing: how many chars of the current composition sit before each cursor. */
+    internal var multiComposingLength = 0
 
     override fun undo() {
         claimSelection()
@@ -1493,6 +1603,12 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         claimSelection()
         val m = liveModel ?: return
         hideSelectionControls()
+        // Esc first drops the extra cursors (VS Code), then collapses the selection.
+        if (m.selections.size > 1) {
+            m.selection = m.selection
+            afterSelectionChange(fromIme = false)
+            return
+        }
         if (m.selection.isEmpty) return
         m.selection = Sel.caret(m.selection.head)
         afterSelectionChange(fromIme = false)
@@ -1604,6 +1720,8 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         /** Which view owns each shared document's selection (weak: models and views come and go). */
         private val selectionOwners = java.util.WeakHashMap<EditorModel, java.lang.ref.WeakReference<CodeEditorView>>()
         private const val BLINK_MS = 530L
+        /** Select All Occurrences stops here (VS Code warns past 10k too). */
+        private const val MAX_CURSORS = 10_000
         /** Android hides an idle insertion (caret) handle after a few seconds. */
         private const val CARET_HANDLE_MS = 4000L
         private const val SQRT2 = 1.4142135f

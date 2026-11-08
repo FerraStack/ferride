@@ -249,6 +249,29 @@ class WorkbenchScreenshotTest {
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
     fun tabletSearchSafLight() = shoot("tablet_search_saf", dark = false, backend = safBackend) { it.showView(SideView.Search) }
 
+    // ----- Multi-cursor ----------------------------------------------------------------
+
+    /** Ctrl+Shift+L on `counts`: a selection and caret on every occurrence. */
+    private fun multiCursor(s: WorkbenchState) {
+        val view = s.editor as CodeEditorView
+        view.requestFocus()
+        view.selectAllOccurrences()
+    }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneMultiCursorDark() = shoot("phone_multi_cursor", dark = true, afterContent = ::multiCursor) {
+        val m = it.activeModel!!
+        val at = m.text().indexOf("counts")
+        m.selection = Sel(at, at + "counts".length)
+    }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletMultiCursorLight() = shoot("tablet_multi_cursor", dark = false, afterContent = ::multiCursor) {
+        val m = it.activeModel!!
+        val at = m.text().indexOf("counts")
+        m.selection = Sel(at, at + "counts".length)
+    }
+
     // ----- Split editor ---------------------------------------------------------------
 
     /** main.rs on the left, app.ts opened next to a second view of main.rs on the right. */

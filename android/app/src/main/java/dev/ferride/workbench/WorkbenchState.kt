@@ -1196,6 +1196,18 @@ class WorkbenchState(
         editCmd("redo.alt", "Redo", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_Z, shift = true), inPalette = false) { editor?.redo() }
         editCmd(CommandIds.SELECT_ALL, "Select All", "Selection", KeyChord.ctrl(KeyEvent.KEYCODE_A)) { editor?.selectAll() }
         editCmd(CommandIds.COPY, "Copy", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_C)) { editor?.copy() }
+        editCmd(CommandIds.ADD_NEXT_MATCH, "Add Selection to Next Find Match", "Selection", KeyChord.ctrl(KeyEvent.KEYCODE_D)) {
+            editor?.addSelectionToNextFindMatch()
+        }
+        editCmd(CommandIds.SELECT_HIGHLIGHTS, "Select All Occurrences of Find Match", "Selection", KeyChord.ctrl(KeyEvent.KEYCODE_L, shift = true)) {
+            editor?.selectAllOccurrences()
+        }
+        editCmd(CommandIds.CURSOR_ABOVE, "Add Cursor Above", "Selection", KeyChord(KeyEvent.KEYCODE_DPAD_UP, ctrl = true, alt = true)) {
+            editor?.insertCursor(above = true)
+        }
+        editCmd(CommandIds.CURSOR_BELOW, "Add Cursor Below", "Selection", KeyChord(KeyEvent.KEYCODE_DPAD_DOWN, ctrl = true, alt = true)) {
+            editor?.insertCursor(above = false)
+        }
         editCmd(CommandIds.CUT, "Cut", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_X)) { editor?.cut() }
         editCmd(CommandIds.PASTE, "Paste", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_V)) { editor?.paste() }
         cmd(CommandIds.FORMAT, "Format Document", null, KeyChord(KeyEvent.KEYCODE_F, shift = true, alt = true), hasEditor) {

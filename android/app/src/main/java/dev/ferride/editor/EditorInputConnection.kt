@@ -31,6 +31,7 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
 
     private fun replaceForIme(text: CharSequence, newCursorPosition: Int, composing: Boolean): Boolean {
         val m = view.liveModel ?: return false
+        if (m.selections.size > 1) return replaceAtEveryCursor(m, text.toString(), composing)
         val sel = m.selection
         val (start, end) = view.composingRange() ?: (sel.start to sel.end)
         val s = text.toString()
@@ -46,6 +47,32 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
         if (composing && s.isNotEmpty()) view.setComposing(start, newEnd) else view.clearComposing()
         val cursor = if (newCursorPosition > 0) newEnd + newCursorPosition - 1 else start + newCursorPosition
         m.selection = Sel.caret(cursor.coerceIn(0, m.length))
+        view.afterEdit(fromIme = true)
+        return true
+    }
+
+    /**
+     * Multi-cursor typing: the composition is mirrored at every cursor (each
+     * update replaces what was composed so far before each cursor), like VS
+     * Code. The IME sees the primary cursor's composing region.
+     */
+    private fun replaceAtEveryCursor(m: EditorModel, s: String, composing: Boolean): Boolean {
+        val before = view.multiComposingLength
+        if (s == "\n" && !composing) {
+            if (before > 0) m.replaceAroundSelections(before, 0, "", true)
+            view.clearComposing()
+            m.newline()
+            view.afterEdit(fromIme = true)
+            return true
+        }
+        m.replaceAroundSelections(before, 0, s, true)
+        val head = m.selection.head
+        if (composing && s.isNotEmpty()) {
+            view.setComposing(head - s.length, head)
+            view.multiComposingLength = s.length
+        } else {
+            view.clearComposing()
+        }
         view.afterEdit(fromIme = true)
         return true
     }
@@ -85,6 +112,8 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
         val a = minOf(start, end).coerceIn(0, m.length)
         val b = maxOf(start, end).coerceIn(0, m.length)
         if (a == b) view.clearComposing() else view.setComposing(a, b)
+        // Re-composing the word before the cursors (Gboard on backspace) with several cursors.
+        if (m.selections.size > 1 && a != b && b == m.selection.head) view.multiComposingLength = b - a
         view.invalidate()
         return true
     }
@@ -97,6 +126,13 @@ class EditorInputConnection(private val view: CodeEditorView) : BaseInputConnect
 
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
         val m = view.liveModel ?: return false
+        if (m.selections.size > 1) {
+            // Backspace from the keyboard deletes at every cursor.
+            m.replaceAroundSelections(beforeLength, afterLength, "", true)
+            view.clearComposing()
+            view.afterEdit(fromIme = true)
+            return true
+        }
         val sel = m.selection
         // After first, so the "before" offsets stay valid.
         if (afterLength > 0) m.replace(sel.end, minOf(m.length, sel.end + afterLength), "", true)

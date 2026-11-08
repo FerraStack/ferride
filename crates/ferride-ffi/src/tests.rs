@@ -328,3 +328,34 @@ fn grapheme_navigation_in_utf16() {
     doc.backspace();
     assert_eq!(doc.text(), "ab");
 }
+
+#[test]
+fn multi_cursor_selections_and_ime_typing() {
+    let doc = Document::new("ab\nab\nab".into(), None);
+    doc.set_selections(
+        vec![
+            SelectionRange { anchor: 2, head: 2 },
+            SelectionRange { anchor: 5, head: 5 },
+            SelectionRange { anchor: 8, head: 8 },
+        ],
+        1,
+    );
+    assert_eq!(doc.selections().len(), 3);
+    assert_eq!(doc.primary_selection_index(), 1);
+    // Composition "c" then "cd" at every cursor, then a commit of "cd!".
+    doc.replace_around_selections(0, 0, "c".into(), true);
+    doc.replace_around_selections(1, 0, "cd".into(), true);
+    doc.replace_around_selections(2, 0, "cd!".into(), true);
+    assert_eq!(doc.text(), "abcd!\nabcd!\nabcd!");
+    // Backspace through the IME at every cursor.
+    doc.replace_around_selections(1, 0, String::new(), true);
+    assert_eq!(doc.text(), "abcd\nabcd\nabcd");
+    assert_eq!(doc.selection(), SelectionRange { anchor: 9, head: 9 });
+    // One undo step for the whole run.
+    let mut steps = vec![];
+    while doc.can_undo() {
+        doc.undo();
+        steps.push(doc.text());
+    }
+    assert_eq!(steps, vec!["ab\nab\nab".to_string()]);
+}

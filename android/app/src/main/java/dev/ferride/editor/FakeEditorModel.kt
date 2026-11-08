@@ -35,10 +35,62 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
     override fun detectLanguage(): String? = languageFor(fileName).also { language = it }
     override var version: Long = 0
         private set
-    override var selection: Sel = Sel.caret(0)
+    private var sels: List<Sel> = listOf(Sel.caret(0))
+    override var primaryIndex: Int = 0
+        private set
+
+    private fun clampSel(s: Sel) = Sel(s.anchor.coerceIn(0, length), s.head.coerceIn(0, length))
+
+    override var selection: Sel
+        get() = sels[primaryIndex]
         set(value) {
-            field = Sel(value.anchor.coerceIn(0, length), value.head.coerceIn(0, length))
+            sels = listOf(clampSel(value))
+            primaryIndex = 0
         }
+    override val selections: List<Sel> get() = sels
+
+    override fun setSelections(sels: List<Sel>, primary: Int) {
+        if (sels.isEmpty()) return
+        val primarySel = clampSel(sels[primary.coerceIn(0, sels.lastIndex)])
+        // Sort and merge overlapping ranges, like the core.
+        val merged = mutableListOf<Sel>()
+        for (s in sels.map(::clampSel).sortedWith(compareBy({ it.start }, { it.end }))) {
+            val last = merged.lastOrNull()
+            if (last != null && (s.start < last.end || s.start == last.end && s.isEmpty || s == last)) {
+                merged[merged.lastIndex] = Sel(last.start, maxOf(last.end, s.end))
+            } else {
+                merged += s
+            }
+        }
+        this.sels = merged
+        primaryIndex = merged.indexOfFirst { primarySel.head in it.start..it.end }.coerceAtLeast(0)
+    }
+
+    /** Applies one edit per selection (left to right), leaving a caret after each insertion. */
+    private fun editEach(typing: Boolean, edit: (Sel) -> Triple<Int, Int, String>?) {
+        live()
+        snapshot()
+        var shift = 0
+        val carets = sels.map { s ->
+            val shifted = Sel(s.anchor + shift, s.head + shift)
+            val e = edit(shifted)
+            if (e == null) {
+                shifted
+            } else {
+                val (a, b, text) = e
+                sb.replace(a, b, text)
+                shift += text.length - (b - a)
+                Sel.caret(a + text.length)
+            }
+        }
+        version++
+        val primary = primaryIndex
+        sels = carets
+        primaryIndex = primary
+    }
+
+    override fun replaceAroundSelections(before: Int, after: Int, text: String, typing: Boolean) =
+        editEach(typing) { s -> Triple((s.start - before).coerceAtLeast(0), (s.end + after).coerceAtMost(sb.length), text) }
 
     override val lineCount: Int get() = live().count { it == '\n' } + 1
     override val length: Int get() = live().length
@@ -141,14 +193,12 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
         return a + text.length
     }
 
-    override fun insert(text: String, typing: Boolean) {
-        replace(selection.start, selection.end, text, typing)
-    }
+    override fun insert(text: String, typing: Boolean) = editEach(typing) { s -> Triple(s.start, s.end, text) }
 
-    override fun newline() {
-        val line = lineOfOffset(selection.start)
+    override fun newline() = editEach(false) { s ->
+        val line = lineOfOffset(s.start)
         val indent = textRange(lineStart(line), lineEnd(line)).takeWhile { it == ' ' || it == '\t' }
-        insert("\n$indent", false)
+        Triple(s.start, s.end, "\n$indent")
     }
 
     override fun graphemeBefore(offset: Int): Int {
@@ -165,16 +215,20 @@ class FakeEditorModel(text: String, override val fileName: String) : EditorModel
         return it.following(o).let { if (it == BreakIterator.DONE) sb.length else it }
     }
 
-    override fun backspace() {
-        val s = selection
-        if (!s.isEmpty) replace(s.start, s.end, "", true)
-        else if (s.head > 0) replace(sb.offsetByCodePoints(s.head, -1), s.head, "", true)
+    override fun backspace() = editEach(true) { s ->
+        when {
+            !s.isEmpty -> Triple(s.start, s.end, "")
+            s.head > 0 -> Triple(sb.offsetByCodePoints(s.head, -1), s.head, "")
+            else -> null
+        }
     }
 
-    override fun deleteForward() {
-        val s = selection
-        if (!s.isEmpty) replace(s.start, s.end, "", true)
-        else if (s.head < sb.length) replace(s.head, graphemeAfter(s.head), "", true)
+    override fun deleteForward() = editEach(true) { s ->
+        when {
+            !s.isEmpty -> Triple(s.start, s.end, "")
+            s.head < sb.length -> Triple(s.head, graphemeAfter(s.head), "")
+            else -> null
+        }
     }
 
     override fun undo(): Boolean {

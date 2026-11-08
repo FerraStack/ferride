@@ -21,6 +21,13 @@ interface EditorActions {
     /** Replaces a range as one undo step (find/replace). */
     fun replaceRange(start: Int, end: Int, text: String)
 
+    /** Ctrl+D: select the word, then add the next occurrence as another cursor. */
+    fun addSelectionToNextFindMatch() {}
+    /** Ctrl+Shift+L: a cursor on every occurrence. */
+    fun selectAllOccurrences() {}
+    /** Ctrl+Alt+Up/Down: add a cursor on the line above/below. */
+    fun insertCursor(above: Boolean) {}
+
     enum class Direction { Left, Right, Up, Down, LineStart, LineEnd, PageUp, PageDown }
 }
 

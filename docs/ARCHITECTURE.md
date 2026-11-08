@@ -113,7 +113,8 @@ Split editors share one `EditorModel` per file: edits, dirty dots and saves show
 
 Done now: current line highlight, indent guides, bracket pair colorization (bracket tokens and depths come from the tree-sitter tree in Rust, so brackets in strings/comments are ignored), line numbers, **word wrap** (`editor.wordWrap`; the default is on for compact/phone windows and off otherwise, continuation rows indented like the line, numbers only on the first visual row), thin scrollbars (horizontal when wrap is off), find/replace widget (case/word/regex, n of m, replace/replace all), diagnostics squiggles + Problems panel, VS Code-style copy/cut of the whole line without a selection, smart Home, auto-indent on Enter, unsaved-changes prompt on close.
 Done in M1: selection handles and floating toolbar (#8).
-Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already supports it), snippets in VS Code snippet JSON format, sticky scroll, code folding.
+Done: **multi-cursor**: Ctrl+D (`editor.action.addSelectionToNextFindMatch`), Ctrl+Shift+L (`editor.action.selectHighlights`), Ctrl+Alt+Up/Down (`editor.action.insertCursorAbove/Below`), Alt+click; arrows, typing, Backspace/Delete and Enter act at every cursor; IME compositions are mirrored at every cursor (`replaceAroundSelections`), and a multi-cursor typing run is one undo step (the history merges multi-change transactions change by change); Esc returns to one cursor; the status bar shows "N selections".
+Planned: minimap (optional, off on phones), snippets in VS Code snippet JSON format, sticky scroll, code folding.
 
 ## Syntax highlighting
 
