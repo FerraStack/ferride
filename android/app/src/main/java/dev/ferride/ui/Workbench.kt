@@ -29,10 +29,13 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ferride.theme.LocalWorkbenchColors
@@ -80,6 +83,8 @@ fun FerrideWorkbench(
             onSurface = colors.inputForeground,
         )
     }
+    val clipboard = LocalClipboardManager.current
+    SideEffect { state.setClipboard = { clipboard.setText(AnnotatedString(it)) } }
     val config = LocalConfiguration.current
     val keyboardUp = imeVisible ?: WindowInsets.isImeVisible
     val hasHardwareKeyboard = hardwareKeyboard ?: (
@@ -140,6 +145,31 @@ fun FerrideWorkbench(
                 if (state.paletteOpen) {
                     CommandPalette(state, maxWidth)
                     BackHandler { state.paletteOpen = false }
+                }
+
+                state.contextMenu?.let { menu ->
+                    ContextMenuOverlay(menu) { state.contextMenu = null }
+                }
+
+                state.deleteRequest?.let { node ->
+                    AlertDialog(
+                        onDismissRequest = { state.deleteRequest = null },
+                        containerColor = colors.quickInputBackground,
+                        title = {
+                            Text(
+                                if (node.isDir) {
+                                    "Are you sure you want to permanently delete '${node.name}' and its contents?"
+                                } else {
+                                    "Are you sure you want to permanently delete '${node.name}'?"
+                                },
+                                color = colors.inputForeground,
+                                fontSize = 16.sp,
+                            )
+                        },
+                        text = { Text("This action is irreversible!", color = colors.descriptionForeground, fontSize = 13.sp) },
+                        confirmButton = { TextButton({ state.confirmDelete() }) { Text("Delete") } },
+                        dismissButton = { TextButton({ state.deleteRequest = null }) { Text("Cancel") } },
+                    )
                 }
 
                 state.closeRequest?.let { tab ->

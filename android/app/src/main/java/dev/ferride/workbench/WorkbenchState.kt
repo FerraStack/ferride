@@ -50,6 +50,16 @@ class EditorTab(val path: String, val model: EditorModel?, val kind: TabKind = T
     var revision by mutableIntStateOf(0)
 }
 
+/**
+ * The Explorer's inline name box (VS Code edits names in the tree itself):
+ * a new file or folder inside [parent], or renaming [target].
+ */
+data class ExplorerEdit(val kind: Kind, val parent: String, val target: FileNode? = null) {
+    enum class Kind { NewFile, NewFolder, Rename }
+
+    val initial: String get() = target?.name ?: ""
+}
+
 enum class PaletteMode(val prefix: String, val placeholder: String) {
     Files("", "Search files by name (append : to go to line or @ to go to symbol)"),
     Commands(">", "Search commands"),
@@ -318,6 +328,185 @@ class WorkbenchState(
             expanded += path
             if (path !in tree) loadDir(path)
         }
+    }
+
+    // ----- explorer actions ----------------------------------------------------
+
+    /** The inline new-file / new-folder / rename box, if open. */
+    var explorerEdit by mutableStateOf<ExplorerEdit?>(null)
+        private set
+    /** "Delete 'x'?" confirmation. */
+    var deleteRequest by mutableStateOf<FileNode?>(null)
+    /** The open context menu (long press), drawn by the workbench. */
+    var contextMenu by mutableStateOf<ContextMenuRequest?>(null)
+    /** A path the Explorer should scroll to (Reveal Active File). */
+    var revealRequest by mutableStateOf<String?>(null)
+    /** Copies text to the system clipboard (set by the UI). */
+    var setClipboard: (String) -> Unit = {}
+
+    private val rootNode: FileNode get() = FileNode(backend.name, backend.root, "", true, false)
+
+    /** Folder that new files go into: the given one, else the active file's folder, else the root. */
+    private fun targetDir(dir: String?): String =
+        dir ?: activeTab?.takeIf { it.kind == TabKind.File && it.path.startsWith(backend.root) }?.path?.substringBeforeLast('/')
+            ?: backend.root
+
+    fun startNewFile(dir: String? = null) = startEdit(ExplorerEdit(ExplorerEdit.Kind.NewFile, targetDir(dir)))
+    fun startNewFolder(dir: String? = null) = startEdit(ExplorerEdit(ExplorerEdit.Kind.NewFolder, targetDir(dir)))
+    fun startRename(node: FileNode) = startEdit(ExplorerEdit(ExplorerEdit.Kind.Rename, node.path.substringBeforeLast('/'), node))
+
+    private fun startEdit(edit: ExplorerEdit) {
+        activeView = SideView.Explorer
+        sideBarVisible = true
+        // The box shows inside its folder, so open the folder (and its parents).
+        expandTo(edit.parent)
+        explorerEdit = edit
+    }
+
+    fun cancelExplorerEdit() {
+        explorerEdit = null
+    }
+
+    /** VS Code's validation messages for the name box; null when [name] is acceptable. */
+    fun validateName(edit: ExplorerEdit, name: String): String? {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return "A file or folder name must be provided."
+        if (trimmed.startsWith('/') || trimmed.endsWith('/') || trimmed.split('/').any { it == ".." || it == "." || it.isEmpty() }) {
+            return "The name **$trimmed** is not valid as a file or folder name. Please choose a different name."
+        }
+        if (edit.kind == ExplorerEdit.Kind.Rename && trimmed == edit.target?.name) return null
+        val siblings = tree[edit.parent].orEmpty()
+        if (siblings.any { it.name == trimmed.substringBefore('/') && !trimmed.contains('/') }) {
+            return "A file or folder **$trimmed** already exists at this location. Please choose a different name."
+        }
+        return null
+    }
+
+    /** Applies the name box (Enter). Names may contain `/` to create nested folders, like VS Code. */
+    fun commitExplorerEdit(name: String) {
+        val edit = explorerEdit ?: return
+        val trimmed = name.trim()
+        if (validateName(edit, trimmed) != null) return
+        explorerEdit = null
+        if (edit.kind == ExplorerEdit.Kind.Rename && trimmed == edit.target?.name) return
+        val path = "${edit.parent}/$trimmed"
+        scope.launch {
+            val result = withContext(io) {
+                runCatching {
+                    when (edit.kind) {
+                        ExplorerEdit.Kind.NewFile -> backend.createFile(path)
+                        ExplorerEdit.Kind.NewFolder -> backend.createDir(path)
+                        ExplorerEdit.Kind.Rename -> backend.rename(edit.target!!.path, path)
+                    }
+                }
+            }
+            result.onFailure { message = it.message }.onSuccess { created ->
+                refreshDir(edit.parent)
+                when (edit.kind) {
+                    ExplorerEdit.Kind.NewFile -> {
+                        trimmed.substringBeforeLast('/', "").takeIf { it.isNotEmpty() }?.let { expandTo("${edit.parent}/$it") }
+                        openFile(created, preview = false)
+                    }
+                    ExplorerEdit.Kind.NewFolder -> expandTo(created)
+                    ExplorerEdit.Kind.Rename -> retarget(edit.target!!.path, created)
+                }
+            }
+        }
+    }
+
+    /** Open editors follow a renamed file or folder. */
+    private fun retarget(from: String, to: String) {
+        tabs.forEachIndexed { i, tab ->
+            if (tab.kind == TabKind.File && (tab.path == from || tab.path.startsWith("$from/"))) {
+                val moved = EditorTab(to + tab.path.removePrefix(from), tab.model, tab.kind)
+                moved.preview = tab.preview
+                moved.dirty = tab.dirty
+                tabs[i] = moved
+            }
+        }
+        if (expanded.remove(from)) expanded += to
+        tree.remove(from)
+    }
+
+    fun requestDelete(node: FileNode) {
+        deleteRequest = node
+    }
+
+    /** Confirmed delete: removes the file or folder and closes its editors. */
+    fun confirmDelete() {
+        val node = deleteRequest ?: return
+        deleteRequest = null
+        scope.launch {
+            val r = withContext(io) { runCatching { backend.delete(node.path) } }
+            r.onFailure { message = it.message }.onSuccess {
+                for (i in tabs.indices.reversed()) {
+                    val t = tabs[i]
+                    if (t.kind == TabKind.File && (t.path == node.path || t.path.startsWith("${node.path}/"))) closeTab(i)
+                }
+                expanded.removeAll { it == node.path || it.startsWith("${node.path}/") }
+                tree.keys.filter { it == node.path || it.startsWith("${node.path}/") }.forEach { tree.remove(it) }
+                refreshDir(node.path.substringBeforeLast('/'))
+            }
+        }
+    }
+
+    fun copyPath(node: FileNode, relative: Boolean) {
+        setClipboard(if (relative) node.relPath else node.path)
+    }
+
+    /** Re-reads one folder (after a change made here or outside). */
+    fun refreshDir(dir: String) {
+        backend.refresh(dir)
+        loadDir(dir)
+    }
+
+    /** Refresh Explorer: re-reads the root and every expanded folder. */
+    fun refreshExplorer() {
+        backend.refresh(backend.root)
+        loadDir(backend.root)
+        expanded.toList().forEach(::loadDir)
+    }
+
+    fun collapseExplorer() {
+        expanded.clear()
+    }
+
+    /** Expands [dir] and every folder above it (loading them as needed). */
+    private fun expandTo(dir: String) {
+        val root = backend.root
+        if (!dir.startsWith(root)) return
+        var path = root
+        for (part in dir.removePrefix(root).trim('/').split('/').filter { it.isNotEmpty() }) {
+            path = "$path/$part"
+            if (path !in expanded) expanded += path
+            if (path !in tree) loadDir(path)
+        }
+    }
+
+    /** File: Reveal Active File in Explorer View. */
+    fun revealActiveFile() {
+        val path = activeTab?.takeIf { it.kind == TabKind.File }?.path ?: return
+        activeView = SideView.Explorer
+        sideBarVisible = true
+        expandTo(path.substringBeforeLast('/'))
+        revealRequest = path
+    }
+
+    /** Long press on an Explorer row: VS Code's context menu for files and folders. */
+    fun openExplorerMenu(node: FileNode, x: Float, y: Float) {
+        val dir = if (node.isDir) node.path else node.path.substringBeforeLast('/')
+        val items = buildList {
+            if (node.isDir) {
+                add(ContextMenuItem("New File…") { startNewFile(dir) })
+                add(ContextMenuItem("New Folder…") { startNewFolder(dir) })
+            }
+            add(ContextMenuItem("Copy Path", keybinding = "Shift+Alt+C", separatorBefore = node.isDir) { copyPath(node, relative = false) })
+            add(ContextMenuItem("Copy Relative Path") { copyPath(node, relative = true) })
+            val isRoot = node.path == backend.root
+            add(ContextMenuItem("Rename…", keybinding = "F2", enabled = !isRoot, separatorBefore = true) { startRename(node) })
+            add(ContextMenuItem("Delete", keybinding = "Delete", enabled = !isRoot) { requestDelete(node) })
+        }
+        contextMenu = ContextMenuRequest(x, y, items)
     }
 
     // ----- editors ---------------------------------------------------------
@@ -716,6 +905,18 @@ class WorkbenchState(
         }
         cmd(CommandIds.QUICK_OPEN, "Go to File…", null, KeyChord.ctrl(KeyEvent.KEYCODE_P)) { openPalette(PaletteMode.Files) }
         cmd(CommandIds.OPEN_FOLDER, "Open Folder…", "File", enabled = { host != null }) { host?.pickFolder() }
+        cmd(CommandIds.EXPLORER_NEW_FILE, "New File…", "File") { startNewFile() }
+        cmd(CommandIds.EXPLORER_NEW_FOLDER, "New Folder…", "File") { startNewFolder() }
+        cmd(CommandIds.REFRESH_EXPLORER, "Refresh Explorer", "File") { refreshExplorer() }
+        cmd(CommandIds.COLLAPSE_EXPLORER, "Collapse Folders in Explorer", "File") { collapseExplorer() }
+        val hasFile = { activeTab?.kind == TabKind.File }
+        cmd(CommandIds.REVEAL_IN_EXPLORER, "Reveal Active File in Explorer View", "File", enabled = hasFile) { revealActiveFile() }
+        cmd(CommandIds.COPY_PATH, "Copy Path of Active File", "File", KeyChord(KeyEvent.KEYCODE_C, shift = true, alt = true), hasFile) {
+            activeTab?.let { setClipboard(it.path) }
+        }
+        cmd(CommandIds.COPY_RELATIVE_PATH, "Copy Relative Path of Active File", "File", enabled = hasFile) {
+            activeTab?.let { setClipboard(it.path.removePrefix(backend.root).trimStart('/')) }
+        }
         cmd(
             CommandIds.COPY_INTO_PROJECTS,
             "Copy Folder into Ferride Projects",

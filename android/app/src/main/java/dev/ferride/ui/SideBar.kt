@@ -1,5 +1,26 @@
 package dev.ferride.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import dev.ferride.workbench.CommandIds
+import dev.ferride.workbench.ExplorerEdit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,7 +35,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -66,65 +86,250 @@ fun SideBar(state: WorkbenchState, modifier: Modifier = Modifier) {
 
 // ----- Explorer ----------------------------------------------------------------
 
-@Composable
-private fun Explorer(state: WorkbenchState) {
-    val c = LocalWorkbenchColors.current
-    Row(Modifier.fillMaxWidth().height(24.dp).padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.KeyboardArrowDown, null, tint = c.sideBarForeground, modifier = Modifier.size(16.dp))
-        Text(state.backend.name.uppercase(), color = c.sideBarForeground, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+/** Where a row is on screen, for anchoring its long-press menu (not state: no recomposition). */
+class CoordsHolder {
+    var value: LayoutCoordinates? = null
+}
+
+/** A flattened Explorer row: a file/folder, or the inline name box. */
+private sealed interface ExplorerRow {
+    val key: String
+
+    data class Node(val node: FileNode, val depth: Int) : ExplorerRow {
+        override val key get() = node.path
     }
-    val activePath = state.activeTab?.path
-    LazyColumn(Modifier.fillMaxSize()) {
-        treeItems(state, state.backend.root, 0, activePath)
+
+    data class Edit(val edit: ExplorerEdit, val depth: Int) : ExplorerRow {
+        override val key get() = "edit:${edit.parent}:${edit.kind}"
     }
 }
 
-private fun LazyListScope.treeItems(state: WorkbenchState, dir: String, depth: Int, activePath: String?) {
-    val children = state.tree[dir] ?: return
-    for (node in children) {
-        item(key = node.path) { TreeRow(state, node, depth, node.path == activePath) }
-        if (node.isDir && node.path in state.expanded) treeItems(state, node.path, depth + 1, activePath)
+private fun explorerRows(state: WorkbenchState): List<ExplorerRow> {
+    val out = mutableListOf<ExplorerRow>()
+    val edit = state.explorerEdit
+    fun walk(dir: String, depth: Int) {
+        // New items get their name box at the top of their folder, like VS Code.
+        if (edit != null && edit.kind != ExplorerEdit.Kind.Rename && edit.parent == dir) out += ExplorerRow.Edit(edit, depth)
+        for (node in state.tree[dir].orEmpty()) {
+            if (edit?.kind == ExplorerEdit.Kind.Rename && edit.target?.path == node.path) {
+                out += ExplorerRow.Edit(edit, depth)
+            } else {
+                out += ExplorerRow.Node(node, depth)
+            }
+            if (node.isDir && node.path in state.expanded) walk(node.path, depth + 1)
+        }
+    }
+    walk(state.backend.root, 0)
+    return out
+}
+
+@Composable
+private fun Explorer(state: WorkbenchState) {
+    val c = LocalWorkbenchColors.current
+    val headerCoords = remember { CoordsHolder() }
+    // Section header with VS Code's title actions (always visible on touch).
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .onGloballyPositioned { headerCoords.value = it }
+            .pointerInput(state.backend.root) {
+                detectTapGestures(onLongPress = { at ->
+                    val p = headerCoords.value?.localToRoot(at) ?: at
+                    state.openExplorerMenu(FileNode(state.backend.name, state.backend.root, "", true, false), p.x, p.y)
+                })
+            }
+            .padding(start = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.KeyboardArrowDown, null, tint = c.sideBarForeground, modifier = Modifier.size(16.dp))
+        Text(
+            state.backend.name.uppercase(),
+            color = c.sideBarForeground,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        ExplorerAction(Codicon.NEW_FILE, "New File…") { state.commands.execute(CommandIds.EXPLORER_NEW_FILE) }
+        ExplorerAction(Codicon.NEW_FOLDER, "New Folder…") { state.commands.execute(CommandIds.EXPLORER_NEW_FOLDER) }
+        ExplorerAction(Codicon.REFRESH, "Refresh Explorer") { state.commands.execute(CommandIds.REFRESH_EXPLORER) }
+        ExplorerAction(Codicon.COLLAPSE_ALL, "Collapse Folders in Explorer") { state.commands.execute(CommandIds.COLLAPSE_EXPLORER) }
+    }
+    val activePath = state.activeTab?.path
+    val rows = explorerRows(state)
+    val listState = rememberLazyListState()
+    val reveal = state.revealRequest
+    LaunchedEffect(reveal, rows.size) {
+        if (reveal != null) {
+            val i = rows.indexOfFirst { it is ExplorerRow.Node && it.node.path == reveal }
+            if (i >= 0) {
+                listState.animateScrollToItem((i - 3).coerceAtLeast(0))
+                state.revealRequest = null
+            }
+        }
+    }
+    LazyColumn(Modifier.fillMaxSize(), state = listState) {
+        items(rows, key = { it.key }) { row ->
+            when (row) {
+                is ExplorerRow.Node -> TreeRow(state, row.node, row.depth, row.node.path == activePath)
+                is ExplorerRow.Edit -> NameBox(state, row.edit, row.depth)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExplorerAction(glyph: Char, description: String, onClick: () -> Unit) {
+    val c = LocalWorkbenchColors.current
+    Box(
+        Modifier.size(32.dp, 28.dp).clickable(role = Role.Button, onClickLabel = description, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        CodiconIcon(glyph, c.sideBarForeground, description = description)
     }
 }
 
 @Composable
 private fun TreeRow(state: WorkbenchState, node: FileNode, depth: Int, active: Boolean) {
     val c = LocalWorkbenchColors.current
+    val coords = remember { CoordsHolder() }
     Row(
         Modifier
             .fillMaxWidth()
             .height(30.dp)
             .background(if (active) c.listActiveSelectionBackground else c.sideBarBackground)
-            .clickable {
-                if (node.isDir) {
-                    state.toggleDir(node.path)
-                } else {
-                    state.openFile(node.path, preview = true)
-                    if (!state.sideBarDocked) state.sideBarVisible = false
+            .onGloballyPositioned { coords.value = it }
+            .pointerInput(node.path) {
+                detectTapGestures(
+                    onTap = {
+                        if (node.isDir) {
+                            state.toggleDir(node.path)
+                        } else {
+                            state.openFile(node.path, preview = true)
+                            if (!state.sideBarDocked) state.sideBarVisible = false
+                        }
+                    },
+                    onLongPress = { at ->
+                        val p = coords.value?.localToRoot(at) ?: at
+                        state.openExplorerMenu(node, p.x, p.y)
+                    },
+                )
+            }
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                // TalkBack's long-press action opens the same menu at the row.
+                onLongClick(label = "Show actions") {
+                    val box = coords.value ?: return@onLongClick false
+                    val p = box.localToRoot(Offset(box.size.width / 2f, box.size.height / 2f))
+                    state.openExplorerMenu(node, p.x, p.y)
+                    true
                 }
             }
             .padding(start = (8 + depth * 12).dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (node.isDir) {
-            Icon(
-                if (node.path in state.expanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                null,
-                tint = c.sideBarForeground,
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(4.dp))
-        } else {
-            Spacer(Modifier.width(4.dp))
-            FileIcon(node.name)
-            Spacer(Modifier.width(4.dp))
-        }
+        RowIcon(node.isDir, node.path in state.expanded, node.name)
         Text(
             node.name,
             color = if (node.isHidden) c.descriptionForeground else c.sideBarForeground,
             fontSize = 13.sp,
             maxLines = 1,
         )
+    }
+}
+
+@Composable
+private fun RowIcon(isDir: Boolean, expanded: Boolean, name: String) {
+    val c = LocalWorkbenchColors.current
+    if (isDir) {
+        Icon(
+            if (expanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            null,
+            tint = c.sideBarForeground,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+    } else {
+        Spacer(Modifier.width(4.dp))
+        FileIcon(name)
+        Spacer(Modifier.width(4.dp))
+    }
+}
+
+/**
+ * VS Code's inline name box in the tree: Enter applies, Back/Esc cancels;
+ * leaving it applies a valid name and cancels otherwise. Validation messages
+ * show under it in `inputValidation.*` colors.
+ */
+@Composable
+private fun NameBox(state: WorkbenchState, edit: ExplorerEdit, depth: Int) {
+    val c = LocalWorkbenchColors.current
+    val focus = remember { FocusRequester() }
+    var value by remember(edit) {
+        // Renaming selects the name without its extension, like VS Code.
+        val name = edit.initial
+        val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
+        mutableStateOf(TextFieldValue(name, TextRange(0, dot)))
+    }
+    val error = if (value.text.isEmpty() && edit.kind != ExplorerEdit.Kind.Rename) null else state.validateName(edit, value.text)
+    var hadFocus by remember(edit) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(start = (8 + depth * 12).dp, end = 8.dp, top = 2.dp, bottom = 2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val isDir = edit.kind == ExplorerEdit.Kind.NewFolder || edit.target?.isDir == true
+            RowIcon(isDir, false, value.text.ifEmpty { "file" })
+            BasicTextField(
+                value = value,
+                onValueChange = { value = it },
+                singleLine = true,
+                textStyle = TextStyle(color = c.inputForeground, fontSize = 13.sp),
+                cursorBrush = SolidColor(c.editorCursor),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done, autoCorrectEnabled = false),
+                keyboardActions = KeyboardActions(onDone = { state.commitExplorerEdit(value.text) }),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(26.dp)
+                    .background(c.inputBackground)
+                    .border(1.dp, if (error != null) c.inputValidationErrorBorder else c.focusBorder)
+                    .padding(horizontal = 4.dp, vertical = 4.dp)
+                    .focusRequester(focus)
+                    .onFocusChanged { f ->
+                        if (f.isFocused) {
+                            hadFocus = true
+                        } else if (hadFocus && state.explorerEdit == edit) {
+                            if (value.text.isNotBlank() && state.validateName(edit, value.text) == null) {
+                                state.commitExplorerEdit(value.text)
+                            } else {
+                                state.cancelExplorerEdit()
+                            }
+                        }
+                    }
+                    .testTag("explorer-name-box"),
+            )
+        }
+        if (error != null) {
+            Text(
+                markdownBold(error),
+                color = c.inputForeground,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier
+                    .padding(start = 24.dp)
+                    .fillMaxWidth()
+                    .background(c.inputValidationErrorBackground)
+                    .border(1.dp, c.inputValidationErrorBorder)
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }
+    }
+    LaunchedEffect(edit) { runCatching { focus.requestFocus() } }
+    BackHandler { state.cancelExplorerEdit() }
+}
+
+/** `**bold**` spans, as VS Code's validation messages use them. */
+private fun markdownBold(text: String): AnnotatedString = buildAnnotatedString {
+    text.split("**").forEachIndexed { i, part ->
+        if (i % 2 == 1) withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part) } else append(part)
     }
 }
 
