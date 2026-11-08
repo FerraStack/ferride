@@ -33,7 +33,13 @@ class ScmScreenshotTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private fun shoot(name: String, dark: Boolean, repo: Boolean = true, setup: (WorkbenchState) -> Unit) {
+    private fun shoot(
+        name: String,
+        dark: Boolean,
+        repo: Boolean = true,
+        saf: Boolean = false,
+        setup: (WorkbenchState) -> Unit,
+    ) {
         val backend = if (saf) FakeWorkspaceBackend(kind = dev.ferride.core.WorkspaceKind.SAF) else FakeWorkspaceBackend()
         val provider = FakeScmProvider(if (repo) FakeScmRepo(backend.root) else null)
         val state = WorkbenchState(
