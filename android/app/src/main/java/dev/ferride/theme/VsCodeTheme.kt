@@ -2,6 +2,7 @@ package dev.ferride.theme
 
 import androidx.compose.ui.graphics.Color
 import dev.ferride.core.StyleKind
+import dev.ferride.editor.TokenStyles
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -10,9 +11,12 @@ import org.json.JSONObject
  * `tokenColors` (TextMate scopes). Unknown keys are ignored; anything the theme
  * doesn't set falls back to the matching built-in theme.
  *
- * Ferride highlights with tree-sitter, so each [StyleKind] is mapped to the
- * TextMate scopes VS Code grammars would produce for the same tokens
- * ([TEXTMATE_SCOPES]); the theme rule that matches the most specific scope wins.
+ * Ferride highlights with tree-sitter and gives every token the TextMate scope
+ * stack VS Code's grammar would produce (Rust `ferride-syntax`); the theme's
+ * `tokenColors` are matched against it with VS Code's rules (descendant
+ * selectors, specificity, `fontStyle`) by Rust `ferride-theme`
+ * ([WorkbenchColors.tokenStyles]). [TEXTMATE_SCOPES] only provides per-class
+ * fallback colors ([WorkbenchColors.tokens]) for previews without the native library.
  */
 object VsCodeTheme {
     /** tree-sitter highlight class → representative TextMate scopes, most specific first. */
@@ -118,6 +122,8 @@ object VsCodeTheme {
             menuSelectionForeground = col("menu.selectionForeground", base.menuSelectionForeground),
             menuSeparator = col("menu.separatorBackground", base.menuSeparator),
             tokens = tokens,
+            tokenStyles = TokenStyles.fromThemeJson(json),
+            kindColors = false,
         )
     }
 

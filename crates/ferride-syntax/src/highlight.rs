@@ -1,10 +1,13 @@
+use std::collections::HashMap;
 use std::ops::Range;
 
 use ferride_buffer::Buffer;
 use ropey::Rope;
 use tree_sitter::{Node, QueryCursor, StreamingIterator, Tree};
 
+use crate::LanguageId;
 use crate::language::LanguageConfig;
+use crate::scope::{self, LayerId, Parent, ScopeId};
 
 /// Theme-independent highlight classes. The UI maps each to a color/style.
 /// The discriminant values are stable (they cross the FFI as integers).
@@ -53,7 +56,7 @@ impl HighlightKind {
             ("string" | "character", _) => String,
             ("number" | "float", _) => Number,
             ("boolean", _) => Constant,
-            ("comment", _) => Comment,
+            ("comment", _) | ("markup", "quote") => Comment,
             ("constant", _) => Constant,
             ("variable", "builtin") => Builtin,
             ("variable" | "parameter", _) => Variable,
@@ -78,6 +81,8 @@ pub struct HighlightSpan {
     pub start_byte: usize,
     pub end_byte: usize,
     pub kind: HighlightKind,
+    /// TextMate scope stack of the token (see [`crate::scope_stack`]).
+    pub scope: ScopeId,
 }
 
 /// A highlighted range within one line, in UTF-16 columns.
@@ -86,6 +91,7 @@ pub struct LineSpan {
     pub start_col: usize,
     pub end_col: usize,
     pub kind: HighlightKind,
+    pub scope: ScopeId,
 }
 
 /// Runs the highlight query over `window` and paints the captures into
@@ -100,12 +106,14 @@ pub struct LineSpan {
 /// capture paints plain text over its node; other captures without a
 /// highlight class are ignored.
 pub(crate) fn paint(
-    config: &LanguageConfig,
+    language: LanguageId,
+    layer: LayerId,
     tree: &Tree,
     rope: &Rope,
     window: Range<usize>,
-    paint: &mut [HighlightKind],
+    paint: &mut [ScopeId],
 ) {
+    let config: &LanguageConfig = language.config();
     if window.is_empty() {
         return;
     }
@@ -118,8 +126,18 @@ pub(crate) fn paint(
             .map(str::as_bytes)
     };
 
-    // (start, end, pattern, kind)
-    let mut caps: Vec<(usize, usize, usize, HighlightKind)> = Vec::new();
+    let names = config.query.capture_names();
+    struct Cap {
+        start: usize,
+        end: usize,
+        node: Range<usize>,
+        pattern: usize,
+        kind: HighlightKind,
+        token: &'static str,
+        /// The token's first and last characters (for quote punctuation).
+        ends: (char, char),
+    }
+    let mut caps: Vec<Cap> = Vec::new();
     let mut it = cursor.captures(&config.query, tree.root_node(), text);
     while let Some((m, idx)) = it.next() {
         let cap = m.captures()[*idx];
@@ -128,40 +146,163 @@ pub(crate) fn paint(
         };
         let r = cap.node.byte_range();
         let (start, end) = (r.start.max(window.start), r.end.min(window.end));
-        if start < end {
-            caps.push((start, end, m.pattern_index, kind));
+        if start >= end {
+            continue;
         }
+        let prefix = token_prefix(rope, r.clone());
+        let token = if kind == HighlightKind::Plain {
+            ""
+        } else {
+            scope::token_scope(names[cap.index as usize], language, &prefix, cap.node)
+        };
+        let end_char = rope.byte_to_char(r.end.min(rope.len_bytes()));
+        let last = if end_char > 0 {
+            rope.char(end_char - 1)
+        } else {
+            ' '
+        };
+        caps.push(Cap {
+            start,
+            end,
+            node: r,
+            pattern: m.pattern_index,
+            kind,
+            token,
+            ends: (prefix.chars().next().unwrap_or(' '), last),
+        });
     }
     // Outer before inner; for equal ranges, the winning pattern last so it
     // paints over the others.
     caps.sort_by(|a, b| {
         let by_pattern = if config.first_wins {
-            b.2.cmp(&a.2)
+            b.pattern.cmp(&a.pattern)
         } else {
-            a.2.cmp(&b.2)
+            a.pattern.cmp(&b.pattern)
         };
-        a.0.cmp(&b.0).then(b.1.cmp(&a.1)).then(by_pattern)
+        a.start.cmp(&b.start).then(b.end.cmp(&a.end)).then(by_pattern)
     });
-    for (start, end, _, kind) in caps {
-        paint[start - window.start..end - window.start].fill(kind);
+
+    // A capture inside another capture's node nests its scope in the outer
+    // one's stack (an escape inside a string); a capture of the same node
+    // replaces it. Paint that predates this call (a Markdown heading under
+    // the inline grammar's emphasis) is an enclosing scope too.
+    let mut owner: Vec<usize> = vec![usize::MAX; paint.len()];
+    let mut memo: HashMap<(Parent, &'static str, HighlightKind), ScopeId> = HashMap::new();
+    let mut id_for = |parent: Parent, token: &'static str, kind: HighlightKind| -> ScopeId {
+        *memo
+            .entry((parent, token, kind))
+            .or_insert_with(|| scope::intern(parent, token, language, kind))
+    };
+    for (ci, cap) in caps.iter().enumerate() {
+        for p in cap.start..cap.end {
+            let i = p - window.start;
+            if cap.kind == HighlightKind::Plain {
+                paint[i] = 0;
+                owner[i] = ci;
+                continue;
+            }
+            let current = paint[i];
+            let parent = match owner.get(i).copied() {
+                _ if current == 0 => Parent::Layer(layer),
+                Some(o) if o != usize::MAX && caps[o].node == cap.node => {
+                    scope::parent_of(current).unwrap_or(Parent::Layer(layer))
+                }
+                _ => Parent::Style(current),
+            };
+            paint[i] = id_for(parent, cap.token, cap.kind);
+            owner[i] = ci;
+        }
+        // printf-style placeholders inside C, C++ and Go strings.
+        if cap.token.starts_with("string.quoted")
+            && matches!(language, LanguageId::C | LanguageId::Cpp | LanguageId::Go)
+        {
+            let text = rope.byte_slice(cap.node.clone()).to_string();
+            for (a, b) in placeholders(&text) {
+                for at in cap.node.start + a..cap.node.start + b {
+                    if at >= window.start && at < window.end {
+                        let i = at - window.start;
+                        paint[i] = id_for(Parent::Style(paint[i]), "constant.other.placeholder", cap.kind);
+                    }
+                }
+            }
+        }
+        // Quotes are punctuation inside the string, as in TextMate grammars.
+        let quote_scopes = match cap.token {
+            t if t.starts_with("string.quoted") => Some((
+                "punctuation.definition.string.begin",
+                "punctuation.definition.string.end",
+            )),
+            "support.type.property-name" => Some((
+                "punctuation.support.type.property-name.begin",
+                "punctuation.support.type.property-name.end",
+            )),
+            _ => None,
+        };
+        let (open, close) = cap.ends;
+        if let Some((begin, end)) = quote_scopes.filter(|_| matches!(open, '"' | '\'' | '`') && close == open)
+        {
+            let close_at = cap.node.end - close.len_utf8();
+            for (at, scope) in [(cap.node.start, begin), (close_at, end)] {
+                if at >= window.start && at < window.end && cap.node.end - cap.node.start >= 2 {
+                    let i = at - window.start;
+                    paint[i] = id_for(Parent::Style(paint[i]), scope, cap.kind);
+                }
+            }
+        }
     }
 }
 
+/// Byte ranges of printf/Go format verbs (`%d`, `%-8.2f`, `%zu`, `%v`) in a string literal.
+fn placeholders(text: &str) -> Vec<(usize, usize)> {
+    let b = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] != b'%' {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        i += 1;
+        while i < b.len() && matches!(b[i], b'-' | b'+' | b' ' | b'#' | b'0'..=b'9' | b'.' | b'*') {
+            i += 1;
+        }
+        while i < b.len() && matches!(b[i], b'h' | b'l' | b'L' | b'q' | b'j' | b'z' | b't') {
+            i += 1;
+        }
+        if i < b.len() && b"diouxXeEfFgGaAcspnvTqbtwU%".contains(&b[i]) {
+            out.push((start, i + 1));
+            i += 1;
+        }
+    }
+    out
+}
+
+/// The first few characters of a token: enough to tell `if` from `fn` or
+/// `///` from `//`, without copying whole comments or strings.
+fn token_prefix(rope: &Rope, bytes: Range<usize>) -> String {
+    let len = rope.len_bytes();
+    let start = rope.byte_to_char(bytes.start.min(len));
+    let end = rope.byte_to_char(bytes.end.min(len));
+    rope.slice(start..end.min(start + 16)).to_string()
+}
+
 /// Merges a painted window into spans (unhighlighted gaps omitted).
-pub(crate) fn spans(paint: &[HighlightKind], window_start: usize) -> Vec<HighlightSpan> {
+pub(crate) fn spans(paint: &[ScopeId], window_start: usize) -> Vec<HighlightSpan> {
     let mut spans: Vec<HighlightSpan> = Vec::new();
     let mut i = 0;
     while i < paint.len() {
-        let kind = paint[i];
+        let id = paint[i];
         let mut j = i + 1;
-        while j < paint.len() && paint[j] == kind {
+        while j < paint.len() && paint[j] == id {
             j += 1;
         }
-        if kind != HighlightKind::Plain {
+        if id != 0 {
             spans.push(HighlightSpan {
                 start_byte: window_start + i,
                 end_byte: window_start + j,
-                kind,
+                kind: scope::kind_of(id),
+                scope: id,
             });
         }
         i = j;
@@ -198,6 +339,7 @@ pub(crate) fn split_into_lines(
                     start_col: col(a),
                     end_col: col(b),
                     kind: s.kind,
+                    scope: s.scope,
                 });
             }
             k += 1;

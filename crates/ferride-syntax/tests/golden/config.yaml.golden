@@ -1,87 +1,87 @@
    1 | # Ferride sample: a CI workflow
-     |   comment      "# Ferride sample: a CI workflow"
+     |   comment      "# Ferride sample: a CI workflow" comment.line.yaml
    2 | name: CI
-     |   property     "name"
-     |   punctuation  ":"
-     |   string       "CI"
+     |   property     "name"           entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   string       "CI"             string.unquoted.plain.out.yaml
    3 | on:
-     |   property     "on"
-     |   punctuation  ":"
+     |   property     "on"             entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
    4 |   push:
-     |   property     "push"
-     |   punctuation  ":"
+     |   property     "push"           entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
    5 |     branches: [main]
-     |   property     "branches"
-     |   punctuation  ":"
-     |   punctuation  "["
-     |   string       "main"
-     |   punctuation  "]"
+     |   property     "branches"       entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   punctuation  "["              meta.brace.square.yaml
+     |   string       "main"           string.unquoted.plain.out.yaml
+     |   punctuation  "]"              meta.brace.square.yaml
    6 |   pull_request:
-     |   property     "pull_request"
-     |   punctuation  ":"
+     |   property     "pull_request"   entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
    7 | 
    8 | env:
-     |   property     "env"
-     |   punctuation  ":"
+     |   property     "env"            entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
    9 |   CARGO_TERM_COLOR: always
-     |   property     "CARGO_TERM_COLOR"
-     |   punctuation  ":"
-     |   string       "always"
+     |   property     "CARGO_TERM_COLOR" entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   string       "always"         string.unquoted.plain.out.yaml
   10 |   RETRIES: 3
-     |   property     "RETRIES"
-     |   punctuation  ":"
-     |   number       "3"
+     |   property     "RETRIES"        entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   number       "3"              constant.numeric.yaml
   11 |   DEBUG: false
-     |   property     "DEBUG"
-     |   punctuation  ":"
-     |   constant     "false"
+     |   property     "DEBUG"          entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   constant     "false"          constant.language.boolean.yaml
   12 | 
   13 | jobs:
-     |   property     "jobs"
-     |   punctuation  ":"
+     |   property     "jobs"           entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
   14 |   test: &defaults
-     |   property     "test"
-     |   punctuation  ":"
-     |   punctuation  "&"
-     |   label        "defaults"
+     |   property     "test"           entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   punctuation  "&"              punctuation.definition.yaml
+     |   label        "defaults"       variable.other.anchor.yaml
   15 |     runs-on: ubuntu-latest
-     |   property     "runs-on"
-     |   punctuation  ":"
-     |   string       "ubuntu-latest"
+     |   property     "runs-on"        entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   string       "ubuntu-latest"  string.unquoted.plain.out.yaml
   16 |     timeout-minutes: 30
-     |   property     "timeout-minutes"
-     |   punctuation  ":"
-     |   number       "30"
+     |   property     "timeout-minutes" entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   number       "30"             constant.numeric.yaml
   17 |     steps:
-     |   property     "steps"
-     |   punctuation  ":"
+     |   property     "steps"          entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
   18 |       - uses: actions/checkout@v4
-     |   punctuation  "-"
-     |   property     "uses"
-     |   punctuation  ":"
-     |   string       "actions/checkout@v4"
+     |   punctuation  "-"              punctuation.separator.yaml
+     |   property     "uses"           entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   string       "actions/checkout@v4" string.unquoted.plain.out.yaml
   19 |       - name: Run tests
-     |   punctuation  "-"
-     |   property     "name"
-     |   punctuation  ":"
-     |   string       "Run tests"
+     |   punctuation  "-"              punctuation.separator.yaml
+     |   property     "name"           entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   string       "Run tests"      string.unquoted.plain.out.yaml
   20 |         run: |
-     |   property     "run"
-     |   punctuation  ":"
-     |   punctuation  "|"
+     |   property     "run"            entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   punctuation  "|"              punctuation.separator.yaml
   21 |           cargo fmt --check
-     |   string       "          cargo fmt --check"
+     |   string       "          cargo fmt --check" string.unquoted.plain.out.yaml
   22 |           cargo test --locked
-     |   string       "          cargo test --locked"
+     |   string       "          cargo test --locked" string.unquoted.plain.out.yaml
   23 |   lint:
-     |   property     "lint"
-     |   punctuation  ":"
+     |   property     "lint"           entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
   24 |     <<: *defaults
-     |   property     "<<"
-     |   punctuation  ":"
-     |   punctuation  "*"
-     |   label        "defaults"
+     |   property     "<<"             entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   punctuation  "*"              punctuation.definition.yaml
+     |   label        "defaults"       variable.other.anchor.yaml
   25 |     steps: ~
-     |   property     "steps"
-     |   punctuation  ":"
-     |   constant     "~"
+     |   property     "steps"          entity.name.tag.yaml
+     |   punctuation  ":"              punctuation.separator.key-value.yaml
+     |   constant     "~"              constant.language.null.yaml

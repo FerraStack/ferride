@@ -547,11 +547,15 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     private fun colorsFor(vl: ViewLine): IntArray {
         val text = vl.text
         val colors = IntArray(text.length) { style.foreground }
+        val styles = style.tokenStyles
+        fonts = if (fonts.size >= text.length) fonts.also { it.fill(0) } else IntArray(text.length)
         for (s in vl.spans) {
             val a = s.start.coerceIn(0, text.length)
             val b = s.end.coerceIn(a, text.length)
-            val color = style.tokens[s.kind] ?: style.foreground
+            val themed = if (style.kindColors) null else styles?.color(s.scope)
+            val color = themed ?: style.tokens[s.kind] ?: style.foreground
             colors.fill(color, a, b)
+            if (styles != null) fonts.fill(styles.fontStyle(s.scope), a, b)
         }
         if (style.bracketPairs) {
             for (mark in vl.brackets) {
@@ -580,18 +584,26 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         val right = width.toFloat()
         while (i < b) {
             var j = i + 1
-            while (j < b && colors[j] == colors[i]) j++
+            while (j < b && colors[j] == colors[i] && fontAt(j) == fontAt(i)) j++
             val d0 = layout.map[i]
             val d1 = layout.map[j]
             val x0 = rowX + layout.xs[d0]
             if (x0 > right) break
             if (rowX + layout.xs[d1] >= gutterWidth) {
                 textPaint.color = colors[i]
+                val font = fontAt(i)
+                if (font != 0) TokenStyles.apply(textPaint, font)
                 canvas.drawText(layout.display, d0, d1, x0, y, textPaint)
+                if (font != 0) TokenStyles.apply(textPaint, 0)
             }
             i = j
         }
     }
+
+    /** Theme font style bits (italic/bold/underline/strikethrough) of the line last passed to [colorsFor]. */
+    private var fonts = IntArray(0)
+
+    private fun fontAt(col: Int): Int = fonts.getOrElse(col) { 0 }
 
     private fun drawSquiggles(canvas: Canvas, rowStart: Int, rowEnd: Int, x: (Int) -> Float, y: Float) {
         val m = liveModel ?: return

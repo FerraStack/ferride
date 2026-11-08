@@ -8,6 +8,7 @@ members = [
     "crates/ferride-host",
     "crates/ferride-ffi",
     "crates/ferride-scm",
+    "crates/ferride-theme",
 ]
 
 [workspace.package]
@@ -25,6 +26,7 @@ ferride-lsp = { path = "crates/ferride-lsp" }
 ferride-workspace = { path = "crates/ferride-workspace" }
 ferride-host = { path = "crates/ferride-host" }
 ferride-scm = { path = "crates/ferride-scm" }
+ferride-theme = { path = "crates/ferride-theme" }
 
 ropey = { version = "1.6.1", default-features = false, features = ["simd"] }
 tree-sitter = "0.27.2"

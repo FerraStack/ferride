@@ -1,146 +1,158 @@
    1 | @import url("fonts.css");
-     |   keyword      "@import"
-     |   function     "url"
-     |   punctuation  "("
-     |   string       "\"fonts.css\""
-     |   punctuation  ");"
+     |   keyword      "@import"        keyword.control.at-rule.css
+     |   function     "url"            support.function.css
+     |   punctuation  "("              meta.brace.round.css
+     |   string       "\""             punctuation.definition.string.begin.css
+     |   string       "fonts.css"      string.quoted.double.css
+     |   string       "\""             punctuation.definition.string.end.css
+     |   punctuation  ")"              meta.brace.round.css
+     |   punctuation  ";"              punctuation.terminator.css
    2 | 
    3 | :root {
-     |   punctuation  ":"
-     |   attribute    "root"
-     |   punctuation  "{"
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   attribute    "root"           entity.other.attribute-name.class.css
+     |   punctuation  "{"              punctuation.definition.block.css
    4 |   --accent: #0078d4;
-     |   variable     "--accent"
-     |   punctuation  ":"
-     |   punctuation  "#"
-     |   string       "0078d4"
-     |   punctuation  ";"
+     |   variable     "--accent"       variable.css.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   punctuation  "#"              punctuation.separator.css
+     |   string       "0078d4"         constant.other.color.rgb-value.css
+     |   punctuation  ";"              punctuation.terminator.css
    5 |   --radius: 6px;
-     |   variable     "--radius"
-     |   punctuation  ":"
-     |   number       "6"
-     |   type         "px"
-     |   punctuation  ";"
+     |   variable     "--radius"       variable.css.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   number       "6"              constant.numeric.css
+     |   type         "px"             keyword.other.unit.css
+     |   punctuation  ";"              punctuation.terminator.css
    6 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.css
    7 | 
    8 | /* Layout */
-     |   comment      "/* Layout */"
+     |   comment      "/* Layout */"   comment.block.css
    9 | .app {
-     |   punctuation  "."
-     |   attribute    "app"
-     |   punctuation  "{"
+     |   punctuation  "."              punctuation.accessor.css
+     |   attribute    "app"            entity.other.attribute-name.class.css
+     |   punctuation  "{"              punctuation.definition.block.css
   10 |   max-width: 40rem;
-     |   property     "max-width"
-     |   punctuation  ":"
-     |   number       "40"
-     |   type         "rem"
-     |   punctuation  ";"
+     |   property     "max-width"      support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   number       "40"             constant.numeric.css
+     |   type         "rem"            keyword.other.unit.css
+     |   punctuation  ";"              punctuation.terminator.css
   11 |   margin: 0 auto;
-     |   property     "margin"
-     |   punctuation  ":"
-     |   number       "0"
-     |   punctuation  ";"
+     |   property     "margin"         support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   number       "0"              constant.numeric.css
+     |   constant     "auto"           support.constant.property-value.css
+     |   punctuation  ";"              punctuation.terminator.css
   12 |   padding: 1.5em;
-     |   property     "padding"
-     |   punctuation  ":"
-     |   number       "1.5"
-     |   type         "em"
-     |   punctuation  ";"
+     |   property     "padding"        support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   number       "1.5"            constant.numeric.css
+     |   type         "em"             keyword.other.unit.css
+     |   punctuation  ";"              punctuation.terminator.css
   13 |   font-family: system-ui, sans-serif;
-     |   property     "font-family"
-     |   punctuation  ":"
-     |   punctuation  ","
-     |   punctuation  ";"
+     |   property     "font-family"    support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   constant     "system-ui"      support.constant.property-value.css
+     |   punctuation  ","              punctuation.separator.comma.css
+     |   constant     "sans-serif"     support.constant.property-value.css
+     |   punctuation  ";"              punctuation.terminator.css
   14 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.css
   15 | 
   16 | #input:focus,
-     |   punctuation  "#"
-     |   attribute    "input"
-     |   punctuation  ":"
-     |   attribute    "focus"
-     |   punctuation  ","
+     |   punctuation  "#"              punctuation.separator.css
+     |   attribute    "input"          entity.other.attribute-name.class.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   attribute    "focus"          entity.other.attribute-name.class.css
+     |   punctuation  ","              punctuation.separator.comma.css
   17 | button:hover:not([disabled]) {
-     |   tag          "button"
-     |   punctuation  ":"
-     |   attribute    "hover"
-     |   punctuation  ":"
-     |   attribute    "not"
-     |   punctuation  "("
-     |   attribute    "disabled"
-     |   punctuation  ")"
-     |   punctuation  "{"
+     |   tag          "button"         entity.name.tag.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   attribute    "hover"          entity.other.attribute-name.class.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   attribute    "not"            entity.other.attribute-name.class.css
+     |   punctuation  "("              meta.brace.round.css
+     |   attribute    "disabled"       entity.other.attribute-name.class.css
+     |   punctuation  ")"              meta.brace.round.css
+     |   punctuation  "{"              punctuation.definition.block.css
   18 |   outline: 2px solid var(--accent);
-     |   property     "outline"
-     |   punctuation  ":"
-     |   number       "2"
-     |   type         "px"
-     |   function     "var"
-     |   punctuation  "("
-     |   variable     "--accent"
-     |   punctuation  ");"
+     |   property     "outline"        support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   number       "2"              constant.numeric.css
+     |   type         "px"             keyword.other.unit.css
+     |   constant     "solid"          support.constant.property-value.css
+     |   function     "var"            support.function.css
+     |   punctuation  "("              meta.brace.round.css
+     |   variable     "--accent"       variable.css.css
+     |   punctuation  ")"              meta.brace.round.css
+     |   punctuation  ";"              punctuation.terminator.css
   19 |   border-radius: var(--radius);
-     |   property     "border-radius"
-     |   punctuation  ":"
-     |   function     "var"
-     |   punctuation  "("
-     |   variable     "--radius"
-     |   punctuation  ");"
+     |   property     "border-radius"  support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   function     "var"            support.function.css
+     |   punctuation  "("              meta.brace.round.css
+     |   variable     "--radius"       variable.css.css
+     |   punctuation  ")"              meta.brace.round.css
+     |   punctuation  ";"              punctuation.terminator.css
   20 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.css
   21 | 
   22 | ol > li::marker {
-     |   tag          "ol"
-     |   operator     ">"
-     |   tag          "li"
-     |   punctuation  "::"
-     |   attribute    "marker"
-     |   punctuation  "{"
+     |   tag          "ol"             entity.name.tag.css
+     |   operator     ">"              keyword.operator.css
+     |   tag          "li"             entity.name.tag.css
+     |   punctuation  "::"             punctuation.accessor.css
+     |   attribute    "marker"         entity.other.attribute-name.class.css
+     |   punctuation  "{"              punctuation.definition.block.css
   23 |   color: rgba(0, 120, 212, 0.8);
-     |   property     "color"
-     |   punctuation  ":"
-     |   function     "rgba"
-     |   punctuation  "("
-     |   number       "0"
-     |   punctuation  ","
-     |   number       "120"
-     |   punctuation  ","
-     |   number       "212"
-     |   punctuation  ","
-     |   number       "0.8"
-     |   punctuation  ");"
+     |   property     "color"          support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   function     "rgba"           support.function.css
+     |   punctuation  "("              meta.brace.round.css
+     |   number       "0"              constant.numeric.css
+     |   punctuation  ","              punctuation.separator.comma.css
+     |   number       "120"            constant.numeric.css
+     |   punctuation  ","              punctuation.separator.comma.css
+     |   number       "212"            constant.numeric.css
+     |   punctuation  ","              punctuation.separator.comma.css
+     |   number       "0.8"            constant.numeric.css
+     |   punctuation  ")"              meta.brace.round.css
+     |   punctuation  ";"              punctuation.terminator.css
   24 |   font-weight: bold !important;
-     |   property     "font-weight"
-     |   punctuation  ":"
-     |   keyword      "!important"
-     |   punctuation  ";"
+     |   property     "font-weight"    support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   constant     "bold"           support.constant.property-value.css
+     |   keyword      "!important"     keyword.other.css
+     |   punctuation  ";"              punctuation.terminator.css
   25 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.css
   26 | 
   27 | @media (max-width: 600px) {
-     |   keyword      "@media"
-     |   punctuation  "("
-     |   property     "max-width"
-     |   punctuation  ":"
-     |   number       "600"
-     |   type         "px"
-     |   punctuation  ")"
-     |   punctuation  "{"
+     |   keyword      "@media"         keyword.control.at-rule.css
+     |   punctuation  "("              meta.brace.round.css
+     |   property     "max-width"      support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   number       "600"            constant.numeric.css
+     |   type         "px"             keyword.other.unit.css
+     |   punctuation  ")"              meta.brace.round.css
+     |   punctuation  "{"              punctuation.definition.block.css
   28 |   .app { padding: calc(1em + 2px); }
-     |   punctuation  "."
-     |   attribute    "app"
-     |   punctuation  "{"
-     |   property     "padding"
-     |   punctuation  ":"
-     |   function     "calc"
-     |   punctuation  "("
-     |   number       "1"
-     |   type         "em"
-     |   operator     "+"
-     |   number       "2"
-     |   type         "px"
-     |   punctuation  ");"
-     |   punctuation  "}"
+     |   punctuation  "."              punctuation.accessor.css
+     |   attribute    "app"            entity.other.attribute-name.class.css
+     |   punctuation  "{"              punctuation.definition.block.css
+     |   property     "padding"        support.type.property-name.css
+     |   punctuation  ":"              punctuation.separator.key-value.css
+     |   function     "calc"           support.function.css
+     |   punctuation  "("              meta.brace.round.css
+     |   number       "1"              constant.numeric.css
+     |   type         "em"             keyword.other.unit.css
+     |   operator     "+"              keyword.operator.css
+     |   number       "2"              constant.numeric.css
+     |   type         "px"             keyword.other.unit.css
+     |   punctuation  ")"              meta.brace.round.css
+     |   punctuation  ";"              punctuation.terminator.css
+     |   punctuation  "}"              punctuation.definition.block.css
   29 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.css

@@ -1,0 +1,90 @@
+# line	start	end	foreground	fontStyle	text	scope (VS Code)
+0	0	1	#BD93F9	2	"#"	punctuation.definition.heading.markdown
+0	2	15	#BD93F9	2	"hello-ferride"	entity.name.section.markdown
+2	0	43	#F8F8F2	0	"A tiny sample project. Open files from the "	meta.paragraph.markdown
+2	43	45	#FFB86C	2	"**"	punctuation.definition.bold.markdown
+2	45	53	#FFB86C	2	"Explorer"	markup.bold.markdown
+2	53	55	#FFB86C	2	"**"	punctuation.definition.bold.markdown
+2	55	73	#F8F8F2	0	", search with the"	meta.paragraph.markdown
+3	0	51	#F8F8F2	0	"magnifier, or press the command button to open the "	meta.paragraph.markdown
+3	51	52	#F1FA8C	1	"*"	punctuation.definition.italic.markdown
+3	52	67	#F1FA8C	1	"Command Palette"	markup.italic.markdown
+3	67	68	#F1FA8C	1	"*"	punctuation.definition.italic.markdown
+3	68	70	#F8F8F2	0	"."	meta.paragraph.markdown
+5	0	2	#BD93F9	2	"##"	punctuation.definition.heading.markdown
+5	3	8	#BD93F9	2	"Files"	entity.name.section.markdown
+7	0	1	#F8F8F2	0	"-"	punctuation.definition.list.begin.markdown
+7	2	3	#50FA7B	0	"`"	punctuation.definition.raw.markdown
+7	3	14	#50FA7B	0	"src/main.rs"	markup.inline.raw.string.markdown
+7	14	15	#50FA7B	0	"`"	punctuation.definition.raw.markdown
+7	15	29	#F8F8F2	0	" \u2014 Rust, with "	meta.paragraph.markdown
+7	29	31	#FFB86C	2	"**"	punctuation.definition.bold.markdown
+7	31	32	#F1FA8C	1	"*"	punctuation.definition.italic.markdown
+7	32	43	#F1FA8C	1	"bold italic"	markup.italic.markdown
+7	43	44	#F1FA8C	1	"*"	punctuation.definition.italic.markdown
+7	44	46	#FFB86C	2	"**"	punctuation.definition.bold.markdown
+7	46	51	#F8F8F2	0	" and "	meta.paragraph.markdown
+7	51	53	#F8F8F2	0	"~~"	punctuation.definition.strikethrough.markdown
+7	53	55	#F8F8F2	0	"no"	markup.strikethrough.markdown
+7	55	57	#F8F8F2	0	"~~"	punctuation.definition.strikethrough.markdown
+7	58	59	#50FA7B	0	"`"	punctuation.definition.raw.markdown
+7	59	69	#50FA7B	0	"code spans"	markup.inline.raw.string.markdown
+7	69	70	#50FA7B	0	"`"	punctuation.definition.raw.markdown
+8	0	1	#F8F8F2	0	"-"	punctuation.definition.list.begin.markdown
+8	2	3	#50FA7B	0	"`"	punctuation.definition.raw.markdown
+8	3	19	#50FA7B	0	"scripts/stats.py"	markup.inline.raw.string.markdown
+8	19	20	#50FA7B	0	"`"	punctuation.definition.raw.markdown
+8	20	30	#F8F8F2	0	" \u2014 Python"	meta.paragraph.markdown
+9	0	1	#F8F8F2	0	"-"	punctuation.definition.list.begin.markdown
+9	2	3	#F8F8F2	0	"["	punctuation.definition.link.title.begin.markdown
+9	3	13	#FF79C6	0	"web/app.ts"	string.other.link.title.markdown
+9	13	14	#F8F8F2	0	"]"	punctuation.definition.link.title.end.markdown
+9	14	15	#F8F8F2	0	"("	punctuation.definition.metadata.markdown
+9	15	25	#8BE9FD	4	"web/app.ts"	markup.underline.link.markdown
+9	26	27	#F8F8F2	0	"\""	punctuation.definition.string.begin.markdown
+9	27	37	#FF79C6	0	"TypeScript"	string.other.link.description.title.markdown
+9	37	38	#F8F8F2	0	"\""	punctuation.definition.string.end.markdown
+9	38	39	#F8F8F2	0	")"	punctuation.definition.metadata.markdown
+9	39	46	#F8F8F2	0	" \u2014 see "	meta.paragraph.markdown
+9	46	47	#F8F8F2	0	"<"	punctuation.definition.link.markdown
+9	47	66	#8BE9FD	4	"https://ferride.dev"	markup.underline.link.markdown
+9	66	67	#F8F8F2	0	">"	punctuation.definition.link.markdown
+11	0	1	#F1FA8C	1	">"	punctuation.definition.quote.begin.markdown
+11	2	15	#F1FA8C	1	"Ferride runs "	meta.paragraph.markdown
+11	15	17	#FFB86C	2	"**"	punctuation.definition.bold.markdown
+11	17	33	#FFB86C	2	"language servers"	markup.bold.markdown
+11	33	35	#FFB86C	2	"**"	punctuation.definition.bold.markdown
+11	35	51	#F1FA8C	1	" inside Ferrux."	meta.paragraph.markdown
+13	0	3	#50FA7B	0	"```"	punctuation.definition.markdown
+13	3	7	#50FA7B	0	"rust"	fenced_code.block.language.markdown
+14	0	2	#FF79C6	0	"fn"	keyword.other.fn.rust
+14	3	7	#50FA7B	0	"main"	entity.name.function.rust
+14	7	8	#F8F8F2	0	"("	punctuation.brackets.round.rust
+14	8	9	#F8F8F2	0	")"	punctuation.brackets.round.rust
+14	10	11	#F8F8F2	0	"{"	punctuation.brackets.curly.rust
+15	4	12	#50FA7B	0	"println!"	entity.name.function.macro.rust
+15	12	13	#F8F8F2	0	"("	punctuation.brackets.round.rust
+15	13	14	#F1FA8C	0	"\""	punctuation.definition.string.rust
+15	14	21	#F1FA8C	0	"Hello, "	string.quoted.double.rust
+15	21	22	#F1FA8C	0	"{"	punctuation.definition.interpolation.rust
+15	22	23	#F1FA8C	0	"}"	punctuation.definition.interpolation.rust
+15	23	24	#F1FA8C	0	"!"	string.quoted.double.rust
+15	24	25	#F1FA8C	0	"\""	punctuation.definition.string.rust
+15	25	26	#F8F8F2	0	","	punctuation.comma.rust
+15	27	28	#F1FA8C	0	"\""	punctuation.definition.string.rust
+15	28	35	#F1FA8C	0	"Ferride"	string.quoted.double.rust
+15	35	36	#F1FA8C	0	"\""	punctuation.definition.string.rust
+15	36	37	#F8F8F2	0	")"	punctuation.brackets.round.rust
+15	37	38	#F8F8F2	0	";"	punctuation.semi.rust
+16	0	1	#F8F8F2	0	"}"	punctuation.brackets.curly.rust
+17	0	3	#50FA7B	0	"```"	punctuation.definition.markdown
+19	0	3	#50FA7B	0	"```"	punctuation.definition.markdown
+19	3	5	#50FA7B	0	"sh"	fenced_code.block.language.markdown
+20	0	5	#50FA7B	0	"cargo"	entity.name.command.shell
+20	6	9	#F1FA8C	0	"run"	string.unquoted.argument.shell
+20	10	11	#BD93F9	0	"-"	constant.other.option.dash.shell
+20	11	19	#BD93F9	0	"-release"	constant.other.option
+20	20	21	#6272A4	0	"#"	punctuation.definition.comment.shell
+20	21	35	#6272A4	0	" build and run"	comment.line.number-sign.shell
+21	0	3	#50FA7B	0	"```"	punctuation.definition.markdown
+23	0	43	#F8F8F2	0	"<details><summary>More</summary></details>"	meta.paragraph.markdown

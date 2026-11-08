@@ -8,3 +8,8 @@
 ; the generic `(property_name) @property`, which would win here.
 ((property_name) @variable
   (#match? @variable "^--"))
+
+; Keyword values (`auto`, `solid`, `system-ui`) are support constants in VS Code.
+(declaration (plain_value) @constant)
+((plain_value) @variable
+  (#match? @variable "^--"))

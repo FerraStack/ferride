@@ -38,6 +38,10 @@ data class EditorStyle(
     val lineNumberActive: Int,
     val indentGuide: Int,
     val tokens: Map<dev.ferride.core.StyleKind, Int>,
+    /** VS Code theme styles per span scope; `null` = colors from [tokens] only. */
+    val tokenStyles: TokenStyles? = null,
+    /** True: colors come from [tokens] and only font styles from [tokenStyles] (built-in themes). */
+    val kindColors: Boolean = true,
     val findMatch: Int = 0x66515C6A,
     val findMatchCurrent: Int = 0xAA9E6A03.toInt(),
     val error: Int = 0xFFF14C4C.toInt(),

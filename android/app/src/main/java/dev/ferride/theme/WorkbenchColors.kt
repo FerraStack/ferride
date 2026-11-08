@@ -3,6 +3,7 @@ package dev.ferride.theme
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import dev.ferride.core.StyleKind
+import dev.ferride.editor.TokenStyles
 
 /**
  * Workbench colors, named after VS Code's theme color ids (see [VsCodeTheme]
@@ -86,6 +87,14 @@ data class WorkbenchColors(
     val menuSeparator: Color,
     /** Syntax colors per highlight class (from `tokenColors`). */
     val tokens: Map<StyleKind, Color>,
+    /**
+     * Per-token styles from a VS Code theme's `tokenColors`, matched against
+     * each token's TextMate scope stack like VS Code does. Built-in themes use
+     * [tokens] for colors and only take font styles (Markdown bold/italic) from here.
+     */
+    val tokenStyles: TokenStyles = TokenStyles.builtInFontStyles,
+    /** Colors from [tokens] (built-in themes) rather than [tokenStyles]. */
+    val kindColors: Boolean = true,
 ) {
     fun token(kind: StyleKind): Color = tokens[kind] ?: editorForeground
 }

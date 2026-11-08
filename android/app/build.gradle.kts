@@ -225,6 +225,10 @@ android {
                 val samples = repoRoot.dir("crates/ferride-syntax/samples")
                 it.inputs.dir(samples).withPropertyName("syntaxSamples").withPathSensitivity(PathSensitivity.RELATIVE)
                 it.systemProperty("ferride.samples.dir", samples.asFile.absolutePath)
+                // MIT VS Code themes used as theme-fidelity fixtures (ferride-theme's tests).
+                val themes = repoRoot.dir("crates/ferride-theme/tests/fixtures/themes")
+                it.inputs.dir(themes).withPropertyName("themeFixtures").withPathSensitivity(PathSensitivity.RELATIVE)
+                it.systemProperty("ferride.themes.dir", themes.asFile.absolutePath)
                 it.jvmArgs("--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED", "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED")
             }
         }

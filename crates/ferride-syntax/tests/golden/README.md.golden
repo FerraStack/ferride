@@ -1,89 +1,101 @@
    1 | # hello-ferride
-     |   punctuation  "#"
-     |   heading      "hello-ferride"
+     |   punctuation  "#"              punctuation.definition.heading.markdown
+     |   heading      "hello-ferride"  markup.heading.markdown
    2 | 
    3 | A tiny sample project. Open files from the **Explorer**, search with the
-     |   punctuation  "**"
-     |   emphasis     "Explorer"
-     |   punctuation  "**"
+     |   punctuation  "**"             punctuation.definition.markdown.markdown
+     |   emphasis     "Explorer"       markup.bold.markdown
+     |   punctuation  "**"             punctuation.definition.markdown.markdown
    4 | magnifier, or press the command button to open the *Command Palette*.
-     |   punctuation  "*"
-     |   emphasis     "Command Palette"
-     |   punctuation  "*"
+     |   punctuation  "*"              punctuation.definition.markdown.markdown
+     |   emphasis     "Command Palette" markup.italic.markdown
+     |   punctuation  "*"              punctuation.definition.markdown.markdown
    5 | 
    6 | ## Files
-     |   punctuation  "##"
-     |   heading      "Files"
+     |   punctuation  "##"             punctuation.definition.heading.markdown
+     |   heading      "Files"          markup.heading.markdown
    7 | 
    8 | - `src/main.rs` — Rust, with ***bold italic*** and ~~no~~ `code spans`
-     |   punctuation  "- `"
-     |   string       "src/main.rs"
-     |   punctuation  "`"
-     |   punctuation  "***"
-     |   emphasis     "bold italic"
-     |   punctuation  "***"
-     |   punctuation  "~~"
-     |   punctuation  "~~"
-     |   punctuation  "`"
-     |   string       "code spans"
-     |   punctuation  "`"
+     |   punctuation  "- "             punctuation.definition.list.begin.markdown
+     |   punctuation  "`"              punctuation.definition.markdown.markdown
+     |   string       "src/main.rs"    markup.inline.raw.string.markdown
+     |   punctuation  "`"              punctuation.definition.markdown.markdown
+     |   punctuation  "*"              punctuation.definition.markdown.markdown
+     |   punctuation  "**"             punctuation.definition.markdown.markdown
+     |   emphasis     "bold italic"    markup.bold.markdown
+     |   punctuation  "**"             punctuation.definition.markdown.markdown
+     |   punctuation  "*"              punctuation.definition.markdown.markdown
+     |   punctuation  "~~"             punctuation.definition.markdown.markdown
+     |   punctuation  "~~"             punctuation.definition.markdown.markdown
+     |   punctuation  "`"              punctuation.definition.markdown.markdown
+     |   string       "code spans"     markup.inline.raw.string.markdown
+     |   punctuation  "`"              punctuation.definition.markdown.markdown
    9 | - `scripts/stats.py` — Python
-     |   punctuation  "- `"
-     |   string       "scripts/stats.py"
-     |   punctuation  "`"
+     |   punctuation  "- "             punctuation.definition.list.begin.markdown
+     |   punctuation  "`"              punctuation.definition.markdown.markdown
+     |   string       "scripts/stats.py" markup.inline.raw.string.markdown
+     |   punctuation  "`"              punctuation.definition.markdown.markdown
   10 | - [web/app.ts](web/app.ts "TypeScript") — see <https://ferride.dev>
-     |   punctuation  "- ["
-     |   link         "web/app.ts"
-     |   punctuation  "]("
-     |   link         "web/app.ts"
-     |   string       "\"TypeScript\""
-     |   punctuation  ")"
-     |   link         "<https://ferride.dev>"
+     |   punctuation  "- "             punctuation.definition.list.begin.markdown
+     |   punctuation  "["              punctuation.definition.markdown.markdown
+     |   link         "web/app.ts"     string.other.link.title.markdown
+     |   punctuation  "]("             punctuation.definition.markdown.markdown
+     |   link         "web/app.ts"     markup.underline.link.markdown
+     |   string       "\"TypeScript\"" markup.inline.raw.string.markdown
+     |   punctuation  ")"              punctuation.definition.markdown.markdown
+     |   link         "<https://ferride.dev>" markup.underline.link.markdown
   11 | 
   12 | > Ferride runs **language servers** inside Ferrux.
-     |   punctuation  "> "
-     |   punctuation  "**"
-     |   emphasis     "language servers"
-     |   punctuation  "**"
+     |   punctuation  "> "             punctuation.definition.quote.begin.markdown
+     |   comment      "Ferride runs "  markup.quote.markdown
+     |   punctuation  "**"             punctuation.definition.markdown.markdown
+     |   emphasis     "language servers" markup.bold.markdown
+     |   punctuation  "**"             punctuation.definition.markdown.markdown
+     |   comment      " inside Ferrux." markup.quote.markdown
   13 | 
   14 | ```rust
-     |   punctuation  "```"
-     |   string       "rust"
+     |   punctuation  "```"            punctuation.definition.markdown.markdown
+     |   string       "rust"           markup.inline.raw.string.markdown
   15 | fn main() {
-     |   keyword      "fn"
-     |   function     "main"
-     |   punctuation  "()"
-     |   punctuation  "{"
+     |   keyword      "fn"             keyword.other.rust
+     |   function     "main"           entity.name.function.rust
+     |   punctuation  "()"             meta.brace.round.rust
+     |   punctuation  "{"              punctuation.definition.block.rust
   16 |     println!("Hello, {}!", "Ferride");
-     |   function     "println!"
-     |   punctuation  "("
-     |   string       "\"Hello, {}!\""
-     |   punctuation  ","
-     |   string       "\"Ferride\""
-     |   punctuation  ");"
+     |   function     "println!"       entity.name.function.macro.rust
+     |   punctuation  "("              meta.brace.round.rust
+     |   string       "\""             punctuation.definition.string.begin.rust
+     |   string       "Hello, {}!"     string.quoted.double.rust
+     |   string       "\""             punctuation.definition.string.end.rust
+     |   punctuation  ","              punctuation.separator.comma.rust
+     |   string       "\""             punctuation.definition.string.begin.rust
+     |   string       "Ferride"        string.quoted.double.rust
+     |   string       "\""             punctuation.definition.string.end.rust
+     |   punctuation  ")"              meta.brace.round.rust
+     |   punctuation  ";"              punctuation.terminator.rust
   17 | }
-     |   punctuation  "}"
+     |   punctuation  "}"              punctuation.definition.block.rust
   18 | ```
-     |   punctuation  "```"
+     |   punctuation  "```"            punctuation.definition.markdown.markdown
   19 | 
   20 | ```sh
-     |   punctuation  "```"
-     |   string       "sh"
+     |   punctuation  "```"            punctuation.definition.markdown.markdown
+     |   string       "sh"             markup.inline.raw.string.markdown
   21 | cargo run --release # build and run
-     |   function     "cargo"
-     |   constant     "--release"
-     |   comment      "# build and run"
+     |   function     "cargo"          entity.name.command.shell
+     |   constant     "--release"      constant.other.option.shell
+     |   comment      "# build and run" comment.line.shell
   22 | ```
-     |   punctuation  "```"
+     |   punctuation  "```"            punctuation.definition.markdown.markdown
   23 | 
   24 | <details><summary>More</summary></details>
-     |   punctuation  "<"
-     |   tag          "details"
-     |   punctuation  "><"
-     |   tag          "summary"
-     |   punctuation  ">"
-     |   punctuation  "</"
-     |   tag          "summary"
-     |   punctuation  "></"
-     |   tag          "details"
-     |   punctuation  ">"
+     |   punctuation  "<"              punctuation.definition.tag.html
+     |   tag          "details"        entity.name.tag.html
+     |   punctuation  "><"             punctuation.definition.tag.html
+     |   tag          "summary"        entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
+     |   punctuation  "</"             punctuation.definition.tag.html
+     |   tag          "summary"        entity.name.tag.html
+     |   punctuation  "></"            punctuation.definition.tag.html
+     |   tag          "details"        entity.name.tag.html
+     |   punctuation  ">"              punctuation.definition.tag.html
