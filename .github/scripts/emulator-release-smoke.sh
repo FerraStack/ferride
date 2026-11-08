@@ -60,7 +60,9 @@ expect_text "TypeScript" "status bar language after opening app.ts"
 adb shell input keycombination 113 59 44
 sleep 2
 alive "Command Palette"
-expect_text "Show All Commands" "the first command in the Command Palette"
+adb shell input text "language"
+sleep 2
+expect_text "Change Language Mode" "the Command Palette filtering commands"
 adb exec-out screencap -p > "$out/emulator_release_palette_dark.png"
 adb shell input keyevent 111
 sleep 1
