@@ -143,6 +143,8 @@ class ScmStateTest {
         val wb = state(repo = null)
         assertEquals(ScmMode.NoRepository, wb.scm.mode)
         assertTrue(wb.commands.get(GitCommandIds.INIT)!!.enabled())
+        // The Welcome page's Start section shows "Clone Git Repository…" when this command exists.
+        assertNotNull(wb.commands.get(dev.ferride.workbench.CommandIds.GIT_CLONE))
         assertFalse(wb.commands.get(GitCommandIds.COMMIT)!!.enabled())
         wb.commands.execute(GitCommandIds.INIT)
         assertEquals(ScmMode.Ready, wb.scm.mode)

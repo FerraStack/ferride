@@ -581,5 +581,6 @@ object GitCommandIds {
     const val FETCH = "git.fetch"
     const val PUBLISH = "git.publish"
     const val INIT = "git.init"
-    const val CLONE = "git.clone"
+    /** The Welcome page's "Clone Git Repository…" runs this (lane 1 defined the id first). */
+    const val CLONE = dev.ferride.workbench.CommandIds.GIT_CLONE
 }

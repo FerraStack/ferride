@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -239,10 +240,13 @@ private fun CredentialDialog(prompt: CredentialPrompt) {
         title = { Text("Sign in to $host", color = c.inputForeground, fontSize = 16.sp) },
         text = {
             Column {
+                // Focusable so it, not the Username field, takes the dialog window's initial focus (outside
+                // touch mode Android focuses the first focusable): no keyboard pops up, no endless cursor blink.
                 Text(
                     "Git needs a username and a personal access token for ${prompt.url}",
                     color = c.descriptionForeground,
                     fontSize = 13.sp,
+                    modifier = Modifier.focusable(),
                 )
                 Spacer(Modifier.height(10.dp))
                 // No auto focus: the dialog opens while a network call waits; the user taps the field (and the keyboard opens).

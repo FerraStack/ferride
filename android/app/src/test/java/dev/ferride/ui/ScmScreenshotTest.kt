@@ -39,13 +39,11 @@ class ScmScreenshotTest {
         repo: Boolean = true,
         saf: Boolean = false,
         openFirst: String? = "src/main.rs",
-        /**
-         * Drive Compose's clock by hand: dialogs with text fields keep an endless cursor-blink animation
-         * running, so `waitForIdle()` never returns (AppNotIdleException on phones).
-         */
-        manualClock: Boolean = false,
+        /** Phones run in touch mode, where Android gives no view initial focus (Robolectric doesn't by default). */
+        touchMode: Boolean = false,
         setup: (WorkbenchState) -> Unit,
     ) {
+        if (touchMode) androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().setInTouchMode(true)
         val backend = if (saf) FakeWorkspaceBackend(kind = dev.ferride.core.WorkspaceKind.SAF) else FakeWorkspaceBackend()
         val provider = FakeScmProvider(if (repo) FakeScmRepo(backend.root) else null)
         val state = WorkbenchState(
@@ -59,9 +57,8 @@ class ScmScreenshotTest {
         state.scm.projectsDir = "/sample/projects"
         state.start(openFirst)
         setup(state)
-        if (manualClock) compose.mainClock.autoAdvance = false
         compose.setContent { FerrideWorkbench(state, imeVisible = false, hardwareKeyboard = false) }
-        if (manualClock) compose.mainClock.advanceTimeBy(1_000) else compose.waitForIdle()
+        compose.waitForIdle()
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/${name}_${if (dark) "dark" else "light"}.png")
     }
 
@@ -138,16 +135,16 @@ class ScmScreenshotTest {
     fun tabletScmEmptyLight() = shoot("tablet_scm_empty", false, repo = false) { it.showView(SideView.SourceControl) }
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
-    fun phoneScmSignInDark() = shoot("phone_scm_signin", true, manualClock = true, setup = ::signIn)
+    fun phoneScmSignInDark() = shoot("phone_scm_signin", true, touchMode = true, setup = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
-    fun phoneScmSignInLight() = shoot("phone_scm_signin", false, manualClock = true, setup = ::signIn)
+    fun phoneScmSignInLight() = shoot("phone_scm_signin", false, touchMode = true, setup = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
-    fun tabletScmSignInDark() = shoot("tablet_scm_signin", true, manualClock = true, setup = ::signIn)
+    fun tabletScmSignInDark() = shoot("tablet_scm_signin", true, touchMode = true, setup = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
-    fun tabletScmSignInLight() = shoot("tablet_scm_signin", false, manualClock = true, setup = ::signIn)
+    fun tabletScmSignInLight() = shoot("tablet_scm_signin", false, touchMode = true, setup = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
     fun phoneScmCloneDark() = shoot("phone_scm_clone", true, setup = ::cloning)

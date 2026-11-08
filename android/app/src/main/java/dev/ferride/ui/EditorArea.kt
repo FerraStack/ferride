@@ -230,7 +230,7 @@ private fun Welcome(state: WorkbenchState, modifier: Modifier) {
             "Go to File…" to CommandIds.QUICK_OPEN,
             "Show All Commands" to CommandIds.SHOW_COMMANDS,
             "Open Explorer" to CommandIds.VIEW_EXPLORER,
-            "Clone Git Repository..." to GitCommandIds.CLONE,
+            "Clone Git Repository…" to GitCommandIds.CLONE,
             "Open Settings" to CommandIds.OPEN_SETTINGS,
         ).forEach { (label, id) ->
             val key = state.commands.get(id)?.keybinding
