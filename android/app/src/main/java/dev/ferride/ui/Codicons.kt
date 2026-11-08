@@ -41,6 +41,8 @@ object Codicon {
     const val HISTORY = '\uEA82'
     const val NEW_FILE = '\uEA7F'
     const val NEW_FOLDER = '\uEA80'
+    const val OPEN_PREVIEW = '\uEB28'
+    const val PREVIEW = '\uEB2F'
     const val REFRESH = '\uEB37'
     const val REPO_CLONE = '\uEB3E'
     const val ROCKET = '\uEB44'

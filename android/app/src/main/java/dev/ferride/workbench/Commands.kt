@@ -153,6 +153,8 @@ object CommandIds {
     const val GOTO_LINE = "workbench.action.gotoLine"
     const val GOTO_SYMBOL = "workbench.action.gotoSymbol"
     const val CHANGE_LANGUAGE_MODE = "workbench.action.editor.changeLanguageMode"
+    const val MARKDOWN_PREVIEW = "markdown.showPreview"
+    const val MARKDOWN_PREVIEW_SIDE = "markdown.showPreviewToSide"
     const val SAVE = "workbench.action.files.save"
     const val SAVE_ALL = "workbench.action.files.saveAll"
     const val NEW_FILE = "workbench.action.files.newUntitledFile"

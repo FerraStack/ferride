@@ -112,6 +112,7 @@ Width classes follow Material breakpoints (compact < 600 dp ≤ medium < 840 dp 
 
 Done now: current line highlight, indent guides, bracket pair colorization (bracket tokens and depths come from the tree-sitter tree in Rust, so brackets in strings/comments are ignored), line numbers, **word wrap** (`editor.wordWrap`; the default is on for compact/phone windows and off otherwise, continuation rows indented like the line, numbers only on the first visual row), thin scrollbars (horizontal when wrap is off), find/replace widget (case/word/regex, n of m, replace/replace all), diagnostics squiggles + Problems panel, VS Code-style copy/cut of the whole line without a selection, smart Home, auto-indent on Enter, unsaved-changes prompt on close.
 Done in M1: selection handles and floating toolbar (#8).
+Done: **Markdown preview**: Markdown: Open Preview (`markdown.showPreview`, Ctrl+Shift+V) and Open Preview to the Side (`markdown.showPreviewToSide`, the preview icon in a Markdown tab's title bar) render the file like VS Code's preview (CommonMark + GFM tables, task lists, strikethrough via `pulldown-cmark` in the `ferride-markdown` crate, flattened to blocks for Compose); it follows the open editor's unsaved text, parses off the main thread, and opens http(s) links. To the side uses the second editor group once split editors land; until then it opens as a tab.
 Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already supports it), snippets in VS Code snippet JSON format, sticky scroll, code folding.
 
 ## Syntax highlighting

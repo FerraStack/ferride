@@ -39,6 +39,7 @@ import dev.ferride.workbench.FakeWorkspaceBackend
 import dev.ferride.workbench.InMemorySettingsStore
 import dev.ferride.workbench.PaletteMode
 import dev.ferride.workbench.PanelTab
+import dev.ferride.workbench.SampleProject
 import dev.ferride.workbench.SideView
 import dev.ferride.workbench.RecentFolder
 import dev.ferride.workbench.WorkbenchState
@@ -315,6 +316,27 @@ class WorkbenchScreenshotTest {
         afterContent = { it.requestDelete(srcNode(it)) },
     )
 
+    // ----- Markdown preview -------------------------------------------------------------
+
+    /** A rich README rendered by Markdown: Open Preview (headings, lists, tasks, code, table, quote). */
+    private val markdownBackend get() = FakeWorkspaceBackend(
+        initialFiles = SampleProject.files + ("NOTES.md" to MARKDOWN_SAMPLE),
+    )
+
+    private fun markdownPreview(s: WorkbenchState) {
+        s.openFile("${s.backend.root}/NOTES.md", preview = false)
+        s.openMarkdownPreview(toSide = false)
+    }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneMarkdownPreviewDark() = shoot("phone_markdown_preview", dark = true, backend = markdownBackend, setup = ::markdownPreview)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneMarkdownPreviewLight() = shoot("phone_markdown_preview", dark = false, backend = markdownBackend, setup = ::markdownPreview)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletMarkdownPreviewDark() = shoot("tablet_markdown_preview", dark = true, backend = markdownBackend, setup = ::markdownPreview)
+
     // ----- tablet, landscape: desktop-like layout -----------------------------------
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
@@ -407,3 +429,34 @@ private fun FakeKeyboard(dark: Boolean) {
         }
     }
 }
+
+private val MARKDOWN_SAMPLE = """
+# Ferride notes
+
+A **phone-first** editor with *VS Code* muscle memory. Run `cargo test` before pushing; see the [guide](https://example.com).
+
+## Todo
+
+- [x] Selection handles
+- [ ] Split editor
+- Plain item
+  1. nested step
+  2. another step
+
+> Quotes render with a bar on the left.
+
+```rust
+fn main() {
+    println!("hello");
+}
+```
+
+| Feature | Phone | Tablet |
+|:--|:-:|--:|
+| Minimap | off | on |
+| Split | no | yes |
+
+---
+
+Done.
+""".trimIndent()

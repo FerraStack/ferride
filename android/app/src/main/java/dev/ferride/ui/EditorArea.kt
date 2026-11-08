@@ -72,6 +72,10 @@ fun EditorArea(state: WorkbenchState, modifier: Modifier = Modifier) {
                 WelcomePage(state, Modifier.weight(1f))
                 SideEffect { state.disposeRetired(null) }
             }
+            tab.kind == TabKind.MarkdownPreview -> {
+                MarkdownPreview(state, tab, Modifier.weight(1f))
+                SideEffect { state.disposeRetired(null) }
+            }
             model != null -> {
                 Breadcrumbs(state, tab)
                 CodeEditor(state, tab, model, Modifier.weight(1f))
@@ -145,6 +149,17 @@ private fun TabStrip(state: WorkbenchState) {
             }
         }
         // Editor title actions (VS Code shows these at the right of the tab bar).
+        // Markdown files get VS Code's "Open Preview to the Side" title action.
+        if (tab?.kind == TabKind.File && tab.model?.takeIf { !it.isClosed }?.language == "markdown") {
+            Box(
+                Modifier.size(38.dp).clickable(onClickLabel = "Open Preview to the Side") {
+                    state.commands.execute(CommandIds.MARKDOWN_PREVIEW_SIDE)
+                },
+                contentAlignment = Alignment.Center,
+            ) {
+                CodiconIcon(Codicon.OPEN_PREVIEW, c.tabActiveForeground, description = "Open Preview to the Side")
+            }
+        }
         if (tab?.kind == TabKind.Settings) {
             BarIcon(Icons.Outlined.DataObject, "Open Settings (JSON)", c.tabActiveForeground, size = 38.dp, iconSize = 18.dp) {
                 state.commands.execute(CommandIds.OPEN_SETTINGS_JSON)
@@ -171,6 +186,8 @@ private fun EditorTabItem(tab: EditorTab, active: Boolean, onSelect: () -> Unit,
                 Icon(Icons.Outlined.Settings, null, tint = fg, modifier = Modifier.size(16.dp))
             } else if (tab.kind == TabKind.Welcome) {
                 CodiconIcon(Codicon.ROCKET, fg)
+            } else if (tab.kind == TabKind.MarkdownPreview) {
+                CodiconIcon(Codicon.PREVIEW, fg)
             } else {
                 FileIcon(tab.name)
             }

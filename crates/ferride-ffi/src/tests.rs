@@ -353,3 +353,18 @@ fn token_theme_styles_span_scopes() {
     assert_eq!(theme.style(0).foreground, 0xFFCCCCCC);
     assert!(TokenTheme::new("not json".into()).is_err());
 }
+
+#[test]
+fn markdown_blocks_cross_the_ffi() {
+    let b = crate::markdown_blocks("# Hi\n\n- [x] done\n".into());
+    assert_eq!(b[0].kind, crate::MdKind::Heading { level: 1 });
+    assert_eq!(
+        b[1].kind,
+        crate::MdKind::ListItem {
+            ordered: false,
+            number: 1,
+            checked: Some(true)
+        }
+    );
+    assert_eq!(b[1].line, 2);
+}

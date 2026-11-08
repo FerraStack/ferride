@@ -34,7 +34,7 @@ enum class SideView(val title: String) {
 
 enum class PanelTab(val title: String) { Problems("Problems"), Output("Output"), Terminal("Terminal") }
 
-enum class TabKind { File, Settings, SettingsJson, Welcome }
+enum class TabKind { File, Settings, SettingsJson, Welcome, MarkdownPreview }
 
 /** A folder on the Welcome page's Recent list (newest first). */
 data class RecentFolder(val kind: WorkspaceKind, val root: String, val name: String) {
@@ -55,6 +55,7 @@ class EditorTab(val path: String, val model: EditorModel?, val kind: TabKind = T
     val name: String = when (kind) {
         TabKind.Settings -> "Settings"
         TabKind.Welcome -> "Welcome"
+        TabKind.MarkdownPreview -> "Preview " + path.substringAfterLast('/')
         else -> path.substringAfterLast('/')
     }
     var preview by mutableStateOf(kind == TabKind.File)
@@ -588,6 +589,38 @@ class WorkbenchState(
         contextMenu = ContextMenuRequest(x, y, items)
     }
 
+    // ----- markdown preview -------------------------------------------------------
+
+    /**
+     * Markdown: Open Preview (Ctrl+Shift+V) / Open Preview to the Side: a
+     * rendered view of the active Markdown file that follows its edits. To the
+     * side, it opens in the other editor group when there is room
+     * ([openToSide], set once split editors exist); otherwise as a tab.
+     */
+    fun openMarkdownPreview(toSide: Boolean) {
+        val source = activeTab?.takeIf { it.kind == TabKind.File } ?: return
+        val path = MARKDOWN_PREVIEW_PREFIX + source.path
+        val tab = EditorTab(path, null, TabKind.MarkdownPreview).also { it.preview = false }
+        if (toSide) {
+            openToSide?.let { open -> return open(tab) }
+        }
+        val i = tabs.indexOfFirst { it.path == path }
+        if (i >= 0) activeIndex = i else addTab(tab)
+    }
+
+    /** Opens a tab in the editor group beside the active one (split editors); null when unsupported. */
+    var openToSide: ((EditorTab) -> Unit)? = null
+
+    /** The Markdown source a preview tab shows: the open editor's model if any. */
+    fun previewSourceModel(preview: EditorTab): EditorModel? {
+        val source = preview.path.removePrefix(MARKDOWN_PREVIEW_PREFIX)
+        return tabs.firstOrNull { it.path == source && it.kind == TabKind.File }?.model?.takeIf { !it.isClosed }
+    }
+
+    /** Reads a preview's source from disk when it isn't open (blocks). */
+    fun readPreviewSource(preview: EditorTab): String =
+        runCatching { backend.readFile(preview.path.removePrefix(MARKDOWN_PREVIEW_PREFIX)) }.getOrDefault("")
+
     // ----- editors ---------------------------------------------------------
 
     fun openFile(path: String, preview: Boolean = true, line: Int? = null) {
@@ -1032,6 +1065,13 @@ class WorkbenchState(
         cmd(CommandIds.GOTO_SYMBOL, "Go to Symbol in Editor…", "Go", KeyChord.ctrl(KeyEvent.KEYCODE_O, shift = true), hasEditor) {
             openPalette(PaletteMode.Symbols)
         }
+        val isMarkdown = { activeTab?.kind == TabKind.File && activeModel?.language == "markdown" }
+        cmd(CommandIds.MARKDOWN_PREVIEW, "Open Preview", "Markdown", KeyChord.ctrl(KeyEvent.KEYCODE_V, shift = true), isMarkdown) {
+            openMarkdownPreview(toSide = false)
+        }
+        cmd(CommandIds.MARKDOWN_PREVIEW_SIDE, "Open Preview to the Side", "Markdown", enabled = isMarkdown) {
+            openMarkdownPreview(toSide = true)
+        }
         cmd(CommandIds.CHANGE_LANGUAGE_MODE, "Change Language Mode", null, enabled = hasEditor) {
             showQuickPick(languagePick())
         }
@@ -1147,6 +1187,7 @@ class WorkbenchState(
         const val SETTINGS_JSON_PATH = "ferride:settings.json"
         const val WELCOME_PATH = "ferride:welcome"
         private const val MAX_RECENT_FOLDERS = 10
+        const val MARKDOWN_PREVIEW_PREFIX = "ferride:preview:"
         private const val MAX_RECENT = 5
     }
 }
