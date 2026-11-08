@@ -41,7 +41,7 @@ class LanguageScreenshotTest {
     private fun shoot(png: String, file: String, nightOwlTheme: Boolean, setup: (WorkbenchState) -> Unit = {}) {
         val files = LanguageModeTest.SAMPLES.values.associateWith { sample(it) }
         val state = WorkbenchState(
-            FakeWorkspaceBackend(files = files, modelFactory = RustEditorModel::create),
+            FakeWorkspaceBackend(initialFiles = files, modelFactory = RustEditorModel::create),
             CoroutineScope(Dispatchers.Unconfined),
             Dispatchers.Unconfined,
             settingsStore = InMemorySettingsStore(
