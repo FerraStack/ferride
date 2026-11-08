@@ -61,6 +61,7 @@ Single `:app` module for now (split into `:core-bindings`, `:editor-view`, `:fea
 - **`Dispatchers.IO`:** workspace listing, file read/write, fuzzy find and text search, LSP requests (they block until the response or timeout).
 - **Rust background threads:** one reader thread per LSP session; it calls `LspListener` (Kotlin), which must hop to the main thread before touching UI state.
 - **Parse budgets:** the initial parse (on the IO thread, together with reading the file) gets 1.5 s; an incremental reparse after an edit gets 40 ms on the UI thread. If a budget runs out the edited old tree is kept (highlights stay aligned but may be stale) and the next edit retries. Background parsing on a rope snapshot is tracked in #14.
+- **Poisoned locks:** if a call panics while holding a `Document`'s lock (e.g. inside a grammar during `Syntax::update`), the next call drops the possibly half-updated syntax tree, reparses from the rope (always consistent: edits reach the rope first), logs a warning and clears the poison.
 - **Model lifetime:** closing or replacing a tab only *retires* its native `Document`; it's freed after the editor view has switched to the next model, so neither drawing nor late IME callbacks can touch a freed object.
 
 ## The editor view and the IME

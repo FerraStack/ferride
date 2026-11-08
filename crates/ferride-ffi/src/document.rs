@@ -120,6 +120,8 @@ struct Inner {
     syntax: Option<Syntax>,
     /// File name the document was opened with (for language auto-detection).
     file_name: Option<String>,
+    /// How many times a poisoned lock was recovered (tests, diagnostics).
+    recoveries: u32,
 }
 
 /// Language for a file name, falling back to a `#!` line at the top of `buffer`.
@@ -132,6 +134,18 @@ fn detect_language(file_name: Option<&str>, buffer: &Buffer) -> Option<LanguageI
 }
 
 impl Inner {
+    /// Rebuilds the syntax tree from the rope after a panic left it suspect.
+    fn recover(&mut self) {
+        if let Some(lang) = self.syntax.as_ref().map(|s| s.language()) {
+            log::warn!(
+                "document lock was poisoned; reparsing {} from scratch",
+                lang.name()
+            );
+            self.syntax = Some(Syntax::new(lang, self.buffer.rope()));
+        }
+        self.recoveries += 1;
+    }
+
     fn after_edit(&mut self, edits: &[ByteEdit]) {
         if edits.is_empty() {
             return;
@@ -175,8 +189,34 @@ pub struct Document {
 }
 
 impl Document {
+    /// Locks the document. If a previous call panicked while holding the lock
+    /// (say, inside a grammar during `Syntax::update`), the syntax tree may be
+    /// half-updated: drop it and reparse from the rope, which is always
+    /// consistent (edits are applied to the rope before the tree), then clear
+    /// the poison so later calls take the fast path again.
     fn lock(&self) -> MutexGuard<'_, Inner> {
-        self.inner.lock().unwrap_or_else(|e| e.into_inner())
+        match self.inner.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                let mut guard = poisoned.into_inner();
+                guard.recover();
+                self.inner.clear_poison();
+                guard
+            }
+        }
+    }
+
+    /// How many times a poisoned lock was recovered (tests).
+    #[cfg(test)]
+    pub(crate) fn recoveries(&self) -> u32 {
+        self.lock().recoveries
+    }
+
+    /// Panics while holding the lock (tests of the recovery path).
+    #[cfg(test)]
+    pub(crate) fn poison_for_test(&self) {
+        let _guard = self.inner.lock();
+        panic!("simulated panic inside the document lock");
     }
 }
 
@@ -193,6 +233,7 @@ impl Document {
                 buffer,
                 syntax,
                 file_name,
+                recoveries: 0,
             }),
         })
     }

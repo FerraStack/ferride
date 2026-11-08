@@ -353,3 +353,22 @@ fn token_theme_styles_span_scopes() {
     assert_eq!(theme.style(0).foreground, 0xFFCCCCCC);
     assert!(TokenTheme::new("not json".into()).is_err());
 }
+
+#[test]
+fn poisoned_document_lock_is_recovered_by_reparsing() {
+    let doc = Document::new("fn main() {}\n".into(), Some("main.rs".into()));
+    let d = doc.clone();
+    let panicked = std::thread::spawn(move || d.poison_for_test()).join();
+    assert!(panicked.is_err());
+    // The next call recovers (reparse + clear the poison) and highlighting still works.
+    assert_eq!(doc.recoveries(), 1);
+    let line = &doc.viewport(0, 1)[0];
+    assert!(
+        line.spans.iter().any(|s| s.kind == StyleKind::Keyword),
+        "{:?}",
+        line.spans
+    );
+    doc.insert("// ok\n".into(), false);
+    assert_eq!(doc.recoveries(), 1, "the poison was cleared: no second recovery");
+    assert!(doc.text().starts_with("// ok"));
+}
