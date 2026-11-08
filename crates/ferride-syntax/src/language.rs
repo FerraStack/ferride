@@ -4,6 +4,7 @@ use std::sync::OnceLock;
 use tree_sitter::{Language, Query};
 
 use crate::highlight::HighlightKind;
+use crate::injection::InjectionQuery;
 
 /// Languages with a bundled grammar.
 ///
@@ -29,15 +30,24 @@ pub enum LanguageId {
     Toml,
     Bash,
     Sql,
+    /// Markdown's inline grammar (emphasis, code spans, links), only ever
+    /// injected into Markdown paragraphs; not a user-selectable language.
+    MarkdownInline,
 }
 
+/// User-selectable languages ([`LanguageId::ALL`]).
 const COUNT: usize = 18;
+/// Every grammar, including injection-only ones.
+const GRAMMARS: usize = COUNT + 1;
 
 pub(crate) struct LanguageConfig {
     pub language: Language,
     pub query: Query,
-    /// Capture index → highlight kind.
-    pub kinds: Vec<HighlightKind>,
+    /// Capture index → highlight kind; `None` for captures that don't
+    /// highlight (`@spell`, `@embedded`, ...). `@none` is `Some(Plain)`.
+    pub kinds: Vec<Option<HighlightKind>>,
+    /// Where other grammars are embedded (fenced code, `<script>`, ...).
+    pub injections: Option<InjectionQuery>,
     /// When several patterns capture the same node, the *first* one wins
     /// (tree-sitter-highlight's rule, which the Go query is written for:
     /// generic `(identifier) @variable` last). Otherwise the last one
@@ -168,7 +178,37 @@ impl LanguageId {
             Self::Toml => "toml",
             Self::Bash => "shellscript",
             Self::Sql => "sql",
+            Self::MarkdownInline => "markdown_inline",
         }
+    }
+
+    /// The language an injection names: a VS Code id, a Markdown fence info
+    /// string (` ```rs `, ` ```sh `, ` ```c++ `) or a JS template tag
+    /// (`` sql`...` ``, `` css`...` ``).
+    pub fn from_injection_name(name: &str) -> Option<Self> {
+        let name = name.trim().to_ascii_lowercase();
+        if name == "markdown_inline" {
+            return Some(Self::MarkdownInline);
+        }
+        if let Some(lang) = Self::from_name(&name) {
+            return Some(lang);
+        }
+        Some(match name.as_str() {
+            "shell" | "sh" | "bash" | "zsh" | "ksh" | "shellsession" => Self::Bash,
+            "js" | "jsx" | "node" | "javascriptreact" => Self::JavaScript,
+            "ts" => Self::TypeScript,
+            "tsx" => Self::Tsx,
+            "py" | "python3" | "py3" => Self::Python,
+            "rs" => Self::Rust,
+            "golang" => Self::Go,
+            "c++" | "cxx" => Self::Cpp,
+            "kt" | "kts" => Self::Kotlin,
+            "yml" => Self::Yaml,
+            "md" => Self::Markdown,
+            "jsonc" | "json5" => Self::Json,
+            "postgres" | "postgresql" | "psql" | "sqlite" | "mysql" | "plsql" => Self::Sql,
+            other => return Self::from_extension(other),
+        })
     }
 
     pub fn from_name(name: &str) -> Option<Self> {
@@ -179,8 +219,21 @@ impl LanguageId {
     /// use (so only languages that are actually opened pay for query
     /// compilation).
     pub(crate) fn config(self) -> &'static LanguageConfig {
-        static CONFIGS: [OnceLock<LanguageConfig>; COUNT] = [const { OnceLock::new() }; COUNT];
+        static CONFIGS: [OnceLock<LanguageConfig>; GRAMMARS] = [const { OnceLock::new() }; GRAMMARS];
         CONFIGS[self as usize].get_or_init(|| self.build_config())
+    }
+
+    fn injection_query(self) -> Option<&'static str> {
+        Some(match self {
+            Self::Markdown => tree_sitter_md::INJECTION_QUERY_BLOCK,
+            Self::MarkdownInline => tree_sitter_md::INJECTION_QUERY_INLINE,
+            Self::Html => tree_sitter_html::INJECTIONS_QUERY,
+            // Tagged templates (sql`…`, css`…`, html`…`); regex/JSDoc have no grammar here.
+            Self::JavaScript | Self::TypeScript | Self::Tsx => tree_sitter_javascript::INJECTIONS_QUERY,
+            // Macro arguments (`println!`, `vec!`) are highlighted as Rust.
+            Self::Rust => tree_sitter_rust::INJECTIONS_QUERY,
+            _ => return None,
+        })
     }
 
     fn build_config(self) -> LanguageConfig {
@@ -222,6 +275,10 @@ impl LanguageId {
             Self::Markdown => (
                 tree_sitter_md::LANGUAGE.into(),
                 vec![tree_sitter_md::HIGHLIGHT_QUERY_BLOCK],
+            ),
+            Self::MarkdownInline => (
+                tree_sitter_md::INLINE_LANGUAGE.into(),
+                vec![tree_sitter_md::HIGHLIGHT_QUERY_INLINE],
             ),
             Self::C => (
                 tree_sitter_c::LANGUAGE.into(),
@@ -283,12 +340,21 @@ impl LanguageId {
         let kinds = query
             .capture_names()
             .iter()
-            .map(|n| HighlightKind::from_capture_name(n))
+            .map(|n| match HighlightKind::from_capture_name(n) {
+                _ if *n == "none" => Some(HighlightKind::Plain),
+                HighlightKind::Plain => None,
+                kind => Some(kind),
+            })
             .collect();
+        let injections = self.injection_query().map(|source| {
+            InjectionQuery::new(&language, source)
+                .unwrap_or_else(|e| panic!("bundled injection query for {self:?} is invalid: {e}"))
+        });
         LanguageConfig {
             language,
             query,
             kinds,
+            injections,
             first_wins: matches!(self, Self::Go),
         }
     }

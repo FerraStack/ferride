@@ -84,6 +84,13 @@ class LanguageScreenshotTest {
     @Test fun sqlDark() = language("sql", false)
     @Test fun sqlNightOwl() = language("sql", true)
 
+    // Injections (#12): Markdown inline syntax and fenced code; CSS/JS inside HTML
+    // (html above); SQL and CSS in JavaScript tagged templates.
+    @Test fun markdownDark() = language("markdown", false)
+    @Test fun markdownNightOwl() = language("markdown", true)
+    @Test fun javascriptDark() = language("javascript", false)
+    @Test fun javascriptNightOwl() = language("javascript", true)
+
     /** Change Language Mode, opened from the status bar's language item. */
     @Test
     fun languagePickerDark() = shoot("phone_language_mode_dark", "script.sh", nightOwlTheme = false) {

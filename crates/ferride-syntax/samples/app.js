@@ -20,4 +20,9 @@ class Counter extends EventTarget {
   }
 }
 
+const query = sql`SELECT word, COUNT(*) FROM words WHERE length(word) > ${TOP} GROUP BY word`;
+const styles = css`
+  .counter { color: red; }
+`;
+
 topWords(process.argv[2]).then(console.log).catch((err) => console.error(err));
