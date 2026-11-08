@@ -110,7 +110,17 @@ fn workspace_round_trip() {
     ws.write_file(format!("{root}/b.py"), "alpha = 1\n".into())
         .unwrap();
     assert_eq!(ws.read_file(format!("{root}/b.py")).unwrap(), "alpha = 1\n");
-    let r = ws.search_text("alpha".into(), false, false, false, 100).unwrap();
+    let r = ws
+        .search_text("alpha".into(), false, false, false, 100, None)
+        .unwrap();
+    assert!(!r.cancelled);
+    let cancel = crate::SearchCancellation::new();
+    cancel.cancel();
+    assert!(cancel.is_cancelled());
+    let stopped = ws
+        .search_text("alpha".into(), false, false, false, 100, Some(cancel))
+        .unwrap();
+    assert!(stopped.cancelled && stopped.hits.is_empty());
     assert_eq!(r.hits.len(), 2);
     assert_eq!(ws.find_files("bpy".into(), 5)[0].rel_path, "b.py");
     assert!(matches!(

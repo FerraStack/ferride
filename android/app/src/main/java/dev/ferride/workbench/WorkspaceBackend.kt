@@ -5,6 +5,7 @@ import dev.ferride.core.FileHit
 import dev.ferride.core.FileNode
 import dev.ferride.core.MatchRange
 import dev.ferride.core.SearchHit
+import dev.ferride.core.SearchCancellation
 import dev.ferride.core.SearchReport
 import dev.ferride.core.SafTree
 import dev.ferride.core.WorkspaceHandle
@@ -31,7 +32,8 @@ interface WorkspaceBackend {
     fun readFile(path: String): String
     fun writeFile(path: String, contents: String)
     fun findFiles(query: String, limit: Int): List<FileHit>
-    fun searchText(query: String, regex: Boolean, caseSensitive: Boolean, wholeWord: Boolean): SearchReport
+    /** Full-text search; returns early (partial, `cancelled = true`) once [token] is cancelled. */
+    fun searchText(query: String, regex: Boolean, caseSensitive: Boolean, wholeWord: Boolean, token: SearchToken = SearchToken()): SearchReport
     fun createModel(text: String, fileName: String): EditorModel
     fun ferrux(): FerruxStatus
     /** Current branch from `.git/HEAD`, if the folder is a repository. */
@@ -51,8 +53,21 @@ class RustWorkspaceBackend(private val handle: WorkspaceHandle) : WorkspaceBacke
     override fun readFile(path: String) = handle.readFile(path)
     override fun writeFile(path: String, contents: String) = handle.writeFile(path, contents)
     override fun findFiles(query: String, limit: Int) = handle.findFiles(query, limit)
-    override fun searchText(query: String, regex: Boolean, caseSensitive: Boolean, wholeWord: Boolean) =
-        handle.searchText(query, regex, caseSensitive, wholeWord, 2000)
+    override fun searchText(
+        query: String,
+        regex: Boolean,
+        caseSensitive: Boolean,
+        wholeWord: Boolean,
+        token: SearchToken,
+    ): SearchReport = SearchCancellation().use { native ->
+        token.onCancel { native.cancel() }
+        // Detach before `use` frees the native object, so a late cancel() can't touch it.
+        try {
+            handle.searchText(query, regex, caseSensitive, wholeWord, 2000, native)
+        } finally {
+            token.clearListener()
+        }
+    }
     override fun createModel(text: String, fileName: String): EditorModel = RustEditorModel.create(text, fileName)
     override fun ferrux(): FerruxStatus = ferruxStatus()
     override fun gitBranch(): String? = handle.localRoot()?.let { readBranch(File(it, ".git/HEAD")) }
@@ -79,6 +94,8 @@ class FakeWorkspaceBackend(
     private val branch: String? = "main",
     /** Called inside [writeFile] (tests use it to simulate edits during a save). */
     private val onWrite: (String) -> Unit = {},
+    /** Called at the start of [searchText] (tests use it to make a search slow). */
+    private val onSearch: (String, SearchToken) -> Unit = { _, _ -> },
     override val kind: WorkspaceKind = WorkspaceKind.LOCAL,
     override val root: String = if (kind == WorkspaceKind.SAF) "content://sample.documents/tree/$name" else "/sample/$name",
 ) : WorkspaceBackend {
@@ -113,7 +130,15 @@ class FakeWorkspaceBackend(
         .sortedByDescending { it.score }
         .take(limit)
 
-    override fun searchText(query: String, regex: Boolean, caseSensitive: Boolean, wholeWord: Boolean): SearchReport {
+    override fun searchText(
+        query: String,
+        regex: Boolean,
+        caseSensitive: Boolean,
+        wholeWord: Boolean,
+        token: SearchToken,
+    ): SearchReport {
+        onSearch(query, token)
+        if (token.cancelled) return SearchReport(emptyList(), 0, false, true)
         val hits = files.toSortedMap().flatMap { (p, text) ->
             text.lines().mapIndexedNotNull { i, line ->
                 val at = line.indexOf(query, ignoreCase = !caseSensitive)
@@ -121,11 +146,41 @@ class FakeWorkspaceBackend(
                 else SearchHit("$root/$p", p, i, line, listOf(MatchRange(at, at + query.length)))
             }
         }
-        return SearchReport(hits, files.size, false)
+        return SearchReport(hits, files.size, false, false)
     }
 
     override fun createModel(text: String, fileName: String): EditorModel = FakeEditorModel(text, fileName)
     override fun ferrux(): FerruxStatus = FerruxStatus.NotInstalled
     override fun gitBranch(): String? = branch
     override fun copyInto(dest: String): String = dest
+}
+
+/**
+ * Cancels a running workspace search when a newer one starts (#9). Safe to
+ * cancel from any thread, before or during the search.
+ */
+class SearchToken {
+    @Volatile
+    var cancelled = false
+        private set
+    private var listener: (() -> Unit)? = null
+
+    // The listener runs under the lock, so clearListener() guarantees it won't run afterwards.
+    @Synchronized
+    fun cancel() {
+        cancelled = true
+        listener?.invoke()
+    }
+
+    /** Runs [block] on cancel (immediately if already cancelled). */
+    @Synchronized
+    fun onCancel(block: () -> Unit) {
+        listener = block
+        if (cancelled) block()
+    }
+
+    @Synchronized
+    fun clearListener() {
+        listener = null
+    }
 }

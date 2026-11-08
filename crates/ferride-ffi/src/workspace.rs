@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use ferride_workspace::{
     DocNode, DocumentTree, FerruxVfs, LocalVfs, SafVfs, SearchOptions, Vfs, VfsKind, WorkspaceError,
@@ -163,6 +164,31 @@ pub struct SearchReport {
     pub hits: Vec<SearchHit>,
     pub files_searched: i32,
     pub truncated: bool,
+    /// Stopped by [`SearchCancellation::cancel`]; `hits` is partial.
+    pub cancelled: bool,
+}
+
+/// Cancels a running [`WorkspaceHandle::search_text`] from another thread
+/// (a newer query started). The search checks it between files and lines.
+#[derive(Debug, Default, uniffi::Object)]
+pub struct SearchCancellation {
+    flag: Arc<AtomicBool>,
+}
+
+#[uniffi::export]
+impl SearchCancellation {
+    #[uniffi::constructor]
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn cancel(&self) {
+        self.flag.store(true, Ordering::Relaxed);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.flag.load(Ordering::Relaxed)
+    }
 }
 
 /// An opened folder on any backend. Paths may be absolute (starting with
@@ -367,6 +393,7 @@ impl WorkspaceHandle {
         case_sensitive: bool,
         whole_word: bool,
         max_results: i32,
+        cancel: Option<Arc<SearchCancellation>>,
     ) -> Result<SearchReport, FerrideError> {
         let Some(local) = &self.local else {
             return Err(WorkspaceError::Unsupported(NO_TEXT_SEARCH.into()).into());
@@ -378,6 +405,7 @@ impl WorkspaceHandle {
                 case_sensitive,
                 whole_word,
                 max_results: max_results.max(0) as usize,
+                cancel: cancel.map(|c| c.flag.clone()),
             },
         )?;
         Ok(SearchReport {
@@ -401,6 +429,7 @@ impl WorkspaceHandle {
                 .collect(),
             files_searched: r.files_searched as i32,
             truncated: r.truncated,
+            cancelled: r.cancelled,
         })
     }
 }

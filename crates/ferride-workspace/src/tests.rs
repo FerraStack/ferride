@@ -202,6 +202,26 @@ fn text_search_literal_regex_case_word() {
     assert!(r.truncated);
 }
 
+#[test]
+fn search_can_be_cancelled() {
+    let (_d, ws) = fixture();
+    let flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let opts = SearchOptions {
+        cancel: Some(flag.clone()),
+        ..Default::default()
+    };
+    let r = ws.search_text("hello", &opts).unwrap();
+    assert!(r.cancelled);
+    assert!(
+        r.matches.is_empty(),
+        "a search cancelled before it starts finds nothing"
+    );
+    flag.store(false, std::sync::atomic::Ordering::SeqCst);
+    let r = ws.search_text("hello", &opts).unwrap();
+    assert!(!r.cancelled);
+    assert!(!r.matches.is_empty());
+}
+
 #[cfg(unix)]
 #[test]
 fn symlinks_cannot_escape_and_writes_go_through_links() {
