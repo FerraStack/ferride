@@ -13,7 +13,7 @@
 mod client;
 pub mod codec;
 
-pub use client::{LspClient, LspError, LspEvent};
+pub use client::{CancelToken, LspClient, LspError, LspEvent};
 pub use lsp_types;
 
 use lsp_types::Uri;
