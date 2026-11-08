@@ -25,6 +25,7 @@ import dev.ferride.theme.VsCodeTheme
 import dev.ferride.ui.FerrideWorkbench
 import dev.ferride.workbench.RustWorkspaceBackend
 import dev.ferride.workbench.SampleProject
+import dev.ferride.workbench.RecentFolder
 import dev.ferride.workbench.SettingsStore
 import dev.ferride.workbench.WorkbenchState
 import dev.ferride.workbench.WorkspaceBackend
@@ -67,6 +68,33 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
             pickFolderRequest?.invoke()
         }
         override fun openLocal(path: String): WorkspaceBackend = RustWorkspaceBackend.open(path)
+
+        override fun openRecent(recent: RecentFolder): WorkspaceBackend = when (recent.kind) {
+            WorkspaceKind.SAF -> {
+                val uri = Uri.parse(recent.root)
+                check(getApplication<Application>().contentResolver.persistedUriPermissions.any { it.uri == uri }) {
+                    "access to this folder was revoked"
+                }
+                backendFor(uri)
+            }
+            else -> RustWorkspaceBackend.open(recent.root)
+        }
+
+        override fun loadRecents(): List<RecentFolder> = runCatching {
+            val arr = org.json.JSONArray(prefs.getString(KEY_RECENTS, "[]"))
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                RecentFolder(WorkspaceKind.valueOf(o.getString("kind")), o.getString("root"), o.getString("name"))
+            }
+        }.getOrDefault(emptyList())
+
+        override fun saveRecents(recents: List<RecentFolder>) {
+            val arr = org.json.JSONArray()
+            recents.forEach { r ->
+                arr.put(org.json.JSONObject().put("kind", r.kind.name).put("root", r.root).put("name", r.name))
+            }
+            prefs.edit().putString(KEY_RECENTS, arr.toString()).apply()
+        }
     }
 
     // The last local folder reopens directly; the sample project otherwise.
@@ -83,7 +111,7 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
         host = host,
     ).also {
         it.onWorkspaceOpened = ::remember
-        it.start(openFirst = if (restoredLocal == null) "src/main.rs" else null)
+        it.start(openFirst = if (restoredLocal == null) "src/main.rs" else null, showWelcome = true)
     }
 
     init {
@@ -130,6 +158,7 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         private const val KEY_LAST = "last"
+        private const val KEY_RECENTS = "recents"
     }
 }
 

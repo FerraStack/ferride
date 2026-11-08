@@ -91,6 +91,7 @@ expect_no_text() {
 }
 
 shoot dark
+expect_text "Welcome" "the Welcome tab opens on first launch"
 
 # Touch selection (#8): long press in the editor shows the floating toolbar;
 # Select All keeps it open with Cut/Copy; Copy closes it.
