@@ -77,6 +77,7 @@ object VsCodeTheme {
             warningSquiggle = col("editorWarning.foreground", base.warningSquiggle),
             infoSquiggle = col("editorInfo.foreground", base.infoSquiggle),
             scrollbarSlider = col("scrollbarSlider.background", base.scrollbarSlider),
+            minimapSliderBackground = col("minimapSlider.background", base.minimapSliderBackground),
             editorGroupHeaderBackground = col("editorGroupHeader.tabsBackground", base.editorGroupHeaderBackground),
             tabActiveBackground = col("tab.activeBackground", base.tabActiveBackground),
             tabInactiveBackground = col("tab.inactiveBackground", base.tabInactiveBackground),

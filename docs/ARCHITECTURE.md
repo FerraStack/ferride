@@ -111,7 +111,8 @@ Width classes follow Material breakpoints (compact < 600 dp ≤ medium < 840 dp 
 
 Done now: current line highlight, indent guides, bracket pair colorization (bracket tokens and depths come from the tree-sitter tree in Rust, so brackets in strings/comments are ignored), line numbers, **word wrap** (`editor.wordWrap`; the default is on for compact/phone windows and off otherwise, continuation rows indented like the line, numbers only on the first visual row), thin scrollbars (horizontal when wrap is off), find/replace widget (case/word/regex, n of m, replace/replace all), diagnostics squiggles + Problems panel, VS Code-style copy/cut of the whole line without a selection, smart Home, auto-indent on Enter, unsaved-changes prompt on close.
 Done in M1: selection handles and floating toolbar (#8).
-Planned: minimap (optional, off on phones), multi-cursor UI (the buffer already supports it), snippets in VS Code snippet JSON format, sticky scroll, code folding.
+Done: **minimap** (`editor.minimap.enabled`; default on for wide windows, off on phones): VS Code's scale-1 minimap (2 dp per line, 1 dp per column, colored runs, up to 120 columns) right of the text with a `minimapSlider.background` slider; rendered into a cached bitmap rebuilt when the text or the minimap's first line changes (throttled to 100 ms while typing); tap or drag it to scroll.
+Planned: multi-cursor UI (the buffer already supports it), snippets in VS Code snippet JSON format, sticky scroll, code folding.
 
 ## Syntax highlighting
 

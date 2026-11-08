@@ -14,7 +14,8 @@ data class Settings(
     /** `null` = default: on for compact (phone) windows, off otherwise. */
     val wordWrap: Boolean? = null,
     val lineNumbers: Boolean = true,
-    val minimap: Boolean = false,
+    /** `null` = default: on for wide windows (tablets), off on phones. */
+    val minimap: Boolean? = null,
     val renderIndentGuides: Boolean = true,
     val highlightActiveLine: Boolean = true,
     val bracketPairColorization: Boolean = true,
@@ -63,7 +64,7 @@ data class Settings(
         o.put(EDITOR_INSERT_SPACES, insertSpaces)
         wordWrap?.let { o.put(EDITOR_WORD_WRAP, if (it) "on" else "off") }
         o.put(EDITOR_LINE_NUMBERS, if (lineNumbers) "on" else "off")
-        o.put(EDITOR_MINIMAP, minimap)
+        minimap?.let { o.put(EDITOR_MINIMAP, it) }
         o.put(EDITOR_INDENT_GUIDES, renderIndentGuides)
         o.put(EDITOR_LINE_HIGHLIGHT, if (highlightActiveLine) "line" else "none")
         o.put(EDITOR_BRACKET_PAIRS, bracketPairColorization)
@@ -114,7 +115,7 @@ data class Settings(
                 insertSpaces = o.optBoolean(EDITOR_INSERT_SPACES, d.insertSpaces),
                 wordWrap = if (o.has(EDITOR_WORD_WRAP)) o.optString(EDITOR_WORD_WRAP) != "off" else null,
                 lineNumbers = o.optString(EDITOR_LINE_NUMBERS, "on") != "off",
-                minimap = o.optBoolean(EDITOR_MINIMAP, d.minimap),
+                minimap = if (o.has(EDITOR_MINIMAP)) o.optBoolean(EDITOR_MINIMAP, true) else null,
                 renderIndentGuides = o.optBoolean(EDITOR_INDENT_GUIDES, d.renderIndentGuides),
                 highlightActiveLine = o.optString(EDITOR_LINE_HIGHLIGHT, "line") != "none",
                 bracketPairColorization = o.optBoolean(EDITOR_BRACKET_PAIRS, d.bracketPairColorization),

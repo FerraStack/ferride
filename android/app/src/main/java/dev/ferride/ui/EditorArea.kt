@@ -84,7 +84,7 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
     val squiggles = state.diagnostics[tab.path].orEmpty().map { d ->
         Squiggle(model.offsetAt(d.line, d.startColumn), model.offsetAt(d.endLine, d.endColumn), d.severity)
     }
-    val style = editorStyle(c, state.settings, state.wordWrap)
+    val style = editorStyle(c, state.settings, state.wordWrap, state.minimapEnabled)
     var selectionUi by remember { mutableStateOf<SelectionUi?>(null) }
     val viewRef = remember { arrayOfNulls<CodeEditorView>(1) }
     BoxWithConstraints(modifier.fillMaxWidth()) {
