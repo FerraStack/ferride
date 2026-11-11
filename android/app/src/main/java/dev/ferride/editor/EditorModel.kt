@@ -1,6 +1,7 @@
 package dev.ferride.editor
 
 import dev.ferride.core.Document
+import dev.ferride.core.DocumentSymbol
 import dev.ferride.core.ViewLine
 
 /** A selection in UTF-16 offsets. */
@@ -31,6 +32,12 @@ interface EditorModel {
     var language: String?
     /** Re-detects the language from the file name and `#!` line ("Auto Detect"). */
     fun detectLanguage(): String?
+
+    /**
+     * Outline symbols in document order (pre-order), each with its parent's
+     * index (-1 for top level); empty without a grammar.
+     */
+    fun symbols(): List<DocumentSymbol> = emptyList()
     /** Bumped by every content change. */
     val version: Long
     val lineCount: Int
@@ -86,6 +93,8 @@ class RustEditorModel(private val doc: Document, override val fileName: String) 
         set(value) = doc.setLanguage(value)
 
     override fun detectLanguage(): String? = doc.detectLanguage()
+
+    override fun symbols(): List<DocumentSymbol> = doc.symbols()
     override val version: Long get() = doc.version()
     override val lineCount: Int get() = doc.lineCount()
     override val length: Int get() = doc.lenUtf16()

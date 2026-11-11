@@ -1,0 +1,7 @@
+Function word_counts  [4-10]
+Struct Circle  [13-15]
+  Field radius  [14-14]
+Object impl Circle  [17-23]
+  Constant UNIT  [18-18]
+  Method area  [20-22]
+Function main  [25-32]

@@ -9,6 +9,8 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+ferride-buffer.workspace = true
+ferride-syntax.workspace = true
 ignore.workspace = true
 grep-searcher.workspace = true
 grep-regex.workspace = true

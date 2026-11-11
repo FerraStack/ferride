@@ -6,6 +6,7 @@
 
 mod fuzzy;
 mod search;
+pub mod symbols;
 pub mod vfs;
 
 use std::fs;

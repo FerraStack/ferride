@@ -1,0 +1,6 @@
+Constant MAX_WORDS  [4-4]
+Struct Word  [7-10]
+  Field text  [8-8]
+  Field count  [9-9]
+Function compare  [12-15]
+Function main  [17-26]
