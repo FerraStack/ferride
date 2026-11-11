@@ -517,6 +517,7 @@ dependencies = [
  "ferride-syntax",
  "ferride-theme",
  "ferride-workspace",
+ "log",
  "lsp-types",
  "serde_json",
  "tempfile",
