@@ -103,7 +103,7 @@ fun ScmOverlays(scm: ScmState, maxWidth: Dp, autoFocus: Boolean = true) {
             },
         )
     }
-    scm.credentialPrompt?.let { CredentialDialog(it) }
+    scm.credentialPrompt?.let { CredentialDialog(it, maxWidth) }
 }
 
 @Composable
@@ -231,15 +231,20 @@ private fun InputBoxContent(box: InputBox, autoFocus: Boolean, close: () -> Unit
 }
 
 @Composable
-private fun CredentialDialog(prompt: CredentialPrompt) {
+private fun CredentialDialog(prompt: CredentialPrompt, maxWidth: Dp) {
     val c = LocalWorkbenchColors.current
     val host = hostKey(prompt.url).substringAfter("://")
+    // AlertDialog sizes itself to its content, and the fields below use fillMaxWidth(). On a phone
+    // that pair never settles (the dialog grows to the field, the field grows to the dialog), so
+    // Compose waitForIdle spins. An explicit width, the same idea as QuickInputFrame, breaks the cycle.
+    // Stay inside Material's 280–560 dialog band after the dialog's own 24.dp padding.
+    val dialogWidth = (maxWidth - 120.dp).coerceIn(280.dp, 480.dp)
     AlertDialog(
         onDismissRequest = { prompt.cancel() },
         containerColor = c.quickInputBackground,
         title = { Text("Sign in to $host", color = c.inputForeground, fontSize = 16.sp) },
         text = {
-            Column {
+            Column(Modifier.width(dialogWidth)) {
                 // Focusable so it, not the Username field, takes the dialog window's initial focus (outside
                 // touch mode Android focuses the first focusable): no keyboard pops up, no endless cursor blink.
                 Text(
