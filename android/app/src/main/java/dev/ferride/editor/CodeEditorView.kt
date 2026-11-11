@@ -537,6 +537,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         }
         canvas.restore()
         drawGutter(canvas, firstRow, lastRow, caretLine)
+        drawStickyScroll(canvas, caretLine)
         drawMinimap(canvas)
         drawScrollbars(canvas)
         drawHandles(canvas)
@@ -793,6 +794,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (onStickyTouch(event)) return true
         if (onMinimapTouch(event)) return true
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             val handle = handleAt(event.x, event.y)
@@ -1546,6 +1548,46 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         val text = clip.getItemAt(0).coerceToText(context).toString()
         if (text.isNotEmpty()) insertText(text)
     }
+
+    // ----- sticky scroll (editor.stickyScroll; logic in StickyScroll) --------------------
+
+    private val sticky = StickyScroll()
+
+    /** Line ranges (0-based, inclusive) of multi-line outline symbols, outer first. */
+    var stickyScopes: List<IntRange>
+        get() = sticky.scopes
+        set(value) {
+            if (sticky.scopes != value) {
+                sticky.scopes = value
+                invalidate()
+            }
+        }
+
+    /** `editor.stickyScroll.enabled`. */
+    var stickyScrollEnabled: Boolean
+        get() = sticky.enabled
+        set(value) {
+            sticky.enabled = value
+            invalidate()
+        }
+
+    private fun drawStickyScroll(canvas: Canvas, caretLine: Int) {
+        val m = liveModel ?: return
+        sticky.update(sy, lineHeight, ::lineOfRow)
+        sticky.draw(canvas, m, width.toFloat(), lineHeight, density, style.background) { line, vl, top ->
+            val end = breaksOf(line).getOrNull(1) ?: vl.text.length
+            canvas.save()
+            canvas.clipRect(gutterWidth, top, width.toFloat(), top + lineHeight)
+            drawRun(canvas, layout(vl.text), colorsFor(vl), 0, end, textLeft - sx, top + baseline)
+            canvas.restore()
+            if (style.lineNumbers) {
+                gutterPaint.color = if (line == caretLine) style.lineNumberActive else style.lineNumber
+                canvas.drawText((line + 1).toString(), gutterWidth - charWidth * 1.5f, top + baseline, gutterPaint)
+            }
+        }
+    }
+
+    private fun onStickyTouch(event: MotionEvent): Boolean = sticky.onTouch(event, lineHeight, ::goToLine)
 
     override fun goToLine(line: Int) {
         val m = liveModel ?: return

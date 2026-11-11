@@ -16,6 +16,8 @@ data class Settings(
     val lineNumbers: Boolean = true,
     /** `null` = default: on for wide windows (tablets), off on phones. */
     val minimap: Boolean? = null,
+    /** `editor.stickyScroll.enabled`: enclosing scopes stay at the top while scrolling. */
+    val stickyScroll: Boolean = true,
     val renderIndentGuides: Boolean = true,
     val highlightActiveLine: Boolean = true,
     val bracketPairColorization: Boolean = true,
@@ -42,6 +44,7 @@ data class Settings(
         EDITOR_WORD_WRAP to wordWrap?.let { if (it) "on" else "off" },
         EDITOR_LINE_NUMBERS to if (lineNumbers) "on" else "off",
         EDITOR_MINIMAP to minimap,
+        EDITOR_STICKY_SCROLL to stickyScroll,
         EDITOR_INDENT_GUIDES to renderIndentGuides,
         EDITOR_LINE_HIGHLIGHT to if (highlightActiveLine) "line" else "none",
         EDITOR_BRACKET_PAIRS to bracketPairColorization,
@@ -77,6 +80,7 @@ data class Settings(
         wordWrap?.let { o.put(EDITOR_WORD_WRAP, if (it) "on" else "off") }
         o.put(EDITOR_LINE_NUMBERS, if (lineNumbers) "on" else "off")
         minimap?.let { o.put(EDITOR_MINIMAP, it) }
+        o.put(EDITOR_STICKY_SCROLL, stickyScroll)
         o.put(EDITOR_INDENT_GUIDES, renderIndentGuides)
         o.put(EDITOR_LINE_HIGHLIGHT, if (highlightActiveLine) "line" else "none")
         o.put(EDITOR_BRACKET_PAIRS, bracketPairColorization)
@@ -98,6 +102,7 @@ data class Settings(
         const val EDITOR_WORD_WRAP = "editor.wordWrap"
         const val EDITOR_LINE_NUMBERS = "editor.lineNumbers"
         const val EDITOR_MINIMAP = "editor.minimap.enabled"
+        const val EDITOR_STICKY_SCROLL = "editor.stickyScroll.enabled"
         const val EDITOR_INDENT_GUIDES = "editor.guides.indentation"
         const val EDITOR_LINE_HIGHLIGHT = "editor.renderLineHighlight"
         const val EDITOR_BRACKET_PAIRS = "editor.bracketPairColorization.enabled"
@@ -112,7 +117,7 @@ data class Settings(
 
         private val KNOWN = setOf(
             EDITOR_FONT_SIZE, EDITOR_TAB_SIZE, EDITOR_INSERT_SPACES, EDITOR_WORD_WRAP, EDITOR_LINE_NUMBERS,
-            EDITOR_MINIMAP, EDITOR_INDENT_GUIDES, EDITOR_LINE_HIGHLIGHT, EDITOR_BRACKET_PAIRS, FILES_AUTO_SAVE,
+            EDITOR_MINIMAP, EDITOR_STICKY_SCROLL, EDITOR_INDENT_GUIDES, EDITOR_LINE_HIGHLIGHT, EDITOR_BRACKET_PAIRS, FILES_AUTO_SAVE,
             WORKBENCH_COLOR_THEME, WINDOW_AUTO_DETECT, FERRIDE_EXTRA_KEYS, WORKBENCH_STARTUP_EDITOR,
             GIT_USER_NAME, GIT_USER_EMAIL, GIT_SMART_COMMIT,
         )
@@ -137,6 +142,7 @@ data class Settings(
                 wordWrap = if (o.has(EDITOR_WORD_WRAP)) o.optString(EDITOR_WORD_WRAP) != "off" else null,
                 lineNumbers = o.optString(EDITOR_LINE_NUMBERS, "on") != "off",
                 minimap = if (o.has(EDITOR_MINIMAP)) o.optBoolean(EDITOR_MINIMAP, true) else null,
+                stickyScroll = o.optBoolean(EDITOR_STICKY_SCROLL, d.stickyScroll),
                 renderIndentGuides = o.optBoolean(EDITOR_INDENT_GUIDES, d.renderIndentGuides),
                 highlightActiveLine = o.optString(EDITOR_LINE_HIGHLIGHT, "line") != "none",
                 bracketPairColorization = o.optBoolean(EDITOR_BRACKET_PAIRS, d.bracketPairColorization),

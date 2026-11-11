@@ -14,6 +14,7 @@ mod highlight;
 mod injection;
 mod language;
 mod scope;
+mod symbols;
 
 use std::cell::RefCell;
 use std::ops::ControlFlow;
@@ -31,6 +32,7 @@ pub const INITIAL_PARSE_BUDGET: Duration = Duration::from_millis(1500);
 pub const EDIT_PARSE_BUDGET: Duration = Duration::from_millis(40);
 pub use language::LanguageId;
 pub use scope::{ScopeId, root_scope, scope_stack};
+pub use symbols::{Symbol, SymbolKind};
 
 /// Incremental parser + tree for one document.
 pub struct Syntax {
@@ -282,6 +284,16 @@ fn paint_layer(
             cache,
             depth + 1,
         );
+    }
+}
+
+impl Syntax {
+    /// Outline symbols (byte ranges), nested by containment.
+    pub fn symbols(&self, rope: &Rope) -> Vec<Symbol> {
+        match &self.tree {
+            Some(tree) => symbols::symbols(self.language, tree, rope),
+            None => Vec::new(),
+        }
     }
 }
 

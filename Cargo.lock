@@ -598,6 +598,8 @@ dependencies = [
 name = "ferride-workspace"
 version = "0.1.0"
 dependencies = [
+ "ferride-buffer",
+ "ferride-syntax",
  "grep-matcher",
  "grep-regex",
  "grep-searcher",

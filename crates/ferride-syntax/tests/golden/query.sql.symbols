@@ -1,0 +1,5 @@
+Struct words  [2-7]
+  Field id  [3-3]
+  Field document_id  [4-4]
+  Field word  [5-5]
+  Field created_at  [6-6]

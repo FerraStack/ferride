@@ -1,5 +1,7 @@
 package dev.ferride.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -90,6 +92,12 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
         Squiggle(model.offsetAt(d.line, d.startColumn), model.offsetAt(d.endLine, d.endColumn), d.severity)
     }
     val style = editorStyle(c, state.settings, state.wordWrap, state.minimapEnabled)
+    // Sticky scroll follows the outline: every symbol spanning several lines.
+    val stickyScopes = if (state.settings.stickyScroll) {
+        state.activeSymbols().filter { it.endLine > it.startLine }.map { it.startLine..it.endLine }
+    } else {
+        emptyList()
+    }
     var selectionUi by remember { mutableStateOf<SelectionUi?>(null) }
     val viewRef = remember { arrayOfNulls<CodeEditorView>(1) }
     BoxWithConstraints(modifier.fillMaxWidth()) {
@@ -106,6 +114,8 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
                 view.findMatches = matches
                 view.currentMatch = state.find.current
                 view.squiggles = squiggles
+                view.stickyScrollEnabled = state.settings.stickyScroll
+                view.stickyScopes = stickyScopes
                 view.onSelectionUi = { selectionUi = it }
                 state.editor = view
             },
@@ -202,15 +212,39 @@ private fun EditorTabItem(tab: EditorTab, active: Boolean, onSelect: () -> Unit,
 @Composable
 private fun Breadcrumbs(state: WorkbenchState, tab: EditorTab) {
     val c = LocalWorkbenchColors.current
+    tab.revision // follow the caret
     val parts = when (tab.kind) {
         TabKind.SettingsJson -> listOf("User", "settings.json")
         else -> listOf(state.backend.name) + tab.path.removePrefix(state.backend.root).trimStart('/').split('/')
     }
-    Row(Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    // VS Code's symbol segments: the symbols enclosing the caret, outermost first.
+    val symbols = if (tab.kind == TabKind.File) state.activeSymbols() else emptyList()
+    val caret = tab.model?.takeIf { !it.isClosed }?.selection?.head ?: -1
+    val chain = state.symbolChainAt(symbols, caret)
+    val scroll = rememberScrollState()
+    LaunchedEffect(chain, scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+    Row(
+        Modifier.fillMaxWidth().height(24.dp).horizontalScroll(scroll).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         parts.forEachIndexed { i, p ->
             if (i == parts.lastIndex) FileIcon(p)
-            Text(p, color = c.breadcrumbForeground, fontSize = 12.sp, maxLines = 1)
-            if (i < parts.lastIndex) {
+            Text(p, color = c.breadcrumbForeground, fontSize = 12.sp, maxLines = 1, softWrap = false)
+            if (i < parts.lastIndex || chain.isNotEmpty()) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.breadcrumbForeground, modifier = Modifier.size(14.dp))
+            }
+        }
+        chain.forEachIndexed { k, i ->
+            val s = symbols[i]
+            Row(
+                Modifier.clickable(onClickLabel = "Go to ${s.name}") { state.revealSymbol(s) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CodiconIcon(SymbolIcons.glyph(s.kind), SymbolIcons.color(s.kind, c.isDark, c.breadcrumbForeground), size = 14.dp)
+                Spacer(Modifier.width(3.dp))
+                Text(s.name, color = c.breadcrumbForeground, fontSize = 12.sp, maxLines = 1, softWrap = false)
+            }
+            if (k < chain.lastIndex) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.breadcrumbForeground, modifier = Modifier.size(14.dp))
             }
         }
