@@ -289,6 +289,9 @@ class WorkbenchState(
     /** `editor.wordWrap`: the user's value, else on for compact windows (phones). */
     val wordWrap: Boolean get() = settings.wordWrap ?: compactWindow
 
+    /** `editor.minimap.enabled`: the user's value, else on for wide windows and off on phones. */
+    val minimapEnabled: Boolean get() = settings.minimap ?: !compactWindow
+
     init {
         registerCommands()
         log("Opened workspace ${backend.name} (${backend.root})")

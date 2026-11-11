@@ -40,6 +40,7 @@ data class WorkbenchColors(
     val warningSquiggle: Color,
     val infoSquiggle: Color,
     val scrollbarSlider: Color,
+    val minimapSliderBackground: Color,
     // Tabs + breadcrumbs
     val editorGroupHeaderBackground: Color,
     val tabActiveBackground: Color,
@@ -133,6 +134,7 @@ val DarkModern = WorkbenchColors(
     warningSquiggle = c(0xFFCCA700),
     infoSquiggle = c(0xFF3794FF),
     scrollbarSlider = c(0x66797979),
+    minimapSliderBackground = c(0x33797979),
     editorGroupHeaderBackground = c(0xFF181818),
     tabActiveBackground = c(0xFF1F1F1F),
     tabInactiveBackground = c(0xFF181818),
@@ -226,6 +228,7 @@ val LightModern = WorkbenchColors(
     warningSquiggle = c(0xFFBF8803),
     infoSquiggle = c(0xFF1A85FF),
     scrollbarSlider = c(0x66646464),
+    minimapSliderBackground = c(0x33646464),
     editorGroupHeaderBackground = c(0xFFF8F8F8),
     tabActiveBackground = c(0xFFFFFFFF),
     tabInactiveBackground = c(0xFFF8F8F8),
