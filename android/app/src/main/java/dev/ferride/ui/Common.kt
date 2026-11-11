@@ -97,7 +97,12 @@ fun fileBadge(name: String): Pair<String, Color> {
 fun languageDisplayName(id: String?): String = Languages.displayName(id)
 
 /** Workbench colors + settings → what the editor view draws with. */
-fun editorStyle(colors: WorkbenchColors, settings: Settings, wordWrap: Boolean = settings.wordWrap ?: false) = EditorStyle(
+fun editorStyle(
+    colors: WorkbenchColors,
+    settings: Settings,
+    wordWrap: Boolean = settings.wordWrap ?: false,
+    minimap: Boolean = settings.minimap ?: false,
+) = EditorStyle(
     background = colors.editorBackground.toArgb(),
     foreground = colors.editorForeground.toArgb(),
     lineHighlight = colors.editorLineHighlight.toArgb(),
@@ -117,6 +122,8 @@ fun editorStyle(colors: WorkbenchColors, settings: Settings, wordWrap: Boolean =
     scrollbar = colors.scrollbarSlider.toArgb(),
     handle = colors.focusBorder.toArgb(),
     wordWrap = wordWrap,
+    minimap = minimap,
+    minimapSlider = colors.minimapSliderBackground.toArgb(),
     fontSizeSp = settings.fontSize.toFloat(),
     tabSize = settings.tabSize,
     insertSpaces = settings.insertSpaces,
