@@ -33,6 +33,7 @@ import dev.ferride.core.ViewLine
 import java.text.BreakIterator
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
@@ -316,7 +317,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     private var wrap: Wrap? = null
     private val wrapping get() = style.wordWrap && (liveModel?.length ?: 0) <= MAX_WRAP_CHARS
 
-    private val textAreaWidth get() = max(charWidth * 8, width - textLeft - charWidth)
+    private val textAreaWidth get() = max(charWidth * 8, textRight - textLeft - charWidth)
 
     private fun wrapInfo(): Wrap? {
         val m = liveModel ?: return null
@@ -417,7 +418,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     private val textLeft get() = gutterWidth + textPad
     private val maxScrollY get() = max(0f, (totalRows() - 1) * lineHeight)
-    private val maxScrollX get() = if (wrapping) 0f else max(0f, maxLineWidth + charWidth * 4 - (width - textLeft))
+    private val maxScrollX get() = if (wrapping) 0f else max(0f, maxLineWidth + charWidth * 4 - (textRight - textLeft))
 
     private fun lines(first: Int, count: Int): List<ViewLine> {
         val m = liveModel ?: return emptyList()
@@ -475,7 +476,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         val caretLine = m.lineOfOffset(sel.head)
 
         canvas.save()
-        canvas.clipRect(gutterWidth, 0f, width.toFloat(), height.toFloat())
+        canvas.clipRect(gutterWidth, 0f, textRight, height.toFloat())
         for (vl in lines) {
             val layout = layout(vl.text)
             val lineStart = vl.startOffset
@@ -493,7 +494,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
                 fun x(col: Int) = rowX + xOf(layout, col)
                 if (style.highlightActiveLine && vl.line == caretLine && sel.isEmpty) {
                     fillPaint.color = style.lineHighlight
-                    canvas.drawRect(gutterWidth, top, width.toFloat(), top + lineHeight, fillPaint)
+                    canvas.drawRect(gutterWidth, top, textRight, top + lineHeight, fillPaint)
                 }
                 // Find matches.
                 findMatches.forEachIndexed { i, mr ->
@@ -537,6 +538,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         canvas.restore()
         drawGutter(canvas, firstRow, lastRow, caretLine)
         drawStickyScroll(canvas, caretLine)
+        drawMinimap(canvas)
         drawScrollbars(canvas)
         drawHandles(canvas)
     }
@@ -663,7 +665,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         }
         val maxX = maxScrollX
         if (maxX > 0f) {
-            val area = width - textLeft
+            val area = textRight - textLeft
             val thumbW = max(24f * density, area * area / (area + maxX))
             val left = textLeft + (sx / maxX) * (area - thumbW - thickness)
             canvas.drawRect(left, height - thickness, left + thumbW, height.toFloat(), fillPaint)
@@ -700,7 +702,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         var ny = sy
         if (cy < sy) ny = cy
         if (cy + lineHeight > sy + height) ny = cy + lineHeight - height
-        val areaWidth = width - textLeft
+        val areaWidth = textRight - textLeft
         if (!wrapping) {
             if (cx < sx) nx = max(0f, cx - charWidth * 4)
             if (cx > sx + areaWidth - charWidth * 2) nx = cx - areaWidth + charWidth * 4
@@ -793,6 +795,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (onStickyTouch(event)) return true
+        if (onMinimapTouch(event)) return true
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             val handle = handleAt(event.x, event.y)
             if (handle != null && liveModel != null) {
@@ -1598,8 +1601,133 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         afterSelectionChange(fromIme = false)
     }
 
+    // ----- minimap ---------------------------------------------------------------------------
+    // VS Code's minimap at scale 1: each line 2 dp tall, each column 1 dp wide,
+    // colored runs instead of glyphs, up to 120 columns, with a slider marking
+    // the visible part. Rendered into a cached bitmap (rebuilt when the text or
+    // the minimap's first line changes, at most every 100 ms while typing).
+    // Tap or drag on it to scroll.
+
+    private val mmLineH get() = 2f * density
+    private val mmCharW get() = 1f * density
+    private val minimapWidth: Float
+        get() = if (!style.minimap || width == 0) 0f else min(MINIMAP_COLUMNS * mmCharW, width * 0.18f).let { floor(it) }
+    /** Room for the vertical scrollbar to the right of the minimap. */
+    private val minimapGap get() = 6f * density
+    private val minimapLeft: Float get() = width - minimapWidth - minimapGap
+    /** Right edge of the text area (the minimap sits to its right). */
+    private val textRight: Float get() = if (minimapWidth > 0f) minimapLeft else width.toFloat()
+
+    /** How far the minimap content is scrolled: proportional to the editor when it doesn't fit. */
+    private val minimapScroll: Float
+        get() {
+            val content = lineCount() * mmLineH
+            return if (content <= height) 0f else (sy / max(1f, maxScrollY)) * (content - height)
+        }
+
+    private var minimapBitmap: android.graphics.Bitmap? = null
+    private var minimapKey: List<Any?>? = null
+    private var minimapFirst = 0
+    private var minimapRenderedAt = 0L
+    private var minimapDragging = false
+    private val minimapPaint = Paint()
+
+    private fun drawMinimap(canvas: Canvas) {
+        val w = minimapWidth
+        val m = liveModel ?: return
+        if (w <= 0f) return
+        val scroll = minimapScroll
+        val first = (scroll / mmLineH).toInt()
+        val count = (height / mmLineH).toInt() + 2
+        val key = listOf(m.version, first, count, w.toInt(), style)
+        if (key != minimapKey) {
+            val now = android.os.SystemClock.uptimeMillis()
+            val sameLines = minimapKey?.let { it[1] == first && it[2] == count && it[3] == w.toInt() && it[4] == style } == true
+            if (sameLines && minimapBitmap != null && now - minimapRenderedAt < MINIMAP_THROTTLE_MS) {
+                // Typing: keep the last picture a moment and redraw once things settle.
+                postInvalidateDelayed(MINIMAP_THROTTLE_MS)
+            } else {
+                renderMinimap(m, first, count, w)
+                minimapKey = key
+                minimapFirst = first
+                minimapRenderedAt = now
+            }
+        }
+        val left = minimapLeft
+        minimapBitmap?.let { canvas.drawBitmap(it, left, minimapFirst * mmLineH - scroll, null) }
+        // The slider: the part of the file on screen.
+        val top = sy / lineHeight * mmLineH - scroll
+        fillPaint.color = style.minimapSlider
+        canvas.drawRect(left, top, left + w, top + height / lineHeight * mmLineH, fillPaint)
+    }
+
+    private fun renderMinimap(m: EditorModel, first: Int, count: Int, w: Float) {
+        val bw = w.toInt().coerceAtLeast(1)
+        val bh = ceil(count * mmLineH).toInt().coerceAtLeast(1)
+        val bmp = minimapBitmap?.takeIf { it.width == bw && it.height == bh }
+            ?: android.graphics.Bitmap.createBitmap(bw, bh, android.graphics.Bitmap.Config.ARGB_8888).also {
+                minimapBitmap?.recycle()
+                minimapBitmap = it
+            }
+        bmp.eraseColor(style.background)
+        val c = Canvas(bmp)
+        val cw = mmCharW
+        val barH = mmLineH * 0.75f
+        for (vl in m.viewport(first, count)) {
+            val y = (vl.line - first) * mmLineH
+            val colors = colorsFor(vl)
+            val text = vl.text
+            var dcol = 0
+            var i = 0
+            while (i < text.length && dcol * cw < bw) {
+                val ch = text[i]
+                if (ch == ' ' || ch == '\t') {
+                    dcol += if (ch == '\t') style.tabSize - (dcol % style.tabSize) else 1
+                    i++
+                    continue
+                }
+                // A run of non-blank chars with one color is one bar.
+                val color = colors.getOrElse(i) { style.foreground }
+                val start = dcol
+                while (i < text.length && text[i] != ' ' && text[i] != '\t' && colors.getOrElse(i) { style.foreground } == color) {
+                    if (!Character.isLowSurrogate(text[i])) dcol++
+                    i++
+                }
+                minimapPaint.color = color
+                minimapPaint.alpha = 0xB0
+                c.drawRect(start * cw, y, min(dcol * cw, bw.toFloat()), y + barH, minimapPaint)
+            }
+        }
+    }
+
+    /** Tap or drag on the minimap: scroll so that line is centered. */
+    private fun onMinimapTouch(event: MotionEvent): Boolean {
+        if (minimapWidth <= 0f) return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                if (event.x < minimapLeft) return false
+                minimapDragging = true
+                scroller.forceFinished(true)
+                parent?.requestDisallowInterceptTouchEvent(true)
+            }
+            MotionEvent.ACTION_MOVE -> if (!minimapDragging) return false
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (!minimapDragging) return false
+                minimapDragging = false
+                return true
+            }
+            else -> return minimapDragging
+        }
+        val line = ((event.y + minimapScroll) / mmLineH).toInt().coerceIn(0, lineCount() - 1)
+        scrollToClamped(sx, rowStartOf(line) * lineHeight - height / 2f)
+        return true
+    }
+
     companion object {
         private const val BLINK_MS = 530L
+        /** VS Code's `editor.minimap.maxColumn`. */
+        private const val MINIMAP_COLUMNS = 120
+        private const val MINIMAP_THROTTLE_MS = 100L
         /** Android hides an idle insertion (caret) handle after a few seconds. */
         private const val CARET_HANDLE_MS = 4000L
         private const val SQRT2 = 1.4142135f

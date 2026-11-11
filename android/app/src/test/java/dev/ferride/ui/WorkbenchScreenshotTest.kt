@@ -40,7 +40,10 @@ import dev.ferride.workbench.InMemorySettingsStore
 import dev.ferride.workbench.PaletteMode
 import dev.ferride.workbench.PanelTab
 import dev.ferride.workbench.SideView
+import dev.ferride.workbench.RecentFolder
 import dev.ferride.workbench.WorkbenchState
+import dev.ferride.workbench.WorkspaceBackend
+import dev.ferride.workbench.WorkspaceHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Rule
@@ -78,6 +81,7 @@ class WorkbenchScreenshotTest {
         interact: () -> Unit = {},
         /** Capture every window (dialogs), not just the Compose root. */
         wholeScreen: Boolean = false,
+        host: WorkspaceHost? = null,
         setup: (WorkbenchState) -> Unit = {},
     ) {
         val state = WorkbenchState(
@@ -86,6 +90,7 @@ class WorkbenchScreenshotTest {
             Dispatchers.Unconfined,
             settingsStore = InMemorySettingsStore(settingsJson),
             extraThemes = listOf(nightOwl),
+            host = host,
         )
         state.systemDark = dark ?: true
         state.start("src/main.rs")
@@ -243,6 +248,34 @@ class WorkbenchScreenshotTest {
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
     fun tabletSearchSafLight() = shoot("tablet_search_saf", dark = false, backend = safBackend) { it.showView(SideView.Search) }
+
+    // ----- Welcome ---------------------------------------------------------------------
+
+    /** A host with a few recent folders (local, system picker, app projects). */
+    private val welcomeHost = object : WorkspaceHost {
+        override val projectsDir = "/data/user/0/dev.ferride/files/projects"
+        override fun pickFolder() {}
+        override fun openLocal(path: String): WorkspaceBackend = FakeWorkspaceBackend()
+        override fun loadRecents() = listOf(
+            RecentFolder(WorkspaceKind.LOCAL, "/storage/emulated/0/Projects/ferrux", "ferrux"),
+            RecentFolder(WorkspaceKind.SAF, "content://com.android.externalstorage.documents/tree/primary%3ANotes", "Notes"),
+            RecentFolder(WorkspaceKind.LOCAL, "$projectsDir/lomio", "lomio"),
+        )
+    }
+
+    private fun welcome(s: WorkbenchState) = s.openWelcome()
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneWelcomeDark() = shoot("phone_welcome", dark = true, host = welcomeHost, setup = ::welcome)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
+    fun phoneWelcomeLight() = shoot("phone_welcome", dark = false, host = welcomeHost, setup = ::welcome)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletWelcomeDark() = shoot("tablet_welcome", dark = true, host = welcomeHost, setup = ::welcome)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletWelcomeLight() = shoot("tablet_welcome", dark = false, host = welcomeHost, setup = ::welcome)
 
     // ----- Explorer actions --------------------------------------------------------
 

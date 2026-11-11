@@ -13,6 +13,7 @@ import dev.ferride.core.FileHit
 import dev.ferride.core.FileNode
 import dev.ferride.core.SearchReport
 import dev.ferride.core.SymbolHit
+import dev.ferride.core.WorkspaceKind
 import dev.ferride.editor.EditorActions
 import dev.ferride.editor.EditorModel
 import dev.ferride.editor.Sel
@@ -35,7 +36,18 @@ enum class SideView(val title: String) {
 
 enum class PanelTab(val title: String) { Problems("Problems"), Output("Output"), Terminal("Terminal") }
 
-enum class TabKind { File, Settings, SettingsJson }
+enum class TabKind { File, Settings, SettingsJson, Welcome }
+
+/** A folder on the Welcome page's Recent list (newest first). */
+data class RecentFolder(val kind: WorkspaceKind, val root: String, val name: String) {
+    /** The path line under the name: a file path, or where a picked folder lives. */
+    val location: String
+        get() = when (kind) {
+            WorkspaceKind.SAF -> "System file picker"
+            WorkspaceKind.FERRUX -> "Ferrux"
+            WorkspaceKind.LOCAL -> root.substringBeforeLast('/')
+        }
+}
 
 /**
  * An open editor tab. [preview] tabs (italic) are replaced by the next file
@@ -44,6 +56,7 @@ enum class TabKind { File, Settings, SettingsJson }
 class EditorTab(val path: String, val model: EditorModel?, val kind: TabKind = TabKind.File) {
     val name: String = when (kind) {
         TabKind.Settings -> "Settings"
+        TabKind.Welcome -> "Welcome"
         else -> path.substringAfterLast('/')
     }
     var preview by mutableStateOf(kind == TabKind.File)
@@ -109,6 +122,10 @@ interface WorkspaceHost {
     fun pickFolder()
     /** Opens a real directory (blocks; called on the IO dispatcher). */
     fun openLocal(path: String): WorkspaceBackend
+    /** Reopens a Recent entry (blocks; called on the IO dispatcher). Fails if its grant is gone. */
+    fun openRecent(recent: RecentFolder): WorkspaceBackend = openLocal(recent.root)
+    fun loadRecents(): List<RecentFolder> = emptyList()
+    fun saveRecents(recents: List<RecentFolder>) {}
 }
 
 /** Where `settings.json` lives (a file in the app; memory in tests). */
@@ -141,6 +158,47 @@ class WorkbenchState(
     /** The open folder; replaced by [openWorkspace]. */
     var backend: WorkspaceBackend by mutableStateOf(backend)
         private set
+
+    /** Recently opened folders, newest first (the Welcome page's Recent list). */
+    val recentFolders = mutableStateListOf<RecentFolder>().also { list ->
+        host?.let { h -> list += runCatching { h.loadRecents() }.getOrDefault(emptyList()) }
+    }
+
+    private fun rememberRecent(b: WorkspaceBackend) {
+        if (b.kind == WorkspaceKind.FERRUX) return
+        val entry = RecentFolder(b.kind, b.root, b.name)
+        recentFolders.removeAll { it.root == entry.root }
+        recentFolders.add(0, entry)
+        while (recentFolders.size > MAX_RECENT_FOLDERS) recentFolders.removeAt(recentFolders.lastIndex)
+        host?.saveRecents(recentFolders.toList())
+    }
+
+    fun removeRecent(recent: RecentFolder) {
+        recentFolders.remove(recent)
+        host?.saveRecents(recentFolders.toList())
+    }
+
+    /** Welcome › Recent: reopens a folder (drops it from the list if it can't be opened anymore). */
+    fun openRecent(recent: RecentFolder) {
+        val h = host ?: return
+        if (recent.root == backend.root) {
+            message = "${recent.name} is already open"
+            return
+        }
+        scope.launch {
+            val r = withContext(io) { runCatching { h.openRecent(recent) } }
+            r.onSuccess { openWorkspace(it) }.onFailure {
+                removeRecent(recent)
+                message = "Couldn't open ${recent.name}: ${it.message}. It was removed from Recent."
+            }
+        }
+    }
+
+    /** Help: Welcome — the Get Started page as an editor tab. */
+    fun openWelcome() {
+        val i = tabs.indexOfFirst { it.kind == TabKind.Welcome }
+        if (i >= 0) activeIndex = i else addTab(EditorTab(WELCOME_PATH, null, TabKind.Welcome).also { it.preview = false })
+    }
 
     /** Called after [openWorkspace] switched folders (the app remembers the last one). */
     var onWorkspaceOpened: ((WorkspaceBackend) -> Unit)? = null
@@ -286,12 +344,21 @@ class WorkbenchState(
     /** `editor.wordWrap`: the user's value, else on for compact windows (phones). */
     val wordWrap: Boolean get() = settings.wordWrap ?: compactWindow
 
+    /** `editor.minimap.enabled`: the user's value, else on for wide windows and off on phones. */
+    val minimapEnabled: Boolean get() = settings.minimap ?: !compactWindow
+
     init {
         registerCommands()
         log("Opened workspace ${backend.name} (${backend.root})")
     }
 
-    fun start(openFirst: String? = "src/main.rs") {
+    /**
+     * First load. With [showWelcome] (the app, not tests) the Welcome page
+     * opens too, per `workbench.startupEditor`.
+     */
+    fun start(openFirst: String? = "src/main.rs", showWelcome: Boolean = false) {
+        rememberRecent(backend)
+        if (showWelcome && settings.startupEditor == "welcomePage") openWelcome()
         settingsError?.let {
             message = "Couldn't parse settings.json ($it). It was left untouched; fix it and save."
             openSettingsJson()
@@ -324,7 +391,9 @@ class WorkbenchState(
         diagnostics.clear()
         backend = next
         log("Opened workspace ${next.name} (${next.root})")
+        rememberRecent(next)
         onWorkspaceOpened?.invoke(next)
+        if (settings.startupEditor == "welcomePage") openWelcome()
         scope.launch {
             branch = withContext(io) { runCatching { next.gitBranch() }.getOrNull() }
             loadDir(next.root)
@@ -1026,6 +1095,7 @@ class WorkbenchState(
         cmd(CommandIds.QUICK_OPEN, "Go to File…", null, KeyChord.ctrl(KeyEvent.KEYCODE_P)) { openPalette(PaletteMode.Files) }
         cmd(CommandIds.OPEN_FOLDER, "Open Folder…", "File", enabled = { host != null }) { host?.pickFolder() }
         cmd(CommandIds.EXPLORER_NEW_FILE, "New File…", "File") { startNewFile() }
+        cmd(CommandIds.WELCOME, "Welcome", "Help") { openWelcome() }
         cmd(CommandIds.EXPLORER_NEW_FOLDER, "New Folder…", "File") { startNewFolder() }
         cmd(CommandIds.REFRESH_EXPLORER, "Refresh Explorer", "File") { refreshExplorer() }
         cmd(CommandIds.COLLAPSE_EXPLORER, "Collapse Folders in Explorer", "File") { collapseExplorer() }
@@ -1041,7 +1111,7 @@ class WorkbenchState(
             CommandIds.COPY_INTO_PROJECTS,
             "Copy Folder into Ferride Projects",
             "File",
-            enabled = { host != null && backend.kind == dev.ferride.core.WorkspaceKind.SAF },
+            enabled = { host != null && backend.kind == WorkspaceKind.SAF },
         ) { copyIntoProjects() }
         cmd(CommandIds.GOTO_LINE, "Go to Line/Column…", "Go", KeyChord.ctrl(KeyEvent.KEYCODE_G), hasEditor) {
             openPalette(PaletteMode.GotoLine)
@@ -1165,6 +1235,8 @@ class WorkbenchState(
     companion object {
         const val SETTINGS_PATH = "ferride:settings"
         const val SETTINGS_JSON_PATH = "ferride:settings.json"
+        const val WELCOME_PATH = "ferride:welcome"
+        private const val MAX_RECENT_FOLDERS = 10
         private const val MAX_RECENT = 5
     }
 }

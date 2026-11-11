@@ -121,8 +121,12 @@ fun settingDefs(themeNames: List<String>): List<SettingDef> = listOf(
     ),
     SettingDef(
         Settings.EDITOR_MINIMAP, SettingGroup.TextEditor, "Editor › Minimap", "Enabled",
-        "Controls whether the minimap is shown (not implemented yet; off on phones).",
-        SettingControl.Bool({ it.minimap }, { s, v -> s.copy(minimap = v) }),
+        "Controls whether the minimap is shown. Default: on for tablets and wide windows, off on phones.",
+        SettingControl.Choice(
+            listOf("default", "on", "off"),
+            { when (it.minimap) { null -> "default"; true -> "on"; false -> "off" } },
+            { s, v -> s.copy(minimap = when (v) { "on" -> true; "off" -> false; else -> null }) },
+        ),
     ),
     SettingDef(
         Settings.EDITOR_STICKY_SCROLL, SettingGroup.TextEditor, "Editor › Sticky Scroll", "Enabled",

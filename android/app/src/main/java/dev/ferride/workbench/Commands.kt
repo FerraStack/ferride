@@ -158,6 +158,10 @@ object CommandIds {
     const val SAVE_ALL = "workbench.action.files.saveAll"
     const val NEW_FILE = "workbench.action.files.newUntitledFile"
     const val OPEN_FOLDER = "workbench.action.files.openFolder"
+    /** VS Code's Help: Welcome. */
+    const val WELCOME = "workbench.action.showWelcomePage"
+    /** Registered by Source Control (lane 2); the Welcome page shows Clone only when it exists. */
+    const val GIT_CLONE = "git.clone"
     const val EXPLORER_NEW_FILE = "explorer.newFile"
     const val EXPLORER_NEW_FOLDER = "explorer.newFolder"
     const val REFRESH_EXPLORER = "workbench.files.action.refreshFilesExplorer"

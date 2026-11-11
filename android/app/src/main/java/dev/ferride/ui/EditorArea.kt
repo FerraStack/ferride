@@ -70,6 +70,10 @@ fun EditorArea(state: WorkbenchState, modifier: Modifier = Modifier) {
                 SettingsEditor(state, Modifier.weight(1f))
                 SideEffect { state.disposeRetired(null) }
             }
+            tab.kind == TabKind.Welcome -> {
+                WelcomePage(state, Modifier.weight(1f))
+                SideEffect { state.disposeRetired(null) }
+            }
             model != null -> {
                 Breadcrumbs(state, tab)
                 CodeEditor(state, tab, model, Modifier.weight(1f))
@@ -86,7 +90,7 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
     val squiggles = state.diagnostics[tab.path].orEmpty().map { d ->
         Squiggle(model.offsetAt(d.line, d.startColumn), model.offsetAt(d.endLine, d.endColumn), d.severity)
     }
-    val style = editorStyle(c, state.settings, state.wordWrap)
+    val style = editorStyle(c, state.settings, state.wordWrap, state.minimapEnabled)
     // Sticky scroll follows the outline: every symbol spanning several lines.
     val stickyScopes = if (state.settings.stickyScroll) {
         state.activeSymbols().filter { it.endLine > it.startLine }.map { it.startLine..it.endLine }
@@ -175,6 +179,8 @@ private fun EditorTabItem(tab: EditorTab, active: Boolean, onSelect: () -> Unit,
         Row(Modifier.fillMaxHeight().padding(start = 10.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             if (tab.kind == TabKind.Settings) {
                 Icon(Icons.Outlined.Settings, null, tint = fg, modifier = Modifier.size(16.dp))
+            } else if (tab.kind == TabKind.Welcome) {
+                CodiconIcon(Codicon.ROCKET, fg)
             } else {
                 FileIcon(tab.name)
             }

@@ -43,6 +43,7 @@ object Codicon {
     const val NEW_FOLDER = '\uEA80'
     const val REFRESH = '\uEB37'
     const val REPO_CLONE = '\uEB3E'
+    const val ROCKET = '\uEB44'
     const val SEARCH = '\uEA6D'
     const val SOURCE_CONTROL = '\uEA68'
     const val TRASH = '\uEA81'
