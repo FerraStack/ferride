@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ferride.core.FileHit
+import dev.ferride.core.SymbolHit
 import dev.ferride.theme.LocalWorkbenchColors
 import dev.ferride.theme.WorkbenchColors
 import dev.ferride.workbench.PaletteItem
@@ -67,6 +68,16 @@ import kotlinx.coroutines.withContext
 fun CommandPalette(state: WorkbenchState, maxWidth: Dp, autoFocus: Boolean = true) {
     val c = LocalWorkbenchColors.current
     val mode = state.paletteMode()
+    val symbolHits by produceState(emptyList<SymbolHit>(), state.paletteQuery, mode) {
+        value = if (mode == PaletteMode.WorkspaceSymbols) {
+            withContext(Dispatchers.Default) {
+                val q = state.paletteQuery.removePrefix(mode.prefix).trim()
+                runCatching { state.backend.workspaceSymbols(q, 50) }.getOrDefault(emptyList())
+            }
+        } else {
+            emptyList()
+        }
+    }
     val fileHits by produceState(emptyList<FileHit>(), state.paletteQuery, mode) {
         value = if (mode == PaletteMode.Files) {
             withContext(Dispatchers.Default) {
@@ -76,7 +87,7 @@ fun CommandPalette(state: WorkbenchState, maxWidth: Dp, autoFocus: Boolean = tru
             emptyList()
         }
     }
-    val items = state.paletteItems(fileHits)
+    val items = state.paletteItems(fileHits, symbolHits)
     val focus = remember { FocusRequester() }
 
     // Scrim: dims the workbench and closes on tap.
@@ -143,6 +154,7 @@ fun CommandPalette(state: WorkbenchState, maxWidth: Dp, autoFocus: Boolean = tru
                             when (mode) {
                                 PaletteMode.Files -> "No matching files"
                                 PaletteMode.QuickPick -> "No matching results"
+                                PaletteMode.Symbols, PaletteMode.WorkspaceSymbols -> "No matching symbols"
                                 else -> "No matching commands"
                             },
                             color = c.descriptionForeground,
@@ -166,6 +178,10 @@ private fun PaletteRow(item: PaletteItem, selected: Boolean, files: Boolean, c: 
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        item.symbolKind?.let { kind ->
+            CodiconIcon(SymbolIcons.glyph(kind), SymbolIcons.color(kind, c.isDark, c.inputForeground))
+            Spacer(Modifier.width(6.dp))
+        }
         if (files) {
             FileIcon(item.label)
             Spacer(Modifier.width(6.dp))

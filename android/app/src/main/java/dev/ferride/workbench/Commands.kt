@@ -152,6 +152,7 @@ object CommandIds {
     const val QUICK_OPEN = "workbench.action.quickOpen"
     const val GOTO_LINE = "workbench.action.gotoLine"
     const val GOTO_SYMBOL = "workbench.action.gotoSymbol"
+    const val SHOW_ALL_SYMBOLS = "workbench.action.showAllSymbols"
     const val CHANGE_LANGUAGE_MODE = "workbench.action.editor.changeLanguageMode"
     const val SAVE = "workbench.action.files.save"
     const val SAVE_ALL = "workbench.action.files.saveAll"

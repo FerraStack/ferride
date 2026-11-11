@@ -372,3 +372,33 @@ fn poisoned_document_lock_is_recovered_by_reparsing() {
     assert_eq!(doc.recoveries(), 1, "the poison was cleared: no second recovery");
     assert!(doc.text().starts_with("// ok"));
 }
+
+#[test]
+fn document_symbols_are_flattened_with_parents() {
+    let doc = Document::new(
+        "struct S {\n    a: u8,\n}\n\nimpl S {\n    fn é() {}\n}\n".into(),
+        Some("lib.rs".into()),
+    );
+    let syms = doc.symbols();
+    let summary: Vec<_> = syms
+        .iter()
+        .map(|s| (s.name.as_str(), s.kind, s.parent, s.depth))
+        .collect();
+    assert_eq!(
+        summary,
+        vec![
+            ("S", 23, -1, 0),
+            ("a", 8, 0, 1),
+            ("impl S", 19, -1, 0),
+            ("é", 6, 2, 1)
+        ]
+    );
+    let method = &syms[3];
+    assert_eq!((method.start_line, method.end_line), (5, 5));
+    assert_eq!(doc.text_range(method.name_start, method.name_end), "é");
+    assert!(
+        Document::new("plain".into(), Some("notes.txt".into()))
+            .symbols()
+            .is_empty()
+    );
+}

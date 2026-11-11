@@ -565,3 +565,68 @@ impl Document {
         self.lock().buffer.seal_undo_group();
     }
 }
+
+/// An outline symbol, flattened in document order (pre-order): `parent` is
+/// the index of the enclosing symbol in the same list, or -1. Offsets are
+/// UTF-16; lines are 0-based.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct DocumentSymbol {
+    pub name: String,
+    /// LSP `SymbolKind` value (1 File … 26 TypeParameter).
+    pub kind: i32,
+    pub parent: i32,
+    pub depth: i32,
+    pub start: i32,
+    pub end: i32,
+    pub start_line: i32,
+    pub end_line: i32,
+    pub name_start: i32,
+    pub name_end: i32,
+}
+
+fn flatten(
+    buffer: &Buffer,
+    symbols: &[ferride_syntax::Symbol],
+    parent: i32,
+    depth: i32,
+    out: &mut Vec<DocumentSymbol>,
+) {
+    let off = |byte: usize| buffer.char_to_utf16(buffer.byte_to_char(byte)) as i32;
+    let line = |byte: usize| buffer.byte_to_line(byte) as i32;
+    for s in symbols {
+        let index = out.len() as i32;
+        out.push(DocumentSymbol {
+            name: s.name.clone(),
+            kind: s.kind as i32,
+            parent,
+            depth,
+            start: off(s.range.start),
+            end: off(s.range.end),
+            start_line: line(s.range.start),
+            end_line: line(s.range.end.saturating_sub(1).max(s.range.start)),
+            name_start: off(s.selection.start),
+            name_end: off(s.selection.end),
+        });
+        flatten(buffer, &s.children, index, depth + 1, out);
+    }
+}
+
+#[uniffi::export]
+impl Document {
+    /// Outline symbols (Outline view, breadcrumbs, `@` in Quick Open, sticky scroll).
+    pub fn symbols(&self) -> Vec<DocumentSymbol> {
+        let inner = self.lock();
+        let Some(syntax) = &inner.syntax else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        flatten(
+            &inner.buffer,
+            &syntax.symbols(inner.buffer.rope()),
+            -1,
+            0,
+            &mut out,
+        );
+        out
+    }
+}

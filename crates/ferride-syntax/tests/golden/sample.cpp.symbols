@@ -1,0 +1,6 @@
+Namespace stats  [6-26]
+  Class Counter  [10-24]
+    Method add  [12-12]
+    Method top  [14-20]
+    Field counts_  [23-23]
+Function main  [28-35]

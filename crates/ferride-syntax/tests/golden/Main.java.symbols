@@ -1,0 +1,5 @@
+Class Main  [8-31]
+  Field TOP  [9-9]
+  Struct WordCount  [11-11]
+  Method countWords  [13-22]
+  Method main  [24-30]
