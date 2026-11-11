@@ -58,5 +58,8 @@ data class EditorStyle(
     val highlightActiveLine: Boolean = true,
     val bracketPairs: Boolean = true,
     val wordWrap: Boolean = false,
+    /** `editor.minimap.enabled` (resolved: off on phones by default). */
+    val minimap: Boolean = false,
+    val minimapSlider: Int = 0x33797979,
     val bracketColors: List<Int> = listOf(0xFFFFD700.toInt(), 0xFFDA70D6.toInt(), 0xFF179FFF.toInt()),
 )
