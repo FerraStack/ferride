@@ -103,7 +103,7 @@ fun ScmOverlays(scm: ScmState, maxWidth: Dp, autoFocus: Boolean = true) {
             },
         )
     }
-    scm.credentialPrompt?.let { CredentialDialog(it, maxWidth) }
+    scm.credentialPrompt?.let { CredentialDialog(it) }
 }
 
 @Composable
@@ -231,14 +231,14 @@ private fun InputBoxContent(box: InputBox, autoFocus: Boolean, close: () -> Unit
 }
 
 @Composable
-private fun CredentialDialog(prompt: CredentialPrompt, maxWidth: Dp) {
+private fun CredentialDialog(prompt: CredentialPrompt) {
     val c = LocalWorkbenchColors.current
     val host = hostKey(prompt.url).substringAfter("://")
-    // AlertDialog sizes itself to its content, and the fields below use fillMaxWidth(). On a phone
-    // that pair never settles (the dialog grows to the field, the field grows to the dialog), so
-    // Compose waitForIdle spins. An explicit width, the same idea as QuickInputFrame, breaks the cycle.
-    // Stay inside Material's 280–560 dialog band after the dialog's own 24.dp padding.
-    val dialogWidth = (maxWidth - 120.dp).coerceIn(280.dp, 480.dp)
+    // The fields use fillMaxWidth(), and AlertDialog sizes itself to that content. Deriving the
+    // width from the parent maxWidth oscillates on a phone: the dialog shrinks the constraints,
+    // the width snaps back to Material's 280.dp minimum, and Compose never goes idle. A constant
+    // inside that minimum stays put. Tablet shots passed only because they were already clamped.
+    val dialogWidth = 280.dp
     AlertDialog(
         onDismissRequest = { prompt.cancel() },
         containerColor = c.quickInputBackground,
