@@ -1141,10 +1141,21 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         onFocus?.invoke(gainFocus)
     }
 
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) {
+            removeCallbacks(blink)
+            caretVisible = true
+            invalidate()
+        } else if (hasFocus()) {
+            restartBlink()
+        }
+    }
+
     private fun restartBlink() {
         removeCallbacks(blink)
         caretVisible = true
-        if (hasFocus()) postDelayed(blink, BLINK_MS)
+        if (hasFocus() && hasWindowFocus()) postDelayed(blink, BLINK_MS)
         invalidate()
     }
 

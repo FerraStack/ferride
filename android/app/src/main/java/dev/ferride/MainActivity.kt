@@ -21,6 +21,8 @@ import androidx.lifecycle.viewModelScope
 import dev.ferride.core.WorkspaceKind
 import dev.ferride.storage.SafDocumentTree
 import dev.ferride.storage.StoragePaths
+import dev.ferride.scm.KeystoreCredentialStore
+import dev.ferride.scm.RustScmProvider
 import dev.ferride.theme.VsCodeTheme
 import dev.ferride.ui.FerrideWorkbench
 import dev.ferride.workbench.RustWorkspaceBackend
@@ -109,8 +111,11 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
         settingsStore = settingsStore,
         extraThemes = userThemes,
         host = host,
+        scmProvider = RustScmProvider,
+        credentialStore = KeystoreCredentialStore(app),
     ).also {
         it.onWorkspaceOpened = ::remember
+        it.scm.projectsDir = projectsDir.absolutePath
         it.start(openFirst = if (restoredLocal == null) "src/main.rs" else null, showWelcome = true)
     }
 

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,7 +26,6 @@ import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.FileCopy
@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import dev.ferride.core.FerruxStatus
+import dev.ferride.scm.GitCommandIds
 import dev.ferride.editor.EditorActions
 import dev.ferride.theme.LocalWorkbenchColors
 import dev.ferride.workbench.CommandIds
@@ -66,7 +67,7 @@ import dev.ferride.workbench.WorkbenchState
 fun SideView.icon(): ImageVector = when (this) {
     SideView.Explorer -> Icons.Outlined.FileCopy
     SideView.Search -> Icons.Outlined.Search
-    SideView.SourceControl -> Icons.Outlined.AccountTree
+    SideView.SourceControl -> Codicons.sourceControl
     SideView.Languages -> Icons.Outlined.Extension
 }
 
@@ -78,14 +79,15 @@ fun SideView.icon(): ImageVector = when (this) {
 fun ActivityBar(state: WorkbenchState, vertical: Boolean) {
     val c = LocalWorkbenchColors.current
     @Composable
-    fun Item(icon: ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
+    fun Item(icon: ImageVector, label: String, active: Boolean, badge: Int = 0, onClick: () -> Unit) {
         val tint = if (active) c.activityBarForeground else c.activityBarInactiveForeground
         Box(contentAlignment = if (vertical) Alignment.CenterStart else Alignment.TopCenter) {
-            BarIcon(icon, label, tint, size = 48.dp, iconSize = 24.dp, onClick = onClick)
+            BarIcon(icon, if (badge > 0) "$label ($badge pending changes)" else label, tint, size = 48.dp, iconSize = 24.dp, onClick = onClick)
             if (active) {
                 val indicator = if (vertical) Modifier.width(2.dp).height(48.dp) else Modifier.width(32.dp).height(2.dp)
                 Box(indicator.background(c.activityBarActiveBorder))
             }
+            if (badge > 0) ActivityBadge(badge, Modifier.align(Alignment.TopStart).padding(start = 24.dp, top = 24.dp))
         }
     }
     @Composable
@@ -94,7 +96,8 @@ fun ActivityBar(state: WorkbenchState, vertical: Boolean) {
             // On the bottom bar the current view stays marked even while the drawer is closed.
             val active = state.activeView == v && (state.sideBarVisible || !vertical) &&
                 state.activeTab?.kind != TabKind.Settings
-            Item(v.icon(), v.title, active) { state.showView(v) }
+            val badge = if (v == SideView.SourceControl) state.scm.count else 0
+            Item(v.icon(), v.title, active, badge) { state.showView(v) }
         }
     }
     val settingsActive = state.activeTab?.kind == TabKind.Settings
@@ -273,7 +276,7 @@ fun StatusBar(state: WorkbenchState, compact: Boolean) {
         StatusItem(Icons.Outlined.Terminal, if (compact) "Ferrux" else ferruxLabel(state.ferrux)) {
             state.commands.execute(CommandIds.TOGGLE_TERMINAL)
         }
-        state.branch?.let { StatusItem(Icons.Outlined.AccountTree, it) { state.showView(SideView.SourceControl) } }
+        ScmStatusItems(state, compact)
         Row(
             Modifier.fillMaxHeight().clickable { state.commands.execute(CommandIds.VIEW_PROBLEMS) }.padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -302,6 +305,49 @@ fun StatusBar(state: WorkbenchState, compact: Boolean) {
             if (!compact) StatusItem(null, "{ } LSP: off") { state.showView(SideView.Languages) }
         }
         StatusItem(Icons.Outlined.Notifications, null) { state.showPanel(PanelTab.Output) }
+    }
+}
+
+/** VS Code's activity bar badge: a pill in the lower right of the icon (`activityBarBadge.*`). */
+@Composable
+private fun ActivityBadge(count: Int, modifier: Modifier = Modifier) {
+    val c = LocalWorkbenchColors.current
+    Box(
+        modifier.heightIn(min = 16.dp).widthIn(min = 16.dp).background(c.activityBarBadgeBackground, RoundedCornerShape(50)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            if (count > 999) "999+" else count.toString(),
+            color = c.activityBarBadgeForeground,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+    }
+}
+
+/**
+ * The git items of the status bar: the branch (`main*`, opens "Checkout to...") and the sync item
+ * (`1↓ 2↑`, or the cloud to publish a branch without upstream).
+ */
+@Composable
+private fun ScmStatusItems(state: WorkbenchState, compact: Boolean) {
+    val scm = state.scm
+    val head = scm.head
+    val label = scm.headLabel
+    if (head == null || label == null) {
+        state.branch?.let { StatusItem(Codicons.sourceControl, it) { state.showView(SideView.SourceControl) } }
+        return
+    }
+    StatusItem(Codicons.sourceControl, label) { state.commands.execute(GitCommandIds.CHECKOUT) }
+    when {
+        scm.operation != null -> StatusItem(Codicons.sync, null) {}
+        head.upstream != null -> {
+            val text = if (compact && head.ahead == 0 && head.behind == 0) null else "${head.behind}↓ ${head.ahead}↑"
+            StatusItem(Codicons.sync, text) { state.commands.execute(GitCommandIds.SYNC) }
+        }
+        head.branch != null && head.commit != null ->
+            StatusItem(Codicons.cloudUpload, null) { state.commands.execute(GitCommandIds.PUBLISH) }
     }
 }
 

@@ -97,8 +97,13 @@ data class WorkbenchColors(
     val tokenStyles: TokenStyles = TokenStyles.builtInFontStyles,
     /** Colors from [tokens] (built-in themes) rather than [tokenStyles]. */
     val kindColors: Boolean = true,
+    /** Every color a VS Code theme sets, by its id, for views with their own colors (Source Control, diff). */
+    val themeColors: Map<String, Color> = emptyMap(),
 ) {
     fun token(kind: StyleKind): Color = tokens[kind] ?: editorForeground
+
+    /** A theme color by VS Code id, or [default] when the theme doesn't set it. */
+    fun color(id: String, default: Color): Color = themeColors[id] ?: default
 }
 
 val LocalWorkbenchColors = staticCompositionLocalOf { DarkModern }

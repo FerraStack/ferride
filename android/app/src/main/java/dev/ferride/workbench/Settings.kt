@@ -28,6 +28,12 @@ data class Settings(
     val extraKeys: Boolean = true,
     /** `workbench.startupEditor`: `welcomePage` (default) or `none`. */
     val startupEditor: String = "welcomePage",
+    /** Commit author name; empty = the repository's `user.name`. */
+    val gitUserName: String = "",
+    /** Commit author email; empty = the repository's `user.email`. */
+    val gitUserEmail: String = "",
+    /** Commit all changes when nothing is staged (VS Code's smart commit). */
+    val gitEnableSmartCommit: Boolean = false,
     private val unknown: Map<String, Any?> = emptyMap(),
 ) {
     /** Known keys → JSON-ready values (`null` = leave the key out). */
@@ -47,6 +53,9 @@ data class Settings(
         WINDOW_AUTO_DETECT to autoDetectColorScheme,
         FERRIDE_EXTRA_KEYS to extraKeys,
         WORKBENCH_STARTUP_EDITOR to startupEditor,
+        GIT_USER_NAME to gitUserName.ifEmpty { null },
+        GIT_USER_EMAIL to gitUserEmail.ifEmpty { null },
+        GIT_SMART_COMMIT to gitEnableSmartCommit,
     )
 
     /**
@@ -80,6 +89,9 @@ data class Settings(
         o.put(WINDOW_AUTO_DETECT, autoDetectColorScheme)
         o.put(FERRIDE_EXTRA_KEYS, extraKeys)
         o.put(WORKBENCH_STARTUP_EDITOR, startupEditor)
+        if (gitUserName.isNotEmpty()) o.put(GIT_USER_NAME, gitUserName)
+        if (gitUserEmail.isNotEmpty()) o.put(GIT_USER_EMAIL, gitUserEmail)
+        o.put(GIT_SMART_COMMIT, gitEnableSmartCommit)
         return o.toString(2)
     }
 
@@ -99,11 +111,15 @@ data class Settings(
         const val WINDOW_AUTO_DETECT = "window.autoDetectColorScheme"
         const val FERRIDE_EXTRA_KEYS = "ferride.extraKeys.enabled"
         const val WORKBENCH_STARTUP_EDITOR = "workbench.startupEditor"
+        const val GIT_USER_NAME = "git.user.name"
+        const val GIT_USER_EMAIL = "git.user.email"
+        const val GIT_SMART_COMMIT = "git.enableSmartCommit"
 
         private val KNOWN = setOf(
             EDITOR_FONT_SIZE, EDITOR_TAB_SIZE, EDITOR_INSERT_SPACES, EDITOR_WORD_WRAP, EDITOR_LINE_NUMBERS,
             EDITOR_MINIMAP, EDITOR_STICKY_SCROLL, EDITOR_INDENT_GUIDES, EDITOR_LINE_HIGHLIGHT, EDITOR_BRACKET_PAIRS, FILES_AUTO_SAVE,
             WORKBENCH_COLOR_THEME, WINDOW_AUTO_DETECT, FERRIDE_EXTRA_KEYS, WORKBENCH_STARTUP_EDITOR,
+            GIT_USER_NAME, GIT_USER_EMAIL, GIT_SMART_COMMIT,
         )
 
         /** Parses settings; malformed input falls back to defaults (use [parseResult] to detect it). */
@@ -135,6 +151,9 @@ data class Settings(
                 autoDetectColorScheme = o.optBoolean(WINDOW_AUTO_DETECT, d.autoDetectColorScheme),
                 extraKeys = o.optBoolean(FERRIDE_EXTRA_KEYS, d.extraKeys),
                 startupEditor = o.optString(WORKBENCH_STARTUP_EDITOR, d.startupEditor),
+                gitUserName = o.optString(GIT_USER_NAME, ""),
+                gitUserEmail = o.optString(GIT_USER_EMAIL, ""),
+                gitEnableSmartCommit = o.optBoolean(GIT_SMART_COMMIT, d.gitEnableSmartCommit),
                 unknown = unknown,
             )
         }

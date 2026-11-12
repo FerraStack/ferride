@@ -74,8 +74,9 @@ import dev.ferride.workbench.WorkbenchState
 fun SideBar(state: WorkbenchState, modifier: Modifier = Modifier) {
     val c = LocalWorkbenchColors.current
     Column(modifier.background(c.sideBarBackground)) {
-        Row(Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            SectionTitle(state.activeView.title)
+        Row(Modifier.fillMaxWidth().height(36.dp).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            SectionTitle(state.activeView.title, Modifier.weight(1f))
+            if (state.activeView == SideView.SourceControl) ScmTitleActions(state)
         }
         when (state.activeView) {
             SideView.Explorer -> Explorer(state)
@@ -431,26 +432,6 @@ private fun Toggle(label: String, description: String, on: Boolean, onChange: (B
         contentAlignment = Alignment.Center,
     ) {
         Text(label, color = c.inputForeground, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-    }
-}
-
-// ----- Source Control ------------------------------------------------------------
-
-@Composable
-private fun SourceControlView(state: WorkbenchState) {
-    val c = LocalWorkbenchColors.current
-    Column(Modifier.padding(16.dp)) {
-        Text(
-            if (state.branch != null) "Branch: ${state.branch}" else "The folder isn't a git repository.",
-            color = c.sideBarForeground,
-            fontSize = 13.sp,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Git integration (status, diffs, staging, commits) is coming in milestone M5, powered by gitoxide.",
-            color = c.descriptionForeground,
-            fontSize = 12.sp,
-        )
     }
 }
 

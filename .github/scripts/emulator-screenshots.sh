@@ -74,17 +74,33 @@ dismiss_system_dialogs() {
   fi
 }
 expect_text() {
-  dismiss_system_dialogs
-  if ! ui_dump | grep -q "text=\"$1\""; then
-    echo "::error::Expected \"$1\" on screen: $2"
+  local want="$1" desc="$2" i found=0
+  for i in $(seq 1 10); do
+    dismiss_system_dialogs
+    if ui_dump | grep -Fq "$want"; then
+      found=1
+      break
+    fi
+    sleep 1
+  done
+  if [ "$found" -eq 0 ]; then
+    echo "::error::Expected \"$want\" on screen: $desc"
     adb exec-out screencap -p > "$out/failure.png" || true
     adb logcat -d -t 400 > "$out/logcat.txt" || true
     exit 1
   fi
 }
 expect_no_text() {
-  if ui_dump | grep -q "text=\"$1\""; then
-    echo "::error::Did not expect \"$1\" on screen: $2"
+  local unwanted="$1" desc="$2" i found=1
+  for i in $(seq 1 10); do
+    if ! ui_dump | grep -Fq "$unwanted"; then
+      found=0
+      break
+    fi
+    sleep 1
+  done
+  if [ "$found" -ne 0 ]; then
+    echo "::error::Did not expect \"$unwanted\" on screen: $desc"
     adb exec-out screencap -p > "$out/failure.png" || true
     exit 1
   fi
@@ -176,6 +192,80 @@ sleep 1
 adb shell input keycombination 113 51
 sleep 2
 alive "close tabs with Ctrl+W"
+# Source Control (git on gix, real native core): initialize a repository in the
+# sample project, stage everything, commit with Ctrl+Enter (answering the
+# identity prompt), and check the commit exists on disk and the view moved on.
+# Key codes: SHIFT_LEFT=59, G=35, ENTER=66.
+palette_command() {
+  adb shell input keycombination 113 59 44
+  sleep 1
+  adb shell input keyevent 123   # MOVE_END: type after the ">" prefix
+  adb shell input text "$1"
+  sleep 1
+  adb shell input keyevent 66
+  sleep 3
+}
+center_of_prefix() {
+  grep -o "text=\"$1[^\"]*\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" | head -1 |
+    sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/' |
+    awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }'
+}
+repo_dir=files/projects/hello-ferride
+palette_command "Initialize%sRepository"
+alive "git init"
+adb shell input keycombination 113 59 35
+sleep 2
+expect_text "Changes" "Source Control view lists the untracked sample files"
+palette_command "Stage%sAll%sChanges"
+alive "stage all"
+expect_text "Staged Changes" "files moved to Staged Changes"
+mx=
+my=
+for _ in $(seq 1 10); do
+  dismiss_system_dialogs
+  dump="$(ui_dump)"
+  if read -r mx my < <(center_of_prefix "Message" <<< "$dump") && [ -n "${mx:-}" ]; then
+    break
+  fi
+  if read -r mx my < <(grep -o 'class="android.widget.EditText"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' <<< "$dump" | head -1 | sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/' | awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }') && [ -n "${mx:-}" ]; then
+    break
+  fi
+  if read -r bx by < <(center_of "Commit" <<< "$dump") && [ -n "${bx:-}" ]; then
+    mx="$bx"
+    my="$((by - 110))"
+    break
+  fi
+  sleep 1
+done
+if [ -z "${mx:-}" ]; then
+  echo "::error::commit message box not found"
+  adb exec-out screencap -p > "$out/failure.png" || true
+  adb logcat -d -t 400 > "$out/logcat.txt" || true
+  exit 1
+fi
+adb shell input tap "$mx" "$my"
+sleep 1
+adb shell input text "First%scommit%sfrom%sthe%ssmoke%stest"
+sleep 1
+adb shell input keycombination 113 66
+sleep 2
+expect_text "git.user.name" "commit asks for git.user.name"
+adb shell input text "Ferride%sSmoke"
+adb shell input keyevent 66
+sleep 2
+adb shell input text "smoke@example.com"
+adb shell input keyevent 66
+sleep 4
+alive "commit"
+expect_text "Publish Branch" "after the commit the view offers to publish the branch"
+expect_no_text "Staged Changes" "nothing is staged after the commit"
+if ! adb shell run-as dev.ferride cat "$repo_dir/.git/logs/HEAD" | grep -q "commit (initial): First commit from the smoke test"; then
+  echo "::error::the commit is not in .git/logs/HEAD"
+  adb shell run-as dev.ferride ls -la "$repo_dir/.git" || true
+  exit 1
+fi
+adb exec-out screencap -p > "$out/emulator_scm_dark.png"
+echo "source control: OK"
 shoot light
 adb logcat -d -t 400 > "$out/logcat.txt" || true
 ls -la "$out"

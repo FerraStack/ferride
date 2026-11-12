@@ -172,6 +172,8 @@ fun FerrideWorkbench(
                     )
                 }
 
+                ScmOverlays(state.scm, maxWidth)
+
                 state.closeRequest?.let { tab ->
                     AlertDialog(
                         onDismissRequest = { state.resolveCloseRequest(null) },

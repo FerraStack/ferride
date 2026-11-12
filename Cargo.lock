@@ -514,6 +514,7 @@ dependencies = [
  "ferride-buffer",
  "ferride-host",
  "ferride-lsp",
+ "ferride-scm",
  "ferride-syntax",
  "ferride-theme",
  "ferride-workspace",
