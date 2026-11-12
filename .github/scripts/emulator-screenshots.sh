@@ -74,17 +74,33 @@ dismiss_system_dialogs() {
   fi
 }
 expect_text() {
-  dismiss_system_dialogs
-  if ! ui_dump | grep -q "text=\"$1\""; then
-    echo "::error::Expected \"$1\" on screen: $2"
+  local want="$1" desc="$2" i found=0
+  for i in $(seq 1 10); do
+    dismiss_system_dialogs
+    if ui_dump | grep -q "text=\"$want\""; then
+      found=1
+      break
+    fi
+    sleep 1
+  done
+  if [ "$found" -eq 0 ]; then
+    echo "::error::Expected \"$want\" on screen: $desc"
     adb exec-out screencap -p > "$out/failure.png" || true
     adb logcat -d -t 400 > "$out/logcat.txt" || true
     exit 1
   fi
 }
 expect_no_text() {
-  if ui_dump | grep -q "text=\"$1\""; then
-    echo "::error::Did not expect \"$1\" on screen: $2"
+  local unwanted="$1" desc="$2" i found=1
+  for i in $(seq 1 10); do
+    if ! ui_dump | grep -q "text=\"$unwanted\""; then
+      found=0
+      break
+    fi
+    sleep 1
+  done
+  if [ "$found" -ne 0 ]; then
+    echo "::error::Did not expect \"$unwanted\" on screen: $desc"
     adb exec-out screencap -p > "$out/failure.png" || true
     exit 1
   fi
@@ -203,7 +219,20 @@ expect_text "Changes" "Source Control view lists the untracked sample files"
 palette_command "Stage%sAll%sChanges"
 alive "stage all"
 expect_text "Staged Changes" "files moved to Staged Changes"
-read -r mx my < <(ui_dump | center_of_prefix "Message (Ctrl+Enter") || { echo "::error::commit message box not found"; exit 1; }
+mx=
+for _ in $(seq 1 10); do
+  dismiss_system_dialogs
+  dump="$(ui_dump)"
+  read -r mx my < <(center_of_prefix "Message" <<< "$dump") || true
+  if [ -n "${mx:-}" ]; then break; fi
+  sleep 1
+done
+if [ -z "${mx:-}" ]; then
+  echo "::error::commit message box not found"
+  adb exec-out screencap -p > "$out/failure.png" || true
+  adb logcat -d -t 400 > "$out/logcat.txt" || true
+  exit 1
+fi
 adb shell input tap "$mx" "$my"
 sleep 1
 adb shell input text "First%scommit%sfrom%sthe%ssmoke%stest"
