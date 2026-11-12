@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ferride.scm.CredentialPrompt
 import dev.ferride.scm.FakeScmProvider
 import dev.ferride.scm.FakeScmRepo
@@ -29,6 +30,7 @@ import java.util.concurrent.CompletableFuture
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 class ScmScreenshotTest {
     @get:Rule
     val compose = createComposeRule()
@@ -41,9 +43,12 @@ class ScmScreenshotTest {
         openFirst: String? = "src/main.rs",
         /** Phones run in touch mode, where Android gives no view initial focus (Robolectric doesn't by default). */
         touchMode: Boolean = false,
-        setup: (WorkbenchState) -> Unit,
+        /** Capture every window (dialogs), not just the Compose root. */
+        wholeScreen: Boolean = false,
+        afterContent: (WorkbenchState) -> Unit = {},
+        setup: (WorkbenchState) -> Unit = {},
     ) {
-        if (touchMode) androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().setInTouchMode(true)
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().setInTouchMode(touchMode)
         val backend = if (saf) FakeWorkspaceBackend(kind = dev.ferride.core.WorkspaceKind.SAF) else FakeWorkspaceBackend()
         val provider = FakeScmProvider(if (repo) FakeScmRepo(backend.root) else null)
         val state = WorkbenchState(
@@ -59,7 +64,10 @@ class ScmScreenshotTest {
         setup(state)
         compose.setContent { FerrideWorkbench(state, imeVisible = false, hardwareKeyboard = false) }
         compose.waitForIdle()
-        compose.onRoot().captureRoboImage("build/outputs/roborazzi/${name}_${if (dark) "dark" else "light"}.png")
+        compose.runOnIdle { afterContent(state) }
+        compose.waitForIdle()
+        val path = "build/outputs/roborazzi/${name}_${if (dark) "dark" else "light"}.png"
+        if (wholeScreen) captureScreenRoboImage(path) else compose.onRoot().captureRoboImage(path)
     }
 
     private fun view(s: WorkbenchState) {
@@ -135,16 +143,16 @@ class ScmScreenshotTest {
     fun tabletScmEmptyLight() = shoot("tablet_scm_empty", false, repo = false) { it.showView(SideView.SourceControl) }
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
-    fun phoneScmSignInDark() = shoot("phone_scm_signin", true, touchMode = true, setup = ::signIn)
+    fun phoneScmSignInDark() = shoot("phone_scm_signin", true, touchMode = true, wholeScreen = true, afterContent = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
-    fun phoneScmSignInLight() = shoot("phone_scm_signin", false, touchMode = true, setup = ::signIn)
+    fun phoneScmSignInLight() = shoot("phone_scm_signin", false, touchMode = true, wholeScreen = true, afterContent = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
-    fun tabletScmSignInDark() = shoot("tablet_scm_signin", true, touchMode = true, setup = ::signIn)
+    fun tabletScmSignInDark() = shoot("tablet_scm_signin", true, touchMode = true, wholeScreen = true, afterContent = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
-    fun tabletScmSignInLight() = shoot("tablet_scm_signin", false, touchMode = true, setup = ::signIn)
+    fun tabletScmSignInLight() = shoot("tablet_scm_signin", false, touchMode = true, wholeScreen = true, afterContent = ::signIn)
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.Pixel7)
     fun phoneScmCloneDark() = shoot("phone_scm_clone", true, setup = ::cloning)
