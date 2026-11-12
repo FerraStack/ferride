@@ -77,7 +77,7 @@ expect_text() {
   local want="$1" desc="$2" i found=0
   for i in $(seq 1 10); do
     dismiss_system_dialogs
-    if ui_dump | grep -qE "text=\"$want\"|text=\"[^\"]*$want[^\"]*\""; then
+    if ui_dump | grep -Fq "$want"; then
       found=1
       break
     fi
@@ -93,7 +93,7 @@ expect_text() {
 expect_no_text() {
   local unwanted="$1" desc="$2" i found=1
   for i in $(seq 1 10); do
-    if ! ui_dump | grep -q "text=\"$unwanted\""; then
+    if ! ui_dump | grep -Fq "$unwanted"; then
       found=0
       break
     fi
