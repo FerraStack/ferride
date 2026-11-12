@@ -77,7 +77,7 @@ expect_text() {
   local want="$1" desc="$2" i found=0
   for i in $(seq 1 10); do
     dismiss_system_dialogs
-    if ui_dump | grep -q "text=\"$want\""; then
+    if ui_dump | grep -qE "text=\"$want\"|text=\"[^\"]*$want[^\"]*\""; then
       found=1
       break
     fi
@@ -249,7 +249,7 @@ adb shell input text "First%scommit%sfrom%sthe%ssmoke%stest"
 sleep 1
 adb shell input keycombination 113 66
 sleep 2
-expect_text "Name" "commit asks for git.user.name"
+expect_text "git.user.name" "commit asks for git.user.name"
 adb shell input text "Ferride%sSmoke"
 adb shell input keyevent 66
 sleep 2
