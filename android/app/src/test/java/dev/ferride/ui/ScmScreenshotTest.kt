@@ -65,9 +65,18 @@ class ScmScreenshotTest {
         compose.setContent { FerrideWorkbench(state, imeVisible = false, hardwareKeyboard = false) }
         compose.waitForIdle()
         compose.runOnIdle { afterContent(state) }
-        compose.waitForIdle()
-        val path = "build/outputs/roborazzi/${name}_${if (dark) "dark" else "light"}.png"
-        if (wholeScreen) captureScreenRoboImage(path) else compose.onRoot().captureRoboImage(path)
+        try {
+            if (wholeScreen) {
+                compose.mainClock.autoAdvance = false
+                compose.mainClock.advanceTimeBy(500)
+            } else {
+                compose.waitForIdle()
+            }
+            val path = "build/outputs/roborazzi/${name}_${if (dark) "dark" else "light"}.png"
+            if (wholeScreen) captureScreenRoboImage(path) else compose.onRoot().captureRoboImage(path)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
     }
 
     private fun view(s: WorkbenchState) {
