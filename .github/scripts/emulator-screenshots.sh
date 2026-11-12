@@ -220,11 +220,21 @@ palette_command "Stage%sAll%sChanges"
 alive "stage all"
 expect_text "Staged Changes" "files moved to Staged Changes"
 mx=
+my=
 for _ in $(seq 1 10); do
   dismiss_system_dialogs
   dump="$(ui_dump)"
-  read -r mx my < <(center_of_prefix "Message" <<< "$dump") || true
-  if [ -n "${mx:-}" ]; then break; fi
+  if read -r mx my < <(center_of_prefix "Message" <<< "$dump") && [ -n "${mx:-}" ]; then
+    break
+  fi
+  if read -r mx my < <(grep -o 'class="android.widget.EditText"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' <<< "$dump" | head -1 | sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/' | awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }') && [ -n "${mx:-}" ]; then
+    break
+  fi
+  if read -r bx by < <(center_of "Commit" <<< "$dump") && [ -n "${bx:-}" ]; then
+    mx="$bx"
+    my="$((by - 110))"
+    break
+  fi
   sleep 1
 done
 if [ -z "${mx:-}" ]; then
