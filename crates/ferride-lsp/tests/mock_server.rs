@@ -273,3 +273,67 @@ fn panicking_listener_does_not_hang_requests() {
     assert!(started.elapsed() < Duration::from_secs(5));
     assert!(client.is_closed());
 }
+
+#[test]
+fn requests_can_be_cancelled_and_sync_is_incremental() {
+    use ferride_lsp::CancelToken;
+    use ferride_lsp::lsp_types::{Range, TextDocumentContentChangeEvent, TextDocumentSyncKind};
+
+    let (client_end, server_end) = UnixStream::pair().unwrap();
+    let server = spawn_mock(server_end);
+    let client = LspClient::start(client_end.try_clone().unwrap(), client_end, |_| {});
+    client.set_timeout(Duration::from_secs(10));
+    client.initialize(None, "ferride-test").unwrap();
+    assert_eq!(client.sync_kind(), TextDocumentSyncKind::INCREMENTAL);
+
+    // A request the server never answers: cancelling returns at once.
+    let token = CancelToken::new();
+    let t = token.clone();
+    let canceller = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(100));
+        t.cancel();
+    });
+    let started = std::time::Instant::now();
+    let r = client.request_raw_with("never", json!({}), Some(&token));
+    canceller.join().unwrap();
+    assert!(matches!(r, Err(LspError::Cancelled)), "{r:?}");
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "returned well before the timeout"
+    );
+    // Already cancelled: not even sent.
+    assert!(matches!(
+        client.request_raw_with("never", json!({}), Some(&token)),
+        Err(LspError::Cancelled)
+    ));
+
+    // Incremental didChange carries UTF-16 ranges.
+    let uri = file_uri("/work/a.rs").unwrap();
+    client
+        .did_open(uri.clone(), "rust", 1, "fn main() {}".into())
+        .unwrap();
+    client
+        .did_change(
+            uri,
+            2,
+            vec![TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 3), Position::new(0, 7))),
+                range_length: None,
+                text: "start".into(),
+            }],
+        )
+        .unwrap();
+    client.shutdown().unwrap();
+    let seen = server.join().unwrap();
+    let cancels: Vec<_> = seen.iter().filter(|m| m["method"] == "$/cancelRequest").collect();
+    assert_eq!(cancels.len(), 1, "one $/cancelRequest for the abandoned request");
+    let change = seen
+        .iter()
+        .find(|m| m["method"] == "textDocument/didChange")
+        .unwrap();
+    assert_eq!(
+        change["params"]["contentChanges"][0]["range"]["start"]["character"],
+        3
+    );
+    assert_eq!(change["params"]["contentChanges"][0]["text"], "start");
+}

@@ -462,3 +462,50 @@ fn slow_ime_composition_is_still_one_step() {
     b.undo().unwrap();
     assert_eq!(b.text(), "x ");
 }
+
+/// Replays recorded changes on a plain string the way an LSP server would.
+fn replay(text: &str, changes: &[TextChange]) -> String {
+    let mut s = text.to_owned();
+    for c in changes {
+        let offset = |line: usize, col: usize| {
+            let line_start: usize = s.split('\n').take(line).map(|l| l.len() + 1).sum();
+            let line_text = s[line_start..].split('\n').next().unwrap_or("");
+            let mut units = 0;
+            let mut bytes = 0;
+            for ch in line_text.chars() {
+                if units >= col {
+                    break;
+                }
+                units += ch.len_utf16();
+                bytes += ch.len_utf8();
+            }
+            line_start + bytes
+        };
+        let a = offset(c.start_line, c.start_col);
+        let b = offset(c.end_line, c.end_col);
+        s.replace_range(a..b, &c.text);
+    }
+    s
+}
+
+#[test]
+fn change_log_replays_to_the_same_text() {
+    let start = "fn main() {\n    println!(\"😀\");\n}\n";
+    let mut b = Buffer::new(start);
+    b.set_change_log(true);
+    // Multi-cursor typing, a backspace, an undo and a redo.
+    let sels = Selections::new(vec![Selection::caret(3), Selection::caret(15)], 0).unwrap();
+    b.set_selections(sels);
+    b.insert_at_selections("xy", EditKind::Typing);
+    b.delete_backward();
+    b.apply(vec![Edit::new(0..2, "pub fn")], EditKind::Other).unwrap();
+    b.undo().unwrap();
+    b.redo().unwrap();
+    let changes = b.take_changes();
+    assert!(changes.len() >= 6);
+    assert_eq!(replay(start, &changes), b.text());
+    assert!(b.take_changes().is_empty(), "taken once");
+    b.set_change_log(false);
+    b.insert_at_selections("z", EditKind::Typing);
+    assert!(b.take_changes().is_empty(), "off: nothing recorded");
+}

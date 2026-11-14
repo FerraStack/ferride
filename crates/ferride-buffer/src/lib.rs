@@ -16,6 +16,6 @@ pub mod grapheme;
 mod history;
 mod selection;
 
-pub use buffer::{Buffer, BufferError, ByteEdit, Edit, EditKind, LineEnding, Point};
+pub use buffer::{Buffer, BufferError, ByteEdit, Edit, EditKind, LineEnding, Point, TextChange};
 pub use history::{Change, TYPING_PAUSE, Transaction};
 pub use selection::{Selection, Selections};
