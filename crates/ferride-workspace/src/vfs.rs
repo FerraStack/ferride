@@ -142,6 +142,54 @@ pub fn read_text(vfs: &dyn Vfs, path: &str) -> Result<String> {
     String::from_utf8(bytes).map_err(|_| WorkspaceError::NotUtf8(PathBuf::from(&rel)))
 }
 
+/// Opens a text file in any encoding: detected (BOM, UTF-8, then a guess) or,
+/// with `encoding`, the one the user picked ("Reopen with Encoding"). Same
+/// size and binary rules as [`read_text`]; UTF-16 files may contain NULs.
+pub fn read_decoded(vfs: &dyn Vfs, path: &str, encoding: Option<&str>) -> Result<crate::Decoded> {
+    let rel = normalize_rel(path)?;
+    let stat = vfs.stat(&rel)?;
+    if stat.size > MAX_FILE_SIZE {
+        return Err(WorkspaceError::TooLarge(PathBuf::from(&rel), stat.size));
+    }
+    let bytes = vfs.read(&rel)?;
+    if bytes.len() as u64 > MAX_FILE_SIZE {
+        return Err(WorkspaceError::TooLarge(PathBuf::from(&rel), bytes.len() as u64));
+    }
+    let forced = encoding.map(|id| {
+        crate::TextEncoding::by_id(id).ok_or_else(|| WorkspaceError::UnknownEncoding(id.to_owned()))
+    });
+    let utf16 = crate::encoding::has_utf16_bom(&bytes)
+        || forced
+            .as_ref()
+            .is_some_and(|e| e.as_ref().is_ok_and(|e| e.id.starts_with("utf16")));
+    if !utf16 && bytes[..bytes.len().min(8192)].contains(&0) {
+        return Err(WorkspaceError::Binary(PathBuf::from(&rel)));
+    }
+    Ok(match forced {
+        Some(enc) => {
+            let enc = enc?;
+            let (text, lossy) = enc.decode(&bytes);
+            crate::Decoded {
+                text,
+                encoding: enc,
+                lossy,
+            }
+        }
+        None => crate::encoding::detect(&bytes),
+    })
+}
+
+/// Saves text in `encoding` (VS Code id); refuses characters it can't represent.
+pub fn write_encoded(vfs: &dyn Vfs, path: &str, text: &str, encoding: &str) -> Result<()> {
+    let rel = normalize_rel(path)?;
+    let enc = crate::TextEncoding::by_id(encoding)
+        .ok_or_else(|| WorkspaceError::UnknownEncoding(encoding.to_owned()))?;
+    let bytes = enc
+        .encode(text)
+        .ok_or_else(|| WorkspaceError::Unencodable(PathBuf::from(&rel), enc.label.to_owned()))?;
+    vfs.write(&rel, &bytes)
+}
+
 /// Every file under the root (relative paths), breadth-first, skipping
 /// `.git`, `node_modules` and `target`, stopping after `limit` files. Quick
 /// Open uses this on backends without a real path; listings are cached by

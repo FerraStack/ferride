@@ -2,11 +2,43 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use ferride_workspace::{
-    DocNode, DocumentTree, FerruxVfs, LocalVfs, SafVfs, SearchOptions, Vfs, VfsKind, WorkspaceError,
-    copy_tree, fuzzy_score, normalize_rel, read_text, walk_files,
+    DocNode, DocumentTree, ENCODINGS, FerruxVfs, LocalVfs, SafVfs, SearchOptions, Vfs, VfsKind,
+    WorkspaceError, copy_tree, fuzzy_score, normalize_rel, read_decoded, read_text, walk_files,
+    write_encoded,
 };
 
 use crate::FerrideError;
+
+/// A file opened as text, with the encoding it was read in.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct OpenedText {
+    pub text: String,
+    /// VS Code's `files.encoding` id (`utf8`, `windows1252`, `shiftjis`, …).
+    pub encoding: String,
+    /// What the status bar shows (`UTF-8`, `Western (Windows 1252)`).
+    pub encoding_label: String,
+    /// Some bytes didn't decode (U+FFFD): probably the wrong encoding.
+    pub lossy: bool,
+}
+
+/// One entry of the "Reopen/Save with Encoding" picker.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct EncodingInfo {
+    pub id: String,
+    pub label: String,
+}
+
+/// The encodings Ferride can open and save, in picker order.
+#[uniffi::export]
+pub fn supported_encodings() -> Vec<EncodingInfo> {
+    ENCODINGS
+        .iter()
+        .map(|e| EncodingInfo {
+            id: e.id.to_owned(),
+            label: e.label.to_owned(),
+        })
+        .collect()
+}
 
 /// Where a workspace's files live (see `ferride_workspace::vfs`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -322,6 +354,27 @@ impl WorkspaceHandle {
 
     pub fn read_file(&self, path: String) -> Result<String, FerrideError> {
         Ok(read_text(self.vfs.as_ref(), &self.rel(&path)?)?)
+    }
+
+    /// Opens a file in any encoding: detected, or `encoding` (Reopen with Encoding).
+    pub fn open_text(&self, path: String, encoding: Option<String>) -> Result<OpenedText, FerrideError> {
+        let d = read_decoded(self.vfs.as_ref(), &self.rel(&path)?, encoding.as_deref())?;
+        Ok(OpenedText {
+            text: d.text,
+            encoding: d.encoding.id.to_owned(),
+            encoding_label: d.encoding.label.to_owned(),
+            lossy: d.lossy,
+        })
+    }
+
+    /// Saves in `encoding`; fails (nothing written) if a character can't be represented.
+    pub fn write_text(&self, path: String, contents: String, encoding: String) -> Result<(), FerrideError> {
+        Ok(write_encoded(
+            self.vfs.as_ref(),
+            &self.rel(&path)?,
+            &contents,
+            &encoding,
+        )?)
     }
 
     pub fn write_file(&self, path: String, contents: String) -> Result<(), FerrideError> {

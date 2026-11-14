@@ -315,6 +315,21 @@ class WorkbenchScreenshotTest {
         afterContent = { it.requestDelete(srcNode(it)) },
     )
 
+    // ----- File encoding ---------------------------------------------------------------
+
+    /** main.rs read as Windows 1252: the status bar says so, and Reopen with Encoding is open. */
+    private fun encodingPick(dark: Boolean) = shoot(
+        "tablet_encoding",
+        dark = dark,
+        backend = FakeWorkspaceBackend(encodingOf = mapOf("src/main.rs" to "windows1252")),
+    ) { it.showQuickPick(it.encodingPick(reopen = true)) }
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletEncodingDark() = encodingPick(dark = true)
+
+    @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)
+    fun tabletEncodingLight() = encodingPick(dark = false)
+
     // ----- tablet, landscape: desktop-like layout -----------------------------------
 
     @Test @Config(qualifiers = RobolectricDeviceQualifiers.MediumTablet)

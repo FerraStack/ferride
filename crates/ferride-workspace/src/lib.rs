@@ -4,6 +4,7 @@
 //! (Kotlin `Dispatchers.IO`). Paths crossing the API are absolute; every
 //! operation checks that the path stays inside the workspace root.
 
+pub mod encoding;
 mod fuzzy;
 mod search;
 pub mod symbols;
@@ -13,11 +14,12 @@ use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
+pub use encoding::{Decoded, ENCODINGS, TextEncoding};
 pub use fuzzy::{FileMatch, fuzzy_score};
 pub use search::{SearchOptions, SearchResults, TextMatch};
 pub use vfs::{
     DocNode, DocumentTree, FerruxVfs, LocalVfs, SafVfs, Vfs, VfsEntry, VfsKind, VfsStat, copy_tree,
-    normalize_rel, read_text, walk_files,
+    normalize_rel, read_decoded, read_text, walk_files, write_encoded,
 };
 
 /// Files larger than this are not opened in the editor or searched.
@@ -35,6 +37,10 @@ pub enum WorkspaceError {
     Binary(PathBuf),
     #[error("{0} is not valid UTF-8 (other encodings aren't supported yet)")]
     NotUtf8(PathBuf),
+    #[error("{0} can't be saved as {1}: some characters have no representation in it")]
+    Unencodable(PathBuf, String),
+    #[error("unknown encoding {0}")]
+    UnknownEncoding(String),
     #[error("{0} already exists")]
     AlreadyExists(PathBuf),
     #[error("invalid search pattern: {0}")]
