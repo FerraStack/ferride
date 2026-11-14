@@ -1,6 +1,9 @@
 package dev.ferride.editor
 
+import android.os.Handler
+import android.os.Looper
 import dev.ferride.core.Document
+import dev.ferride.core.DocumentListener
 import dev.ferride.core.DocumentSymbol
 import dev.ferride.core.ViewLine
 
@@ -40,6 +43,12 @@ interface EditorModel {
     fun symbols(): List<DocumentSymbol> = emptyList()
     /** Bumped by every content change. */
     val version: Long
+    /** Bumped whenever syntax highlighting or symbols update (including background reparses). */
+    val syntaxVersion: Long get() = version
+    /** Called on the main thread when a background syntax reparse completes. */
+    var onSyntaxUpdated: (() -> Unit)?
+        get() = null
+        set(_) {}
     val lineCount: Int
     val length: Int
     val isDirty: Boolean
@@ -96,6 +105,35 @@ class RustEditorModel(private val doc: Document, override val fileName: String) 
 
     override fun symbols(): List<DocumentSymbol> = doc.symbols()
     override val version: Long get() = doc.version()
+    override val syntaxVersion: Long get() = doc.syntaxVersion()
+
+    private var mainHandler: Handler? = null
+    private val syntaxListener = object : DocumentListener {
+        override fun onSyntaxUpdated() {
+            val cb = onSyntaxUpdated ?: return
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                if (!isClosed) cb()
+            } else {
+                val handler = mainHandler ?: Handler(Looper.getMainLooper()).also { mainHandler = it }
+                handler.post {
+                    if (!isClosed) onSyntaxUpdated?.invoke()
+                }
+            }
+        }
+    }
+
+    override var onSyntaxUpdated: (() -> Unit)? = null
+        set(value) {
+            field = value
+            if (!isClosed) {
+                if (value != null) {
+                    if (mainHandler == null) mainHandler = Handler(Looper.getMainLooper())
+                    doc.setListener(syntaxListener)
+                } else {
+                    doc.clearListener()
+                }
+            }
+        }
     override val lineCount: Int get() = doc.lineCount()
     override val length: Int get() = doc.lenUtf16()
     override val isDirty: Boolean get() = doc.isDirty()
@@ -147,6 +185,9 @@ class RustEditorModel(private val doc: Document, override val fileName: String) 
     override fun close() {
         if (isClosed) return
         isClosed = true
+        onSyntaxUpdated = null
+        mainHandler?.removeCallbacksAndMessages(null)
+        doc.clearListener()
         doc.close()
     }
 
