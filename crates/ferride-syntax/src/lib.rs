@@ -61,7 +61,6 @@ impl std::fmt::Debug for Syntax {
     }
 }
 
-
 /// An O(1) snapshot of a document's rope and syntax tree for off-thread parsing.
 pub struct ParseSnapshot {
     language: LanguageId,

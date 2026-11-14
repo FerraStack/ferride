@@ -371,16 +371,10 @@ fn background_snapshot_recovers_stale_highlights_and_supports_cancel() {
     let close_at = "fn a() { let x = [1, 2, 3]; }\n".len() * 200;
     text.insert(close_at, '"');
     let mut buf = Buffer::new(&text);
-    let mut syn = Syntax::with_budget(
-        LanguageId::Rust,
-        buf.rope(),
-        std::time::Duration::from_secs(30),
-    );
+    let mut syn = Syntax::with_budget(LanguageId::Rust, buf.rope(), std::time::Duration::from_secs(30));
     assert!(!syn.is_stale());
 
-    let edits = buf
-        .apply(vec![Edit::insert(0, "\"")], EditKind::Other)
-        .unwrap();
+    let edits = buf.apply(vec![Edit::insert(0, "\"")], EditKind::Other).unwrap();
     syn.update_with_budget(buf.rope(), &edits, Duration::ZERO);
     assert!(syn.is_stale());
     // Stale tree still highlights line 100 as code (`fn` is Keyword).

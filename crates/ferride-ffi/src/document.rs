@@ -324,11 +324,7 @@ fn run_background_parse(
             }
         };
         if next_snap.is_none() {
-            let listener = state
-                .listener
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .clone();
+            let listener = state.listener.lock().unwrap_or_else(|e| e.into_inner()).clone();
             if let Some(l) = listener {
                 l.on_syntax_updated();
             }
@@ -346,11 +342,7 @@ pub struct Document {
 
 impl Drop for Document {
     fn drop(&mut self) {
-        let mut inner = self
-            .state
-            .inner
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.state.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.invalidate_background();
     }
 }
