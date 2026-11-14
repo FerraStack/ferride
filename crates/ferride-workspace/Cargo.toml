@@ -16,6 +16,8 @@ grep-searcher.workspace = true
 grep-regex.workspace = true
 grep-matcher.workspace = true
 thiserror.workspace = true
+encoding_rs.workspace = true
+chardetng.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

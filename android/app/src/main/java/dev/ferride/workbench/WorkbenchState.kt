@@ -66,6 +66,9 @@ class EditorTab(val path: String, val model: EditorModel?, val kind: TabKind = T
     }
     var preview by mutableStateOf(kind == TabKind.File)
     var dirty by mutableStateOf(false)
+    /** VS Code's `files.encoding` id the file was read in and is saved in. */
+    var encoding by mutableStateOf("utf8")
+    var encodingLabel by mutableStateOf("UTF-8")
     /** Bumped on every edit/selection change so Compose re-reads model-derived state. */
     var revision by mutableIntStateOf(0)
 }
@@ -672,11 +675,24 @@ class WorkbenchState(
         scope.launch {
             // Reading and the initial parse both happen off the main thread.
             val loaded = withContext(io) {
-                runCatching { backend.createModel(backend.readFile(path), path.substringAfterLast('/')) }
+                runCatching {
+                    val opened = backend.openText(path)
+                    opened to backend.createModel(opened.text, path.substringAfterLast('/'))
+                }
             }
-            loaded.onFailure { message = it.message }.onSuccess { model ->
+            loaded.onFailure { message = it.message }.onSuccess { (opened, model) ->
                 if (line != null) model.selection = Sel.caret(model.offsetAt(line, 0))
-                addTab(EditorTab(path, model).also { it.preview = preview })
+                addTab(
+                    EditorTab(path, model).also {
+                        it.preview = preview
+                        it.encoding = opened.encoding
+                        it.encodingLabel = opened.encodingLabel
+                    },
+                )
+                if (opened.lossy) {
+                    message = "${path.substringAfterLast('/')} was opened as ${opened.encodingLabel}, but some bytes " +
+                        "couldn't be decoded. Pick another with Reopen with Encoding (status bar)."
+                }
             }
         }
     }
@@ -795,7 +811,7 @@ class WorkbenchState(
             return
         }
         scope.launch {
-            val r = withContext(io) { runCatching { backend.writeFile(tab.path, text) } }
+            val r = withContext(io) { runCatching { backend.writeText(tab.path, text, tab.encoding) } }
             r.onSuccess {
                 if (!model.isClosed) {
                     model.markSaved(version)
@@ -1136,6 +1152,9 @@ class WorkbenchState(
         cmd(CommandIds.SHOW_ALL_SYMBOLS, "Go to Symbol in Workspace…", "Go", KeyChord.ctrl(KeyEvent.KEYCODE_T)) {
             openPalette(PaletteMode.WorkspaceSymbols)
         }
+        cmd(CommandIds.CHANGE_ENCODING, "Change File Encoding", null, enabled = { activeTab?.kind == TabKind.File }) {
+            showQuickPick(encodingActionPick())
+        }
         cmd(CommandIds.CHANGE_LANGUAGE_MODE, "Change Language Mode", null, enabled = hasEditor) {
             showQuickPick(languagePick())
         }
@@ -1215,6 +1234,82 @@ class WorkbenchState(
         }
         cmd(CommandIds.ZOOM_OUT, "Decrease Editor Font Size", "Editor", KeyChord.ctrl(KeyEvent.KEYCODE_MINUS)) {
             updateSettings { it.copy(fontSize = (it.fontSize - 1).coerceAtLeast(6)) }
+        }
+    }
+
+    // ----- file encoding (#15) ---------------------------------------------------------
+
+    /** VS Code's first step: "Reopen with Encoding" or "Save with Encoding". */
+    fun encodingActionPick(): QuickPick = QuickPick("Select Action") {
+        listOf(
+            PaletteItem("Reopen with Encoding") { showQuickPick(encodingPick(reopen = true)) },
+            PaletteItem("Save with Encoding") { showQuickPick(encodingPick(reopen = false)) },
+        )
+    }
+
+    /** Every encoding by label with its id; the current one is marked. */
+    fun encodingPick(reopen: Boolean): QuickPick =
+        QuickPick(if (reopen) "Select File Encoding to Reopen File" else "Select File Encoding to Save with") {
+            val tab = activeTab
+            val list = runCatching { backend.encodings() }.getOrDefault(emptyList())
+            list.map { e ->
+                PaletteItem(e.label, description = if (e.id == tab?.encoding) "${e.id} - Current" else e.id) {
+                    paletteOpen = false
+                    quickPick = null
+                    if (tab != null) {
+                        if (reopen) reopenWithEncoding(tab, e.id) else saveWithEncoding(tab, e.id, e.label)
+                    }
+                }
+            }
+        }
+
+    /** Reloads a file decoded as [encoding] (refused while it has unsaved changes). */
+    fun reopenWithEncoding(tab: EditorTab, encoding: String) {
+        if (tab.dirty) {
+            message = "Save or revert ${tab.name} before reopening it with another encoding"
+            return
+        }
+        scope.launch {
+            val r = withContext(io) {
+                runCatching {
+                    val opened = backend.openText(tab.path, encoding)
+                    opened to backend.createModel(opened.text, tab.name)
+                }
+            }
+            r.onFailure { message = it.message }.onSuccess { (opened, model) ->
+                val i = tabs.indexOfFirst { it === tab }
+                if (i < 0) return@onSuccess
+                val reopened = EditorTab(tab.path, model, tab.kind).also {
+                    it.preview = false
+                    it.encoding = opened.encoding
+                    it.encodingLabel = opened.encodingLabel
+                }
+                tabs[i] = reopened
+                retire(tab.model)
+                log("Reopened ${tab.name} with ${opened.encodingLabel}")
+            }
+        }
+    }
+
+    /** Switches the file's encoding and saves; the old one stays if the text can't be represented. */
+    fun saveWithEncoding(tab: EditorTab, encoding: String, label: String) {
+        val previous = tab.encoding to tab.encodingLabel
+        tab.encoding = encoding
+        tab.encodingLabel = label
+        val model = tab.model ?: return
+        val text = model.text()
+        val version = model.version
+        scope.launch {
+            val r = withContext(io) { runCatching { backend.writeText(tab.path, text, encoding) } }
+            r.onSuccess {
+                model.markSaved(version)
+                tab.dirty = model.isDirty
+                log("Saved ${tab.name} as $label")
+            }.onFailure {
+                tab.encoding = previous.first
+                tab.encodingLabel = previous.second
+                message = it.message
+            }
         }
     }
 

@@ -1,6 +1,9 @@
 package dev.ferride.workbench
 
+import dev.ferride.core.EncodingInfo
 import dev.ferride.core.FerruxStatus
+import dev.ferride.core.OpenedText
+import dev.ferride.core.supportedEncodings
 import dev.ferride.core.FileHit
 import dev.ferride.core.FileNode
 import dev.ferride.core.MatchRange
@@ -32,6 +35,12 @@ interface WorkspaceBackend {
     fun listDir(path: String): List<FileNode>
     fun readFile(path: String): String
     fun writeFile(path: String, contents: String)
+    /** Opens a file in its detected encoding, or [encoding] (Reopen with Encoding). */
+    fun openText(path: String, encoding: String? = null): OpenedText
+    /** Saves in [encoding]; throws if a character can't be represented in it. */
+    fun writeText(path: String, contents: String, encoding: String)
+    /** The encodings the Reopen/Save with Encoding pickers offer. */
+    fun encodings(): List<EncodingInfo>
     /** Creates an empty file (and missing parents); returns its path. Fails if it exists. */
     fun createFile(path: String): String
     /** Creates a folder (and missing parents); returns its path. Fails if it exists. */
@@ -63,6 +72,9 @@ class RustWorkspaceBackend(private val handle: WorkspaceHandle) : WorkspaceBacke
     override fun listDir(path: String) = handle.listDir(path)
     override fun readFile(path: String) = handle.readFile(path)
     override fun writeFile(path: String, contents: String) = handle.writeFile(path, contents)
+    override fun openText(path: String, encoding: String?): OpenedText = handle.openText(path, encoding)
+    override fun writeText(path: String, contents: String, encoding: String) = handle.writeText(path, contents, encoding)
+    override fun encodings(): List<EncodingInfo> = supportedEncodings()
     override fun createFile(path: String): String = handle.createFile(path)
     override fun createDir(path: String): String = handle.createDir(path)
     override fun rename(from: String, to: String): String = handle.rename(from, to)
@@ -110,6 +122,8 @@ class FakeWorkspaceBackend(
     private val branch: String? = "main",
     /** Called inside [writeFile] (tests use it to simulate edits during a save). */
     private val onWrite: (String) -> Unit = {},
+    /** Relative path → encoding id the fake pretends a file is in (default UTF-8). */
+    private val encodingOf: Map<String, String> = emptyMap(),
     /** Called at the start of [searchText] (tests use it to make a search slow). */
     private val onSearch: (String, SearchToken) -> Unit = { _, _ -> },
     override val kind: WorkspaceKind = WorkspaceKind.LOCAL,
@@ -150,6 +164,15 @@ class FakeWorkspaceBackend(
     override fun writeFile(path: String, contents: String) {
         onWrite(path)
     }
+
+    override fun openText(path: String, encoding: String?): OpenedText {
+        val id = encoding ?: encodingOf[rel(path)] ?: "utf8"
+        val label = FAKE_ENCODINGS.firstOrNull { it.id == id }?.label ?: id
+        return OpenedText(readFile(path), id, label, false)
+    }
+
+    override fun writeText(path: String, contents: String, encoding: String) = writeFile(path, contents)
+    override fun encodings(): List<EncodingInfo> = FAKE_ENCODINGS
 
     override fun createFile(path: String): String {
         val r = rel(path)
@@ -266,3 +289,14 @@ class SearchToken {
         listener = null
     }
 }
+
+/** A few encodings for the fake backend (the real list comes from the core). */
+private val FAKE_ENCODINGS = listOf(
+    EncodingInfo("utf8", "UTF-8"),
+    EncodingInfo("utf8bom", "UTF-8 with BOM"),
+    EncodingInfo("utf16le", "UTF-16 LE"),
+    EncodingInfo("windows1252", "Western (Windows 1252)"),
+    EncodingInfo("windows1251", "Cyrillic (Windows 1251)"),
+    EncodingInfo("shiftjis", "Japanese (Shift JIS)"),
+    EncodingInfo("gb18030", "Simplified Chinese (GB 18030)"),
+)

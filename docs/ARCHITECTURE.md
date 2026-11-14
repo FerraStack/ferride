@@ -159,7 +159,8 @@ Decision (2026-11-08). Google Play's All files access policy (`MANAGE_EXTERNAL_S
 
 - SAF is slow (each query is a Binder round trip), so a directory is listed with **one** `query()` and the core caches listings per directory; lookups walk the cache, mutations drop the affected entries, Explorer refresh drops a subtree. Quick Open on SAF walks the cached tree (capped at 20k files, skipping `node_modules`/`target`).
 - Moves across folders aren't offered on SAF (providers differ); rename in place is.
-- The same text rules apply on every backend (8 MiB limit, binary sniffing, UTF-8 only until #15).
+- The same text rules apply on every backend (8 MiB limit, binary sniffing; UTF-16 with a BOM may contain NULs).
+- **Encodings** (`ferride_workspace::encoding`): files open in their detected encoding (BOM → UTF-8/UTF-16; valid UTF-8; else a `chardetng` guess decoded with `encoding_rs`) and are saved in it again; the status bar shows it (VS Code's short label, e.g. "Windows 1252") and opens *Change File Encoding* → Reopen with Encoding / Save with Encoding (VS Code ids such as `windows1252`, `shiftjis`). Saving refuses characters the encoding can't represent instead of writing escapes; a lossy decode is reported.
 - The last folder is remembered (`path:` or `saf:` + URI) and reopened on launch if its grant is still held.
 - `File: Open Folder…` (`workbench.action.files.openFolder`) opens the picker in both flavors; in foss, `Ferride: Allow Access to All Files` opens the system setting, after which picked device folders open as local paths.
 

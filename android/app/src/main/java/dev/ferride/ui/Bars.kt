@@ -298,7 +298,9 @@ fun StatusBar(state: WorkbenchState, compact: Boolean) {
                 StatusItem(null, if (s.insertSpaces) "Spaces: ${s.tabSize}" else "Tab Size: ${s.tabSize}") {
                     state.openSettings()
                 }
-                StatusItem(null, "UTF-8") {}
+                // VS Code's short form: "Windows 1252" for "Western (Windows 1252)".
+                val enc = tab.encodingLabel.substringAfter('(').substringBefore(')')
+                StatusItem(null, enc) { state.commands.execute(CommandIds.CHANGE_ENCODING) }
                 StatusItem(null, "LF") {}
             }
             StatusItem(null, languageDisplayName(m.language)) { state.commands.execute(CommandIds.CHANGE_LANGUAGE_MODE) }
