@@ -19,6 +19,9 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.EditorBoundsInfo
 import android.view.inputmethod.EditorInfo
@@ -1348,6 +1351,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         ensureCaretVisible()
         restartBlink()
         if (!fromIme || inputConnection?.inBatch != true) updateImeSelection()
+        notifyAccessibility(contentChanged = true)
         onChange?.invoke(true)
     }
 
@@ -1356,7 +1360,143 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         ensureCaretVisible()
         restartBlink()
         if (!fromIme || inputConnection?.inBatch != true) updateImeSelection()
+        notifyAccessibility(contentChanged = false)
         onChange?.invoke(false)
+    }
+
+    // ----- accessibility (#7) -------------------------------------------------------------------
+    // TalkBack sees an editable, multi-line text field: the text (up to
+    // A11Y_MAX_CHARS), the selection, and the standard actions: set selection,
+    // move by character / word / line / paragraph, copy, cut, paste, select
+    // all. Edits and cursor moves send the usual text events, and moving to
+    // another line announces "Line N".
+
+    /** What TalkBack calls the editor ("main.rs, editor"); set by the host. */
+    var accessibilityLabel: String = "Editor"
+
+    private var lastAnnouncedLine = -1
+
+    private fun a11yText(m: EditorModel): String = if (m.length <= A11Y_MAX_CHARS) m.text() else m.textRange(0, A11Y_MAX_CHARS)
+
+    override fun getAccessibilityClassName(): CharSequence = android.widget.EditText::class.java.name
+
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        val m = liveModel ?: return
+        info.isEditable = true
+        info.isMultiLine = true
+        info.isFocusable = true
+        info.isLongClickable = true
+        info.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        info.text = a11yText(m)
+        info.hintText = accessibilityLabel
+        info.contentDescription = null
+        val sel = m.selection
+        val max = min(m.length, A11Y_MAX_CHARS)
+        info.setTextSelection(sel.start.coerceAtMost(max), sel.end.coerceAtMost(max))
+        info.movementGranularities = A11Y_GRANULARITIES
+        listOf(
+            AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_SELECTION,
+            AccessibilityNodeInfo.AccessibilityAction.ACTION_NEXT_AT_MOVEMENT_GRANULARITY,
+            AccessibilityNodeInfo.AccessibilityAction.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY,
+            AccessibilityNodeInfo.AccessibilityAction.ACTION_COPY,
+            AccessibilityNodeInfo.AccessibilityAction.ACTION_CUT,
+            AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE,
+            AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_TEXT,
+        ).forEach(info::addAction)
+    }
+
+    override fun performAccessibilityAction(action: Int, arguments: android.os.Bundle?): Boolean {
+        val m = liveModel ?: return super.performAccessibilityAction(action, arguments)
+        return when (action) {
+            AccessibilityNodeInfo.ACTION_SET_SELECTION -> {
+                val start = arguments?.getInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, -1) ?: -1
+                val end = arguments?.getInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, -1) ?: -1
+                // Both -1 (or missing) collapses to the caret, like TextView.
+                if (start < 0 || end < 0) select(m.selection.head, m.selection.head) else select(start, end)
+                true
+            }
+            AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY,
+            AccessibilityNodeInfo.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY,
+            -> {
+                val granularity = arguments?.getInt(AccessibilityNodeInfo.ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT) ?: 0
+                val extend = arguments?.getBoolean(AccessibilityNodeInfo.ACTION_ARGUMENT_EXTEND_SELECTION_BOOLEAN) ?: false
+                val forward = action == AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY
+                moveByGranularity(m, granularity, forward, extend)
+            }
+            AccessibilityNodeInfo.ACTION_COPY -> { copy(); true }
+            AccessibilityNodeInfo.ACTION_CUT -> { cut(); true }
+            AccessibilityNodeInfo.ACTION_PASTE -> { paste(); true }
+            AccessibilityNodeInfo.ACTION_SET_TEXT -> {
+                val text = arguments?.getCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE)
+                replaceRange(0, m.length, text?.toString() ?: "")
+                true
+            }
+            else -> super.performAccessibilityAction(action, arguments)
+        }
+    }
+
+    /** TalkBack's reading controls: by character, word, line or paragraph. */
+    private fun moveByGranularity(m: EditorModel, granularity: Int, forward: Boolean, extend: Boolean): Boolean {
+        val sel = m.selection
+        val head = sel.head
+        val text = a11yText(m)
+        val target = when (granularity) {
+            AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER ->
+                if (forward) stepForward(m, head) else stepBack(m, head)
+            AccessibilityNodeInfo.MOVEMENT_GRANULARITY_WORD -> {
+                val isWord = { c: Char -> c.isLetterOrDigit() || c == '_' }
+                var i = head.coerceAtMost(text.length)
+                if (forward) {
+                    while (i < text.length && !isWord(text[i])) i++
+                    while (i < text.length && isWord(text[i])) i++
+                } else {
+                    while (i > 0 && !isWord(text[i - 1])) i--
+                    while (i > 0 && isWord(text[i - 1])) i--
+                }
+                i
+            }
+            AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE,
+            AccessibilityNodeInfo.MOVEMENT_GRANULARITY_PARAGRAPH,
+            -> {
+                val line = m.lineOfOffset(head)
+                when {
+                    forward && head < m.lineEnd(line) -> m.lineEnd(line)
+                    forward -> if (line + 1 < m.lineCount) m.lineEnd(line + 1) else m.length
+                    head > m.lineStart(line) -> m.lineStart(line)
+                    else -> if (line > 0) m.lineStart(line - 1) else 0
+                }
+            }
+            else -> return false
+        }
+        if (target == head) return false
+        select(if (extend) sel.anchor else target, target)
+        return true
+    }
+
+    private fun notifyAccessibility(contentChanged: Boolean) {
+        val am = context.getSystemService(AccessibilityManager::class.java) ?: return
+        if (!am.isEnabled) return
+        val m = liveModel ?: return
+        if (contentChanged) {
+            sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED)
+        }
+        sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED)
+        // Like VS Code's screen reader mode: say the line number when the caret changes line.
+        val line = m.lineOfOffset(m.selection.head)
+        if (!contentChanged && lastAnnouncedLine >= 0 && line != lastAnnouncedLine) announceForAccessibility("Line ${line + 1}")
+        lastAnnouncedLine = line
+    }
+
+    override fun onInitializeAccessibilityEvent(event: AccessibilityEvent) {
+        super.onInitializeAccessibilityEvent(event)
+        val m = liveModel ?: return
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
+            val max = min(m.length, A11Y_MAX_CHARS)
+            event.fromIndex = m.selection.start.coerceAtMost(max)
+            event.toIndex = m.selection.end.coerceAtMost(max)
+            event.itemCount = max
+        }
     }
 
     /** Edits not coming from the IME must reset its view of the text. */
@@ -1739,6 +1879,13 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         /** VS Code's `editor.minimap.maxColumn`. */
         private const val MINIMAP_COLUMNS = 120
         private const val MINIMAP_THROTTLE_MS = 100L
+        /** Larger documents expose only their beginning to accessibility services (Binder size). */
+        private const val A11Y_MAX_CHARS = 100_000
+        private const val A11Y_GRANULARITIES =
+            AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER or
+                AccessibilityNodeInfo.MOVEMENT_GRANULARITY_WORD or
+                AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE or
+                AccessibilityNodeInfo.MOVEMENT_GRANULARITY_PARAGRAPH
         /** Android hides an idle insertion (caret) handle after a few seconds. */
         private const val CARET_HANDLE_MS = 4000L
         private const val SQRT2 = 1.4142135f

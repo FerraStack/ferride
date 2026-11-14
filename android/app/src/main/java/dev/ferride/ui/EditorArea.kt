@@ -116,6 +116,7 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
                 view.squiggles = squiggles
                 view.stickyScrollEnabled = state.settings.stickyScroll
                 view.stickyScopes = stickyScopes
+                view.accessibilityLabel = "${tab.name}, editor"
                 view.onSelectionUi = { selectionUi = it }
                 state.editor = view
             },
