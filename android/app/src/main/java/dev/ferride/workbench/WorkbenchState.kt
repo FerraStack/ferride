@@ -298,14 +298,23 @@ class WorkbenchState(
     var outlineExpanded by mutableStateOf(false)
     /** Outline rows the user collapsed, by symbol path ("Circle/area"). */
     val outlineCollapsed = mutableStateListOf<String>()
-    private var symbolCache: Triple<EditorModel, Long, List<DocumentSymbol>>? = null
+    private class SymbolCache(
+        val model: EditorModel,
+        val version: Long,
+        val syntaxVersion: Long,
+        val symbols: List<DocumentSymbol>,
+    )
 
-    /** Symbols of the active editor, recomputed when its text changes. */
+    private var symbolCache: SymbolCache? = null
+
+    /** Symbols of the active editor, recomputed when its text or syntax tree changes. */
     fun activeSymbols(): List<DocumentSymbol> {
         val m = activeModel?.takeIf { !it.isClosed } ?: return emptyList()
-        symbolCache?.let { (cm, v, list) -> if (cm === m && v == m.version) return list }
+        val v = m.version
+        val sv = m.syntaxVersion
+        symbolCache?.let { if (it.model === m && it.version == v && it.syntaxVersion == sv) return it.symbols }
         val list = runCatching { m.symbols() }.getOrDefault(emptyList())
-        symbolCache = Triple(m, m.version, list)
+        symbolCache = SymbolCache(m, v, sv, list)
         return list
     }
 

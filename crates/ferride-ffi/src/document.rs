@@ -1,7 +1,9 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use std::time::Duration;
 
 use ferride_buffer::{Buffer, ByteEdit, Edit, EditKind, Selection, Selections};
-use ferride_syntax::{HighlightKind, LanguageId, Syntax};
+use ferride_syntax::{EDIT_PARSE_BUDGET, HighlightKind, LanguageId, ParseSnapshot, Syntax};
 
 use crate::FerrideError;
 
@@ -115,13 +117,48 @@ fn ix(v: i32) -> usize {
     v.max(0) as usize
 }
 
+/// Receives notifications when an asynchronous background reparse finishes.
+/// Called on a worker thread: post to the main thread before touching UI.
+#[uniffi::export(callback_interface)]
+pub trait DocumentListener: Send + Sync {
+    fn on_syntax_updated(&self);
+}
+
+struct BackgroundState {
+    epoch: u64,
+    in_flight: bool,
+    cancel: Arc<AtomicBool>,
+    pending_edits: Vec<ByteEdit>,
+}
+
+impl Default for BackgroundState {
+    fn default() -> Self {
+        Self {
+            epoch: 0,
+            in_flight: false,
+            cancel: Arc::new(AtomicBool::new(false)),
+            pending_edits: Vec::new(),
+        }
+    }
+}
+
 struct Inner {
     buffer: Buffer,
     syntax: Option<Syntax>,
+    /// Monotonic counter bumped on any syntax change (sync/async parse, language switch).
+    syntax_version: u64,
     /// File name the document was opened with (for language auto-detection).
     file_name: Option<String>,
     /// How many times a poisoned lock was recovered (tests, diagnostics).
     recoveries: u32,
+    /// Synchronous parse budget per edit (overridable in tests).
+    edit_budget: Duration,
+    bg: BackgroundState,
+}
+
+struct SharedState {
+    inner: Mutex<Inner>,
+    listener: Mutex<Option<Arc<dyn DocumentListener>>>,
 }
 
 /// Language for a file name, falling back to a `#!` line at the top of `buffer`.
@@ -134,24 +171,67 @@ fn detect_language(file_name: Option<&str>, buffer: &Buffer) -> Option<LanguageI
 }
 
 impl Inner {
+    fn invalidate_background(&mut self) {
+        self.bg.cancel.store(true, Ordering::Relaxed);
+        self.bg.epoch += 1;
+        self.bg.in_flight = false;
+        self.bg.pending_edits.clear();
+    }
+
+    fn spawn_background_parse(&mut self, state: &Arc<SharedState>) {
+        let Some(s) = &self.syntax else {
+            return;
+        };
+        self.bg.epoch += 1;
+        let epoch = self.bg.epoch;
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.bg.cancel = cancel.clone();
+        self.bg.in_flight = true;
+        self.bg.pending_edits.clear();
+        let snap = s.snapshot(self.buffer.rope());
+        let weak = Arc::downgrade(state);
+        if let Err(err) = std::thread::Builder::new()
+            .name("ferride-syntax".into())
+            .spawn(move || run_background_parse(weak, epoch, cancel, snap))
+        {
+            log::warn!("failed to spawn background syntax worker: {err}");
+            self.bg.in_flight = false;
+        }
+    }
+
     /// Rebuilds the syntax tree from the rope after a panic left it suspect.
     fn recover(&mut self) {
+        self.invalidate_background();
         if let Some(lang) = self.syntax.as_ref().map(|s| s.language()) {
             log::warn!(
                 "document lock was poisoned; reparsing {} from scratch",
                 lang.name()
             );
             self.syntax = Some(Syntax::new(lang, self.buffer.rope()));
+            self.syntax_version += 1;
         }
         self.recoveries += 1;
     }
 
-    fn after_edit(&mut self, edits: &[ByteEdit]) {
+    fn after_edit(&mut self, edits: &[ByteEdit], state: &Arc<SharedState>) {
         if edits.is_empty() {
             return;
         }
-        if let Some(s) = &mut self.syntax {
-            s.update(self.buffer.rope(), edits);
+        let budget = self.edit_budget;
+        let Some(s) = &mut self.syntax else {
+            return;
+        };
+        s.update_with_budget(self.buffer.rope(), edits, budget);
+        self.syntax_version += 1;
+        if s.is_stale() {
+            if self.bg.in_flight {
+                self.bg.pending_edits.extend_from_slice(edits);
+            } else {
+                self.spawn_background_parse(state);
+            }
+        } else if self.bg.in_flight {
+            // Synchronous fast path produced an up-to-date tree: supersede older worker.
+            self.invalidate_background();
         }
     }
 
@@ -182,10 +262,78 @@ impl Inner {
     }
 }
 
+fn run_background_parse(
+    weak: Weak<SharedState>,
+    epoch: u64,
+    cancel: Arc<AtomicBool>,
+    mut snap: ParseSnapshot,
+) {
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return;
+        }
+        let Some(tree) = snap.parse(&cancel) else {
+            return;
+        };
+        let Some(state) = weak.upgrade() else {
+            return;
+        };
+        let next_snap = {
+            let mut inner = match state.inner.lock() {
+                Ok(g) => g,
+                Err(poisoned) => {
+                    let mut g = poisoned.into_inner();
+                    g.recover();
+                    state.inner.clear_poison();
+                    g
+                }
+            };
+            if inner.bg.epoch != epoch || inner.bg.cancel.load(Ordering::Relaxed) {
+                return;
+            }
+            let Inner {
+                buffer,
+                syntax,
+                syntax_version,
+                bg,
+                ..
+            } = &mut *inner;
+            let pending = std::mem::take(&mut bg.pending_edits);
+            let Some(s) = syntax else {
+                bg.in_flight = false;
+                return;
+            };
+            s.apply_background_tree(tree, &pending);
+            *syntax_version += 1;
+            if pending.is_empty() {
+                bg.in_flight = false;
+                None
+            } else {
+                Some(s.snapshot(buffer.rope()))
+            }
+        };
+        if next_snap.is_none() {
+            let listener = state.listener.lock().unwrap_or_else(|e| e.into_inner()).clone();
+            if let Some(l) = listener {
+                l.on_syntax_updated();
+            }
+            return;
+        }
+        snap = next_snap.unwrap();
+    }
+}
+
 /// An open text document: buffer + undo history + selections + syntax tree.
 #[derive(uniffi::Object)]
 pub struct Document {
-    inner: Mutex<Inner>,
+    state: Arc<SharedState>,
+}
+
+impl Drop for Document {
+    fn drop(&mut self) {
+        let mut inner = self.state.inner.lock().unwrap_or_else(|e| e.into_inner());
+        inner.invalidate_background();
+    }
 }
 
 impl Document {
@@ -195,12 +343,12 @@ impl Document {
     /// consistent (edits are applied to the rope before the tree), then clear
     /// the poison so later calls take the fast path again.
     fn lock(&self) -> MutexGuard<'_, Inner> {
-        match self.inner.lock() {
+        match self.state.inner.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
                 let mut guard = poisoned.into_inner();
                 guard.recover();
-                self.inner.clear_poison();
+                self.state.inner.clear_poison();
                 guard
             }
         }
@@ -215,8 +363,14 @@ impl Document {
     /// Panics while holding the lock (tests of the recovery path).
     #[cfg(test)]
     pub(crate) fn poison_for_test(&self) {
-        let _guard = self.inner.lock();
+        let _guard = self.state.inner.lock();
         panic!("simulated panic inside the document lock");
+    }
+
+    /// Overrides the synchronous edit parse budget (tests).
+    #[cfg(test)]
+    pub(crate) fn set_edit_budget_for_test(&self, budget: Duration) {
+        self.lock().edit_budget = budget;
     }
 }
 
@@ -228,14 +382,51 @@ impl Document {
     pub fn new(text: String, file_name: Option<String>) -> Arc<Self> {
         let buffer = Buffer::new(&text);
         let syntax = detect_language(file_name.as_deref(), &buffer).map(|l| Syntax::new(l, buffer.rope()));
-        Arc::new(Self {
-            inner: Mutex::new(Inner {
-                buffer,
-                syntax,
-                file_name,
-                recoveries: 0,
+        let doc = Arc::new(Self {
+            state: Arc::new(SharedState {
+                inner: Mutex::new(Inner {
+                    buffer,
+                    syntax,
+                    syntax_version: 0,
+                    file_name,
+                    recoveries: 0,
+                    edit_budget: EDIT_PARSE_BUDGET,
+                    bg: BackgroundState::default(),
+                }),
+                listener: Mutex::new(None),
             }),
-        })
+        });
+        {
+            let mut inner = doc.lock();
+            if inner.syntax.as_ref().is_some_and(Syntax::is_stale) {
+                inner.spawn_background_parse(&doc.state);
+            }
+        }
+        doc
+    }
+
+    /// Registers a listener for background syntax parse completion.
+    pub fn set_listener(&self, listener: Box<dyn DocumentListener>) {
+        let mut guard = self.state.listener.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = Some(Arc::from(listener));
+    }
+
+    /// Clears the syntax update listener (call when closing the editor/tab).
+    pub fn clear_listener(&self) {
+        let mut guard = self.state.listener.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = None;
+    }
+
+    /// Monotonic counter bumped whenever syntax highlighting or symbols change
+    /// (including asynchronous background reparses).
+    pub fn syntax_version(&self) -> i64 {
+        self.lock().syntax_version as i64
+    }
+
+    /// True when the active syntax tree lagged behind the latest edit and a
+    /// background reparse is pending.
+    pub fn is_syntax_stale(&self) -> bool {
+        self.lock().syntax.as_ref().is_some_and(Syntax::is_stale)
     }
 
     /// Re-runs language detection on the current file name and first line
@@ -244,7 +435,12 @@ impl Document {
         let mut inner = self.lock();
         let lang = detect_language(inner.file_name.as_deref(), &inner.buffer);
         if inner.syntax.as_ref().map(Syntax::language) != lang {
+            inner.invalidate_background();
             inner.syntax = lang.map(|l| Syntax::new(l, inner.buffer.rope()));
+            inner.syntax_version += 1;
+            if inner.syntax.as_ref().is_some_and(Syntax::is_stale) {
+                inner.spawn_background_parse(&self.state);
+            }
         }
         lang.map(|l| l.name().to_owned())
     }
@@ -262,7 +458,12 @@ impl Document {
         let mut inner = self.lock();
         let lang = language.as_deref().and_then(LanguageId::from_name);
         if inner.syntax.as_ref().map(Syntax::language) != lang {
+            inner.invalidate_background();
             inner.syntax = lang.map(|l| Syntax::new(l, inner.buffer.rope()));
+            inner.syntax_version += 1;
+            if inner.syntax.as_ref().is_some_and(Syntax::is_stale) {
+                inner.spawn_background_parse(&self.state);
+            }
         }
     }
 
@@ -473,7 +674,7 @@ impl Document {
             .buffer
             .apply(vec![Edit::new(range, text)], kind)
             .map_err(|e| FerrideError::InvalidArgument { msg: e.to_string() })?;
-        inner.after_edit(&edits);
+        inner.after_edit(&edits, &self.state);
         let mut out = inner.outcome(before);
         out.end = inner.buffer.char_to_utf16(new_end) as i32;
         Ok(out)
@@ -486,7 +687,7 @@ impl Document {
         let kind = if typing { EditKind::Typing } else { EditKind::Other };
         let text = inner.buffer.normalize_eol(&text);
         let edits = inner.buffer.insert_at_selections(&text, kind);
-        inner.after_edit(&edits);
+        inner.after_edit(&edits, &self.state);
         inner.outcome(before)
     }
 
@@ -514,7 +715,7 @@ impl Document {
             })
             .collect();
         let edits = inner.buffer.apply(edits, EditKind::Other).unwrap_or_default();
-        inner.after_edit(&edits);
+        inner.after_edit(&edits, &self.state);
         inner.outcome(before)
     }
 
@@ -522,7 +723,7 @@ impl Document {
         let mut inner = self.lock();
         let before = inner.buffer.version() as i64;
         let edits = inner.buffer.delete_backward();
-        inner.after_edit(&edits);
+        inner.after_edit(&edits, &self.state);
         inner.outcome(before)
     }
 
@@ -530,7 +731,7 @@ impl Document {
         let mut inner = self.lock();
         let before = inner.buffer.version() as i64;
         let edits = inner.buffer.delete_forward();
-        inner.after_edit(&edits);
+        inner.after_edit(&edits, &self.state);
         inner.outcome(before)
     }
 
@@ -538,7 +739,7 @@ impl Document {
         let mut inner = self.lock();
         let before = inner.buffer.version() as i64;
         if let Some(edits) = inner.buffer.undo() {
-            inner.after_edit(&edits);
+            inner.after_edit(&edits, &self.state);
         }
         inner.outcome(before)
     }
@@ -547,7 +748,7 @@ impl Document {
         let mut inner = self.lock();
         let before = inner.buffer.version() as i64;
         if let Some(edits) = inner.buffer.redo() {
-            inner.after_edit(&edits);
+            inner.after_edit(&edits, &self.state);
         }
         inner.outcome(before)
     }

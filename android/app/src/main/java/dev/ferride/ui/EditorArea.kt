@@ -110,6 +110,7 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
                 view.setModel(model)
                 state.disposeRetired(model)
                 view.onChange = { changed -> state.onEditorChanged(tab, changed) }
+                view.onSyntaxUpdated = { tab.revision++ }
                 view.onFocus = { focused -> state.editorFocused = focused }
                 view.findMatches = matches
                 view.currentMatch = state.find.current
@@ -120,6 +121,7 @@ private fun CodeEditor(state: WorkbenchState, tab: EditorTab, model: EditorModel
                 state.editor = view
             },
             onRelease = { view ->
+                view.onSyntaxUpdated = null
                 view.onSelectionUi = null
                 selectionUi = null
                 if (viewRef[0] === view) viewRef[0] = null

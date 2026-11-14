@@ -18,6 +18,7 @@ mod symbols;
 
 use std::cell::RefCell;
 use std::ops::ControlFlow;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use ferride_buffer::{Buffer, ByteEdit};
@@ -60,6 +61,53 @@ impl std::fmt::Debug for Syntax {
     }
 }
 
+/// An O(1) snapshot of a document's rope and syntax tree for off-thread parsing.
+pub struct ParseSnapshot {
+    language: LanguageId,
+    rope: Rope,
+    old_tree: Option<Tree>,
+}
+
+impl ParseSnapshot {
+    /// Parses the snapshotted rope incrementally against the old tree.
+    ///
+    /// Stops early and returns `None` if `cancel` becomes `true`.
+    pub fn parse(self, cancel: &AtomicBool) -> Option<Tree> {
+        let mut parser = Parser::new();
+        parser
+            .set_language(&self.language.config().language)
+            .expect("bundled grammars match the tree-sitter ABI");
+        parse_rope(&mut parser, &self.rope, self.old_tree.as_ref(), || {
+            cancel.load(Ordering::Relaxed)
+        })
+    }
+}
+
+fn parse_rope(
+    parser: &mut Parser,
+    rope: &Rope,
+    old_tree: Option<&Tree>,
+    mut should_cancel: impl FnMut() -> bool,
+) -> Option<Tree> {
+    let len = rope.len_bytes();
+    let mut read = |byte: usize, _: Point| -> &[u8] {
+        if byte >= len {
+            return &[];
+        }
+        let (chunk, chunk_start, _, _) = rope.chunk_at_byte(byte);
+        &chunk.as_bytes()[byte - chunk_start..]
+    };
+    let mut progress = |_: &ParseState| {
+        if should_cancel() {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    };
+    let options = ParseOptions::new().progress_callback(&mut progress);
+    parser.parse_with_options(&mut read, old_tree, Some(options))
+}
+
 impl Syntax {
     /// Creates a parser for `language` and parses `rope` fully (within
     /// [`INITIAL_PARSE_BUDGET`]; past that the document stays unhighlighted).
@@ -98,10 +146,37 @@ impl Syntax {
         self.stale
     }
 
+    /// Monotonic counter bumped whenever the tree changes (edit, reparse, or
+    /// background tree publication).
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// Captures an O(1) snapshot (`Rope::clone` + `Tree::clone`) for parsing on
+    /// a background thread after a synchronous parse exceeds its budget.
+    pub fn snapshot(&self, rope: &Rope) -> ParseSnapshot {
+        ParseSnapshot {
+            language: self.language,
+            rope: rope.clone(),
+            old_tree: self.tree.clone(),
+        }
+    }
+
+    /// Publishes a tree produced by [`ParseSnapshot::parse`], applying any
+    /// `pending_edits` recorded while the background parse was running.
+    pub fn apply_background_tree(&mut self, mut tree: Tree, pending_edits: &[ByteEdit]) {
+        for e in pending_edits {
+            tree.edit(&to_input_edit(e));
+        }
+        self.tree = Some(tree);
+        self.stale = !pending_edits.is_empty();
+        self.generation += 1;
+    }
+
     /// Applies buffer edits to the old tree and reparses incrementally within
     /// [`EDIT_PARSE_BUDGET`]. If the budget runs out, the edited old tree is
-    /// kept (highlights shift with the text but may be stale) and the next
-    /// call tries again.
+    /// kept (highlights shift with the text but may be stale) and the caller
+    /// can finish parsing off-thread via [`Syntax::snapshot`].
     pub fn update(&mut self, rope: &Rope, edits: &[ByteEdit]) {
         self.update_with_budget(rope, edits, EDIT_PARSE_BUDGET);
     }
@@ -118,27 +193,10 @@ impl Syntax {
 
     /// Returns false if parsing was cancelled by the budget.
     fn reparse(&mut self, rope: &Rope, budget: Duration) -> bool {
-        let len = rope.len_bytes();
-        let mut read = |byte: usize, _: Point| -> &[u8] {
-            if byte >= len {
-                return &[];
-            }
-            let (chunk, chunk_start, _, _) = rope.chunk_at_byte(byte);
-            &chunk.as_bytes()[byte - chunk_start..]
-        };
         let started = Instant::now();
-        let mut progress = |_: &ParseState| {
-            if started.elapsed() > budget {
-                ControlFlow::Break(())
-            } else {
-                ControlFlow::Continue(())
-            }
-        };
-        let options = ParseOptions::new().progress_callback(&mut progress);
-        match self
-            .parser
-            .parse_with_options(&mut read, self.tree.as_ref(), Some(options))
-        {
+        match parse_rope(&mut self.parser, rope, self.tree.as_ref(), || {
+            started.elapsed() > budget
+        }) {
             Some(tree) => {
                 self.tree = Some(tree);
                 self.stale = false;

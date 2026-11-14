@@ -488,3 +488,89 @@ fn document_symbols_are_flattened_with_parents() {
             .is_empty()
     );
 }
+
+#[test]
+fn background_syntax_parse_updates_highlights_after_budget_timeout() {
+    use std::sync::{Arc, Condvar, Mutex};
+    use std::time::Duration;
+
+    #[derive(Default)]
+    struct Waiter {
+        updates: Mutex<usize>,
+        cv: Condvar,
+    }
+    impl DocumentListener for Waiter {
+        fn on_syntax_updated(&self) {
+            *self.updates.lock().unwrap() += 1;
+            self.cv.notify_all();
+        }
+    }
+
+    let mut text = "fn a() { let x = [1, 2, 3]; }\n".repeat(20_000);
+    let close_at = "fn a() { let x = [1, 2, 3]; }\n".len() * 200;
+    text.insert(close_at, '"');
+
+    let doc = Document::new(text, Some("main.rs".into()));
+    let waiter = Arc::new(Waiter::default());
+    struct Forward(Arc<Waiter>);
+    impl DocumentListener for Forward {
+        fn on_syntax_updated(&self) {
+            self.0.on_syntax_updated();
+        }
+    }
+    doc.set_listener(Box::new(Forward(waiter.clone())));
+    doc.set_edit_budget_for_test(Duration::ZERO);
+
+    let sv_before = doc.syntax_version();
+    doc.replace(0, 0, "\"".into(), true).unwrap();
+    // Synchronous fast path timed out: stale tree keeps pre-edit highlights for now.
+    assert!(doc.is_syntax_stale());
+    let stale_line = &doc.viewport(100, 1)[0];
+    assert!(
+        stale_line.spans.iter().any(|s| s.kind == StyleKind::Keyword),
+        "{:?}",
+        stale_line.spans
+    );
+
+    // Wait for the background worker to finish parsing the rope snapshot.
+    let guard = waiter.updates.lock().unwrap();
+    let (guard, timeout) = waiter
+        .cv
+        .wait_timeout_while(guard, Duration::from_secs(10), |n| *n == 0)
+        .unwrap();
+    assert!(!timeout.timed_out(), "background parse did not notify in time");
+    assert_eq!(*guard, 1);
+    drop(guard);
+
+    assert!(!doc.is_syntax_stale());
+    assert!(doc.syntax_version() > sv_before);
+    let fresh_line = &doc.viewport(100, 1)[0];
+    assert!(
+        fresh_line.spans.iter().any(|s| s.kind == StyleKind::String),
+        "expected String highlight after background parse: {:?}",
+        fresh_line.spans
+    );
+    assert!(
+        !fresh_line.spans.iter().any(|s| s.kind == StyleKind::Keyword),
+        "expected no Keyword highlight inside multi-line string: {:?}",
+        fresh_line.spans
+    );
+
+    // Edits made while a background parse is in flight are replayed and caught up.
+    doc.replace(1, 1, " ".into(), true).unwrap();
+    doc.replace(2, 2, "x".into(), true).unwrap();
+    let guard = waiter.updates.lock().unwrap();
+    let (_guard, timeout) = waiter
+        .cv
+        .wait_timeout_while(guard, Duration::from_secs(10), |n| *n < 2)
+        .unwrap();
+    assert!(!timeout.timed_out(), "follow-up background parse timed out");
+    assert!(!doc.is_syntax_stale());
+    let line100 = &doc.viewport(100, 1)[0];
+    assert!(line100.spans.iter().any(|s| s.kind == StyleKind::String));
+
+    // Dropping a document with an active background parse cancels without panicking.
+    doc.clear_listener();
+    doc.replace(0, 1, "".into(), true).unwrap();
+    drop(doc);
+}
