@@ -64,6 +64,9 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     /** Called after edits (`true`) and selection-only changes (`false`). */
     var onChange: ((contentChanged: Boolean) -> Unit)? = null
 
+    /** Called on the main thread when a background syntax reparse updates highlights. */
+    var onSyntaxUpdated: (() -> Unit)? = null
+
     /**
      * The floating selection toolbar should show at [SelectionUi] (or hide, on
      * `null`). The host draws it (Compose) and calls [onSelectionToolbarAction].
@@ -140,6 +143,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     private var cacheFirst = -1
     private var cacheCount = 0
     private var cacheVersion = -1L
+    private var cacheSyntaxVersion = -1L
 
     private var composingStart = -1
     private var composingEnd = -1
@@ -168,12 +172,19 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     fun setModel(newModel: EditorModel?) {
         if (newModel === model) return
+        model?.onSyntaxUpdated = null
         liveModel?.let {
             scrollMemory[it] = sx to sy
             it.sealUndoGroup()
         }
         scrollMemory.keys.removeAll { it.isClosed }
         model = newModel
+        newModel?.onSyntaxUpdated = {
+            if (liveModel === newModel) {
+                invalidateLines()
+                onSyntaxUpdated?.invoke()
+            }
+        }
         hideSelectionControls()
         val (x, y) = newModel?.let { scrollMemory[it] } ?: (0f to 0f)
         sx = x
@@ -198,6 +209,8 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     private fun invalidateLines() {
         cacheVersion = -1
+        cacheSyntaxVersion = -1
+        minimapKey = null
         invalidate()
     }
 
@@ -422,11 +435,12 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     private fun lines(first: Int, count: Int): List<ViewLine> {
         val m = liveModel ?: return emptyList()
-        if (m.version != cacheVersion || first != cacheFirst || count != cacheCount) {
+        if (m.version != cacheVersion || m.syntaxVersion != cacheSyntaxVersion || first != cacheFirst || count != cacheCount) {
             cache = m.viewport(first, count)
             cacheFirst = first
             cacheCount = count
             cacheVersion = m.version
+            cacheSyntaxVersion = m.syntaxVersion
         }
         return cache
     }
@@ -1650,7 +1664,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         val scroll = minimapScroll
         val first = (scroll / mmLineH).toInt()
         val count = (height / mmLineH).toInt() + 2
-        val key = listOf(m.version, first, count, w.toInt(), style)
+        val key = listOf(m.version, first, count, w.toInt(), style, m.syntaxVersion)
         if (key != minimapKey) {
             val now = android.os.SystemClock.uptimeMillis()
             val sameLines = minimapKey?.let { it[1] == first && it[2] == count && it[3] == w.toInt() && it[4] == style } == true

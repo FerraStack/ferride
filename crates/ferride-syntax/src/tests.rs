@@ -360,3 +360,65 @@ fn injections_are_parsed_for_the_viewport_only() {
         syn.injections.borrow()
     );
 }
+
+#[test]
+fn background_snapshot_recovers_stale_highlights_and_supports_cancel() {
+    use std::sync::atomic::AtomicBool;
+
+    // 20k lines so zero-budget synchronous parse times out; a matching `"` at
+    // line 200 turns lines 1..199 into a multi-line string once reparsed.
+    let mut text = "fn a() { let x = [1, 2, 3]; }\n".repeat(20_000);
+    let close_at = "fn a() { let x = [1, 2, 3]; }\n".len() * 200;
+    text.insert(close_at, '"');
+    let mut buf = Buffer::new(&text);
+    let mut syn = Syntax::with_budget(
+        LanguageId::Rust,
+        buf.rope(),
+        std::time::Duration::from_secs(30),
+    );
+    assert!(!syn.is_stale());
+
+    let edits = buf
+        .apply(vec![Edit::insert(0, "\"")], EditKind::Other)
+        .unwrap();
+    syn.update_with_budget(buf.rope(), &edits, Duration::ZERO);
+    assert!(syn.is_stale());
+    // Stale tree still highlights line 100 as code (`fn` is Keyword).
+    let stale_spans = syn.line_spans(&buf, 100..101);
+    assert!(
+        stale_spans[0].iter().any(|s| s.kind == HighlightKind::Keyword),
+        "stale tree should still hold pre-edit highlights: {:?}",
+        stale_spans[0]
+    );
+
+    // Clone an O(1) snapshot and parse it on a worker thread.
+    let snap = syn.snapshot(buf.rope());
+    let cancel = AtomicBool::new(false);
+    let tree = std::thread::spawn(move || snap.parse(&cancel))
+        .join()
+        .unwrap()
+        .expect("uncancelled background parse should complete");
+
+    let gen_before = syn.generation();
+    syn.apply_background_tree(tree, &[]);
+    assert!(!syn.is_stale());
+    assert_eq!(syn.generation(), gen_before + 1);
+
+    // Line 100 is now inside the multi-line string literal.
+    let fresh_spans = syn.line_spans(&buf, 100..101);
+    assert!(
+        fresh_spans[0].iter().any(|s| s.kind == HighlightKind::String),
+        "background parse should update line 100 to String: {:?}",
+        fresh_spans[0]
+    );
+    assert!(
+        !fresh_spans[0].iter().any(|s| s.kind == HighlightKind::Keyword),
+        "line 100 should no longer be highlighted as Keyword: {:?}",
+        fresh_spans[0]
+    );
+
+    // Cancelled snapshot aborts early and returns None.
+    let snap = syn.snapshot(buf.rope());
+    let cancel = AtomicBool::new(true);
+    assert!(snap.parse(&cancel).is_none());
+}
