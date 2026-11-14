@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
-use ferride_lsp::lsp_types::{DiagnosticSeverity, MessageType, Position};
-use ferride_lsp::{LspClient, LspEvent, file_uri};
+use ferride_lsp::lsp_types::{
+    DiagnosticSeverity, MessageType, Position, Range, TextDocumentContentChangeEvent, TextDocumentSyncKind,
+};
+use ferride_lsp::{CancelToken, LspClient, LspEvent, file_uri};
 
-use crate::FerrideError;
+use crate::{Document, FerrideError};
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct LspDiagnostic {
@@ -195,6 +197,45 @@ impl LspSession {
         Ok(self.client.did_change_full(uri(&path)?, version, text)?)
     }
 
+    /// Sends what changed in `document` since the last sync: incremental
+    /// ranges when the server supports them (the document must have
+    /// [`Document::enable_lsp_sync`] on since `didOpen`), the full text
+    /// otherwise. Returns whether it sent incremental changes.
+    pub fn did_change_document(
+        &self,
+        path: String,
+        version: i32,
+        document: Arc<Document>,
+    ) -> Result<bool, FerrideError> {
+        let uri = uri(&path)?;
+        let changes = document.take_lsp_changes();
+        match self.client.sync_kind() {
+            TextDocumentSyncKind::INCREMENTAL => {
+                if changes.is_empty() {
+                    return Ok(true);
+                }
+                let events = changes
+                    .into_iter()
+                    .map(|c| TextDocumentContentChangeEvent {
+                        range: Some(Range::new(
+                            Position::new(c.start_line.max(0) as u32, c.start_column.max(0) as u32),
+                            Position::new(c.end_line.max(0) as u32, c.end_column.max(0) as u32),
+                        )),
+                        range_length: None,
+                        text: c.text,
+                    })
+                    .collect();
+                self.client.did_change(uri, version, events)?;
+                Ok(true)
+            }
+            TextDocumentSyncKind::NONE => Ok(false),
+            _ => {
+                self.client.did_change_full(uri, version, document.text())?;
+                Ok(false)
+            }
+        }
+    }
+
     pub fn did_save(&self, path: String) -> Result<(), FerrideError> {
         Ok(self.client.did_save(uri(&path)?, None)?)
     }
@@ -203,16 +244,19 @@ impl LspSession {
         Ok(self.client.did_close(uri(&path)?)?)
     }
 
-    /// Blocking; call off the UI thread.
+    /// Blocking; call off the UI thread. `cancel` abandons it (with
+    /// `$/cancelRequest`) when a newer request supersedes it.
     pub fn completion(
         &self,
         path: String,
         line: i32,
         column: i32,
+        cancel: Option<Arc<LspCancellation>>,
     ) -> Result<Vec<LspCompletion>, FerrideError> {
-        let items = self.client.completion(
+        let items = self.client.completion_with(
             uri(&path)?,
             Position::new(line.max(0) as u32, column.max(0) as u32),
+            cancel.as_ref().map(|c| &c.token),
         )?;
         Ok(items
             .into_iter()
@@ -225,10 +269,17 @@ impl LspSession {
     }
 
     /// Blocking; call off the UI thread.
-    pub fn hover(&self, path: String, line: i32, column: i32) -> Result<Option<String>, FerrideError> {
-        Ok(self.client.hover(
+    pub fn hover(
+        &self,
+        path: String,
+        line: i32,
+        column: i32,
+        cancel: Option<Arc<LspCancellation>>,
+    ) -> Result<Option<String>, FerrideError> {
+        Ok(self.client.hover_with(
             uri(&path)?,
             Position::new(line.max(0) as u32, column.max(0) as u32),
+            cancel.as_ref().map(|c| &c.token),
         )?)
     }
 
@@ -238,6 +289,24 @@ impl LspSession {
 
     pub fn is_closed(&self) -> bool {
         self.client.is_closed()
+    }
+}
+
+/// Cancels a pending LSP request from another thread (see [`LspSession::completion`]).
+#[derive(Debug, Default, uniffi::Object)]
+pub struct LspCancellation {
+    token: CancelToken,
+}
+
+#[uniffi::export]
+impl LspCancellation {
+    #[uniffi::constructor]
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn cancel(&self) {
+        self.token.cancel();
     }
 }
 

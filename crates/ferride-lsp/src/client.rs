@@ -15,8 +15,9 @@ use lsp_types::{
     HoverParams, InitializeParams, InitializeResult, InitializedParams, MarkedString, MarkupKind,
     MessageType, PartialResultParams, Position, PositionEncodingKind, PublishDiagnosticsClientCapabilities,
     ServerCapabilities, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextDocumentSyncClientCapabilities,
-    Uri, VersionedTextDocumentIdentifier, WindowClientCapabilities, WorkDoneProgressParams, WorkspaceFolder,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextDocumentSyncCapability,
+    TextDocumentSyncClientCapabilities, TextDocumentSyncKind, Uri, VersionedTextDocumentIdentifier,
+    WindowClientCapabilities, WorkDoneProgressParams, WorkspaceFolder,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -30,6 +31,8 @@ pub enum LspError {
     Response { code: i64, message: String },
     #[error("request timed out")]
     Timeout,
+    #[error("request cancelled")]
+    Cancelled,
     #[error("connection to the language server is closed")]
     Closed,
     #[error("i/o error: {0}")]
@@ -62,6 +65,29 @@ pub enum LspEvent {
     /// The server's output stream ended (it exited or the fd was closed).
     Closed,
 }
+
+/// Cancels an in-flight request from another thread (a newer completion
+/// request, the user moved on). The waiting call returns
+/// [`LspError::Cancelled`] and the server gets `$/cancelRequest`.
+#[derive(Debug, Clone, Default)]
+pub struct CancelToken(Arc<AtomicBool>);
+
+impl CancelToken {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn cancel(&self) {
+        self.0.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+/// How often a waiting request checks its [`CancelToken`].
+const CANCEL_POLL: Duration = Duration::from_millis(20);
 
 type EventHandler = Box<dyn Fn(LspEvent) + Send + Sync>;
 type Closer = Box<dyn FnOnce() + Send>;
@@ -158,13 +184,40 @@ impl LspClient {
         R::Params: Serialize,
         R::Result: DeserializeOwned,
     {
-        let value = self.request_raw(R::METHOD, serde_json::to_value(params).map_err(proto)?)?;
+        self.request_with::<R>(params, None)
+    }
+
+    /// A typed request that `cancel` can abandon.
+    pub fn request_with<R: Request>(
+        &self,
+        params: R::Params,
+        cancel: Option<&CancelToken>,
+    ) -> Result<R::Result, LspError>
+    where
+        R::Params: Serialize,
+        R::Result: DeserializeOwned,
+    {
+        let value = self.request_raw_with(R::METHOD, serde_json::to_value(params).map_err(proto)?, cancel)?;
         serde_json::from_value(value).map_err(proto)
     }
 
     pub fn request_raw(&self, method: &str, params: Value) -> Result<Value, LspError> {
+        self.request_raw_with(method, params, None)
+    }
+
+    /// Like [`request_raw`](Self::request_raw), abandoned early (with
+    /// `$/cancelRequest`) when `cancel` fires.
+    pub fn request_raw_with(
+        &self,
+        method: &str,
+        params: Value,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Value, LspError> {
         if self.is_closed() {
             return Err(LspError::Closed);
+        }
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(LspError::Cancelled);
         }
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = mpsc::channel();
@@ -174,16 +227,45 @@ impl LspClient {
             lock(&self.pending).remove(&id);
             return Err(e);
         }
-        let timeout = *lock(&self.timeout);
-        match rx.recv_timeout(timeout) {
-            Ok(result) => result,
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                lock(&self.pending).remove(&id);
-                // Best effort: tell the server we gave up.
-                let _ = self.notify_raw("$/cancelRequest", json!({"id": id}));
-                Err(LspError::Timeout)
+        let deadline = std::time::Instant::now() + *lock(&self.timeout);
+        loop {
+            let now = std::time::Instant::now();
+            if now >= deadline {
+                return Err(self.abandon(id, LspError::Timeout));
             }
-            Err(mpsc::RecvTimeoutError::Disconnected) => Err(LspError::Closed),
+            let slice = if cancel.is_some() {
+                CANCEL_POLL.min(deadline - now)
+            } else {
+                deadline - now
+            };
+            match rx.recv_timeout(slice) {
+                Ok(result) => return result,
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    if cancel.is_some_and(CancelToken::is_cancelled) {
+                        return Err(self.abandon(id, LspError::Cancelled));
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => return Err(LspError::Closed),
+            }
+        }
+    }
+
+    /// Stops waiting for `id` and tells the server we gave up (best effort).
+    fn abandon(&self, id: i64, why: LspError) -> LspError {
+        lock(&self.pending).remove(&id);
+        let _ = self.notify_raw("$/cancelRequest", json!({"id": id}));
+        why
+    }
+
+    /// How the server wants document changes: full text or incremental ranges.
+    pub fn sync_kind(&self) -> TextDocumentSyncKind {
+        match lock(&self.capabilities)
+            .as_ref()
+            .and_then(|c| c.text_document_sync.clone())
+        {
+            Some(TextDocumentSyncCapability::Kind(k)) => k,
+            Some(TextDocumentSyncCapability::Options(o)) => o.change.unwrap_or(TextDocumentSyncKind::NONE),
+            None => TextDocumentSyncKind::FULL,
         }
     }
 
@@ -296,15 +378,28 @@ impl LspClient {
     // ----- language features ---------------------------------------------
 
     pub fn completion(&self, uri: Uri, position: Position) -> Result<Vec<CompletionItem>, LspError> {
-        let resp = self.request::<req::Completion>(CompletionParams {
-            text_document_position: TextDocumentPositionParams {
-                text_document: TextDocumentIdentifier { uri },
-                position,
+        self.completion_with(uri, position, None)
+    }
+
+    /// Completion that a newer request can cancel (typing on while it's pending).
+    pub fn completion_with(
+        &self,
+        uri: Uri,
+        position: Position,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Vec<CompletionItem>, LspError> {
+        let resp = self.request_with::<req::Completion>(
+            CompletionParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position,
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: None,
             },
-            work_done_progress_params: WorkDoneProgressParams::default(),
-            partial_result_params: PartialResultParams::default(),
-            context: None,
-        })?;
+            cancel,
+        )?;
         Ok(match resp {
             None => Vec::new(),
             Some(CompletionResponse::Array(items)) => items,
@@ -314,13 +409,25 @@ impl LspClient {
 
     /// Hover contents flattened to Markdown/plain text.
     pub fn hover(&self, uri: Uri, position: Position) -> Result<Option<String>, LspError> {
-        let resp: Option<Hover> = self.request::<req::HoverRequest>(HoverParams {
-            text_document_position_params: TextDocumentPositionParams {
-                text_document: TextDocumentIdentifier { uri },
-                position,
+        self.hover_with(uri, position, None)
+    }
+
+    pub fn hover_with(
+        &self,
+        uri: Uri,
+        position: Position,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Option<String>, LspError> {
+        let resp: Option<Hover> = self.request_with::<req::HoverRequest>(
+            HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position,
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
             },
-            work_done_progress_params: WorkDoneProgressParams::default(),
-        })?;
+            cancel,
+        )?;
         Ok(resp.map(|h| hover_to_text(h.contents)))
     }
 }

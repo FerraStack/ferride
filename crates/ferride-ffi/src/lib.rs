@@ -14,8 +14,10 @@ mod scm;
 mod theme;
 mod workspace;
 
-pub use document::{Document, DocumentSymbol, EditOutcome, SelectionRange, StyleKind, StyleSpan, ViewLine};
-pub use lsp::{LspCompletion, LspDiagnostic, LspListener, LspSession};
+pub use document::{
+    Document, DocumentSymbol, EditOutcome, LspTextChange, SelectionRange, StyleKind, StyleSpan, ViewLine,
+};
+pub use lsp::{LspCancellation, LspCompletion, LspDiagnostic, LspListener, LspSession};
 pub use scm::{
     GitError, ScmBranch, ScmCancel, ScmChange, ScmCommit, ScmCredential, ScmDiffLine, ScmFileDiff, ScmGroup,
     ScmHead, ScmHunk, ScmIdentity, ScmLineChange, ScmLineChangeKind, ScmNetworkListener, ScmRefKind,

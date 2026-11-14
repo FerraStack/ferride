@@ -110,6 +110,17 @@ pub struct EditOutcome {
     pub end: i32,
 }
 
+/// One document change for incremental LSP sync (UTF-16 positions in the
+/// text before the change).
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct LspTextChange {
+    pub start_line: i32,
+    pub start_column: i32,
+    pub end_line: i32,
+    pub end_column: i32,
+    pub text: String,
+}
+
 /// Clamps a (possibly negative) FFI index to `usize`.
 fn ix(v: i32) -> usize {
     v.max(0) as usize
@@ -558,6 +569,30 @@ impl Document {
 
     pub fn can_redo(&self) -> bool {
         self.lock().buffer.can_redo()
+    }
+
+    /// Records every change from now on for incremental LSP sync (turn on
+    /// right after `didOpen`; [`LspSession::did_change_document`] drains it).
+    ///
+    /// [`LspSession::did_change_document`]: crate::LspSession::did_change_document
+    pub fn enable_lsp_sync(&self, on: bool) {
+        self.lock().buffer.set_change_log(on);
+    }
+
+    /// Changes since the last call, in order (UTF-16 ranges of the text before each).
+    pub fn take_lsp_changes(&self) -> Vec<LspTextChange> {
+        self.lock()
+            .buffer
+            .take_changes()
+            .into_iter()
+            .map(|c| LspTextChange {
+                start_line: c.start_line as i32,
+                start_column: c.start_col as i32,
+                end_line: c.end_line as i32,
+                end_column: c.end_col as i32,
+                text: c.text,
+            })
+            .collect()
     }
 
     /// Ends the current typing run (call on cursor jumps, focus loss, save).

@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use super::*;
 
@@ -243,7 +243,7 @@ fn lsp_session_over_socket_fd() {
     session
         .did_open("/w s/a.rs".into(), "rust".into(), 1, "x".into())
         .unwrap();
-    let items = session.completion("/w s/a.rs".into(), 0, 1).unwrap();
+    let items = session.completion("/w s/a.rs".into(), 0, 1, None).unwrap();
     assert_eq!(
         items,
         vec![LspCompletion {
@@ -252,7 +252,7 @@ fn lsp_session_over_socket_fd() {
             insert_text: "foo()".into()
         }]
     );
-    assert_eq!(session.hover("/w s/a.rs".into(), 0, 0).unwrap(), None);
+    assert_eq!(session.hover("/w s/a.rs".into(), 0, 0, None).unwrap(), None);
     session.shutdown().unwrap();
     server.join().unwrap();
     // The reader thread marks the session closed and then calls on_closed;
@@ -487,4 +487,72 @@ fn document_symbols_are_flattened_with_parents() {
             .symbols()
             .is_empty()
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn did_change_document_sends_incremental_or_full_changes() {
+    use std::io::BufReader;
+    use std::os::fd::IntoRawFd;
+    use std::os::unix::net::UnixStream;
+
+    use ferride_lsp::codec;
+    use serde_json::{Value, json};
+
+    fn session(sync: u8) -> (Arc<LspSession>, std::thread::JoinHandle<Vec<Value>>) {
+        let (client_end, server_end) = UnixStream::pair().unwrap();
+        let server = std::thread::spawn(move || {
+            let mut r = BufReader::new(server_end.try_clone().unwrap());
+            let mut w = server_end;
+            let mut seen = Vec::new();
+            let mut send = |v: Value| codec::write_message(&mut w, &serde_json::to_vec(&v).unwrap()).unwrap();
+            while let Some(body) = codec::read_message(&mut r).unwrap() {
+                let m: Value = serde_json::from_slice(&body).unwrap();
+                match m["method"].as_str() {
+                    Some("initialize") => send(json!({"jsonrpc":"2.0","id":m["id"],"result":{
+                        "capabilities":{"textDocumentSync": sync}}})),
+                    Some("shutdown") => send(json!({"jsonrpc":"2.0","id":m["id"],"result":null})),
+                    Some("exit") => break,
+                    _ => {}
+                }
+                seen.push(m);
+            }
+            seen
+        });
+        let rec = Arc::new(Recorder::default());
+        let fd = client_end.into_raw_fd();
+        let s = LspSession::connect_fds(fd, fd, Box::new(rec)).unwrap();
+        s.initialize(None).unwrap();
+        (s, server)
+    }
+
+    for sync in [2u8, 1u8] {
+        let (s, server) = session(sync);
+        let doc = Document::new("let x = 1;\n".into(), None);
+        s.did_open("/w/a.rs".into(), "rust".into(), 1, doc.text())
+            .unwrap();
+        doc.enable_lsp_sync(true);
+        doc.replace(4, 5, "total".into(), false).unwrap();
+        doc.set_selection(14, 14);
+        doc.insert(" // ok".into(), true);
+        let incremental = s.did_change_document("/w/a.rs".into(), 2, doc.clone()).unwrap();
+        assert_eq!(incremental, sync == 2);
+        s.shutdown().unwrap();
+        let seen = server.join().unwrap();
+        let change = seen
+            .iter()
+            .find(|m| m["method"] == "textDocument/didChange")
+            .unwrap();
+        let events = change["params"]["contentChanges"].as_array().unwrap();
+        if sync == 2 {
+            assert_eq!(events.len(), 2);
+            assert_eq!(events[0]["range"]["start"]["character"], 4);
+            assert_eq!(events[0]["text"], "total");
+            assert_eq!(events[1]["text"], " // ok");
+        } else {
+            assert_eq!(events.len(), 1);
+            assert!(events[0].get("range").is_none());
+            assert_eq!(events[0]["text"], "let total = 1; // ok\n");
+        }
+    }
 }

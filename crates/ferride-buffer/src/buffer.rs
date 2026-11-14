@@ -83,6 +83,18 @@ impl LineEnding {
     }
 }
 
+/// One applied change in LSP terms: the replaced range in UTF-16 line/column
+/// positions *of the text just before this change*, and the new text. A list
+/// of these, in order, is exactly an incremental `textDocument/didChange`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextChange {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub text: String,
+}
+
 /// A text document's content plus selections and history.
 #[derive(Debug)]
 pub struct Buffer {
@@ -94,6 +106,8 @@ pub struct Buffer {
     line_ending: LineEnding,
     /// Fixed "now" for undo grouping (tests); `None` uses the system clock.
     clock: Option<Instant>,
+    /// Changes since the last [`take_changes`](Self::take_changes), when enabled.
+    change_log: Option<Vec<TextChange>>,
 }
 
 impl Default for Buffer {
@@ -117,6 +131,7 @@ impl Buffer {
             saved_version: 0,
             line_ending,
             clock: None,
+            change_log: None,
         }
     }
 
@@ -485,6 +500,16 @@ impl Buffer {
         self.apply(edits, EditKind::Typing).unwrap_or_default()
     }
 
+    /// Starts (or stops) recording [`TextChange`]s for incremental LSP sync.
+    pub fn set_change_log(&mut self, on: bool) {
+        self.change_log = on.then(Vec::new);
+    }
+
+    /// Changes recorded since the last call (every edit, undo and redo).
+    pub fn take_changes(&mut self) -> Vec<TextChange> {
+        self.change_log.as_mut().map(std::mem::take).unwrap_or_default()
+    }
+
     /// Pins the clock used to group typing by pauses (deterministic tests and
     /// replays); `None` goes back to the system clock.
     pub fn set_clock(&mut self, now: Option<Instant>) {
@@ -561,6 +586,19 @@ impl Buffer {
 
     /// Replaces chars `start..end` with `text` without touching history.
     fn apply_raw(&mut self, start: usize, end: usize, text: &str) -> (Change, ByteEdit) {
+        if self.change_log.is_some() {
+            let (start_line, start_col) = self.char_to_line_col_utf16(start);
+            let (end_line, end_col) = self.char_to_line_col_utf16(end);
+            if let Some(log) = self.change_log.as_mut() {
+                log.push(TextChange {
+                    start_line,
+                    start_col,
+                    end_line,
+                    end_col,
+                    text: text.to_owned(),
+                });
+            }
+        }
         let start_byte = self.rope.char_to_byte(start);
         let old_end_byte = self.rope.char_to_byte(end);
         let start_position = self.char_to_point(start);

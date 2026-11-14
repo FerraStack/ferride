@@ -133,7 +133,8 @@ Planned: multi-cursor UI (the buffer already supports it), snippets in VS Code s
 
 - Language servers run **inside Ferrux** (rust-analyzer, pyright/basedpyright, typescript-language-server, …). Ferride spawns them through the process host and gets a socketpair fd; `LspSession.connectFds(fd, fd, listener)` wraps it.
 - Positions are UTF-16 (we advertise only `utf-16` in `general.positionEncodings`), matching both LSP's default and Android's strings.
-- Text sync: full-document `didChange` for now; incremental sync from `ByteEdit`s/UTF-16 ranges is planned once servers run on device.
+- Text sync: **incremental** when the server supports it. With `Document.enableLspSync(true)` the buffer records every applied change (edits, multi-cursor typing, undo/redo) as a UTF-16 range in the text before it plus the new text; `LspSession.didChangeDocument(path, version, document)` drains them into one `didChange`, or sends the full text to servers that only do full sync.
+- Cancellation: `completion`/`hover` take an `LspCancellation`; cancelling stops waiting at once (polled every 20 ms) and sends `$/cancelRequest`.
 - Features in this round: initialize/shutdown, open/change/save/close, completion, hover, diagnostics and messages as events. Next: signature help, go to definition, references, rename, formatting, code actions, semantic tokens (merged over tree-sitter spans).
 
 ## Workspace, file tree and search
