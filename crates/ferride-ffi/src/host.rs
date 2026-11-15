@@ -285,7 +285,7 @@ impl TerminalSession {
         Ok(self.bridge.wait(self.handle)?)
     }
 
-    pub fn close(&self) {
+    pub fn shutdown(&self) {
         if self.closed.swap(true, Ordering::SeqCst) {
             return;
         }
@@ -297,6 +297,6 @@ impl TerminalSession {
 
 impl Drop for TerminalSession {
     fn drop(&mut self) {
-        self.close();
+        self.shutdown();
     }
 }

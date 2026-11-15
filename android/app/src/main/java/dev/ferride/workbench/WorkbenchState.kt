@@ -166,7 +166,10 @@ object RustTerminalLauncher : TerminalLauncher {
             override fun signal(signo: Int) = session.signal(signo)
             override fun kill() = session.kill()
             override fun waitForExit(): Int = session.wait()
-            override fun close() = session.close()
+            override fun close() {
+                session.shutdown()
+                session.close()
+            }
         }
     }
 }

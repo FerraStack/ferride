@@ -771,7 +771,7 @@ fn register_host_bridge_and_terminal_session_round_trip() {
     session.signal(15).unwrap();
     session.kill().unwrap();
     assert_eq!(session.wait().unwrap(), 0);
-    session.close();
+    session.shutdown();
     bridge.peer.lock().unwrap().take();
 
     let log = bridge.log.lock().unwrap().clone();
