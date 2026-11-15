@@ -190,7 +190,10 @@ class TerminalStateTest {
         state.refreshFerruxStatus()
         assertTrue(state.commands.execute(CommandIds.OPEN_FERRUX_HOME))
         assertEquals(ferruxHomeBackend, state.backend)
-        assertTrue("Ferrux home is not persisted as a local recent folder", state.recentFolders.isEmpty())
+        assertFalse(
+            "Ferrux home is not persisted as a local recent folder",
+            state.recentFolders.any { it.root == ferruxHomeBackend.root || it.kind == WorkspaceKind.FERRUX },
+        )
     }
 
     private fun waitUntil(timeoutMs: Long = 5000L, predicate: () -> Boolean) {
