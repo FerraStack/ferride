@@ -15,7 +15,8 @@ mod theme;
 mod workspace;
 
 pub use document::{
-    Document, DocumentSymbol, EditOutcome, LspTextChange, SelectionRange, StyleKind, StyleSpan, ViewLine,
+    Document, DocumentListener, DocumentSymbol, EditOutcome, LspTextChange, SelectionRange, StyleKind,
+    StyleSpan, ViewLine,
 };
 pub use lsp::{LspCancellation, LspCompletion, LspDiagnostic, LspListener, LspSession};
 pub use scm::{

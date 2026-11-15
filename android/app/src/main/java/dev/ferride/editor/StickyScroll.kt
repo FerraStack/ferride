@@ -22,6 +22,7 @@ class StickyScroll(private val maxLines: Int = MAX_LINES) {
 
     private val cache = HashMap<Int, ViewLine>()
     private var cacheVersion = -1L
+    private var cacheSyntaxVersion = -1L
     private var gesture = false
     private val paint = Paint()
 
@@ -51,9 +52,10 @@ class StickyScroll(private val maxLines: Int = MAX_LINES) {
 
     /** The view line of a sticky [line], cached per document version. */
     fun viewLine(model: EditorModel, line: Int): ViewLine? {
-        if (model.version != cacheVersion) {
+        if (model.version != cacheVersion || model.syntaxVersion != cacheSyntaxVersion) {
             cache.clear()
             cacheVersion = model.version
+            cacheSyntaxVersion = model.syntaxVersion
         }
         return cache[line] ?: model.viewport(line, 1).firstOrNull()?.also { cache[line] = it }
     }
