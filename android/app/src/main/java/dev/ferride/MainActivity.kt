@@ -17,14 +17,18 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import dev.ferride.core.WorkspaceKind
+import dev.ferride.host.FerruxConnector
 import dev.ferride.storage.SafDocumentTree
 import dev.ferride.storage.StoragePaths
 import dev.ferride.scm.KeystoreCredentialStore
 import dev.ferride.scm.RustScmProvider
 import dev.ferride.theme.VsCodeTheme
 import dev.ferride.ui.FerrideWorkbench
+import dev.ferride.workbench.RustTerminalLauncher
 import dev.ferride.workbench.RustWorkspaceBackend
 import dev.ferride.workbench.SampleProject
 import dev.ferride.workbench.RecentFolder
@@ -34,10 +38,16 @@ import dev.ferride.workbench.WorkspaceBackend
 import dev.ferride.workbench.WorkspaceHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 
 class FerrideViewModel(app: Application) : AndroidViewModel(app) {
+    // Load libferride_ffi via TerminalNative before any UniFFI/native object initializes.
+    @Suppress("unused")
+    private val nativeLoadError = FerruxConnector.ensureNativeLoaded()
+    private val connector = FerruxConnector(app).apply { register() }
+
     private val settingsFile = File(app.filesDir, "settings.json")
 
     /** User themes: VS Code `*-color-theme.json` files dropped into `files/themes/`. */
@@ -70,6 +80,10 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
             pickFolderRequest?.invoke()
         }
         override fun openLocal(path: String): WorkspaceBackend = RustWorkspaceBackend.open(path)
+        override fun openFerruxHome(): WorkspaceBackend? {
+            val (home, tree) = runBlocking { connector.openHomeTree() } ?: return null
+            return RustWorkspaceBackend.openFerruxTree(home, tree)
+        }
 
         override fun openRecent(recent: RecentFolder): WorkspaceBackend = when (recent.kind) {
             WorkspaceKind.SAF -> {
@@ -79,6 +93,7 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 backendFor(uri)
             }
+            WorkspaceKind.FERRUX -> openFerruxHome() ?: error("Ferrux is not connected")
             else -> RustWorkspaceBackend.open(recent.root)
         }
 
@@ -113,7 +128,10 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
         host = host,
         scmProvider = RustScmProvider,
         credentialStore = KeystoreCredentialStore(app),
+        terminalLauncher = RustTerminalLauncher,
     ).also {
+        connector.onStatusChanged = { it.refreshFerruxStatus() }
+        connector.setWorkspaceOpen(true)
         it.onWorkspaceOpened = ::remember
         it.scm.projectsDir = projectsDir.absolutePath
         it.start(openFirst = if (restoredLocal == null) "src/main.rs" else null, showWelcome = true)
@@ -123,6 +141,10 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
         // A system-picker folder needs its persisted grant; reopen it off the main thread.
         val saf = last?.removePrefix("saf:")?.takeIf { last.startsWith("saf:") }?.let(Uri::parse)
         if (saf != null && app.contentResolver.persistedUriPermissions.any { it.uri == saf }) openFolder(saf)
+    }
+
+    fun onForeground(visible: Boolean) {
+        connector.setVisible(visible)
     }
 
     /** Result of the system folder picker (or a restored grant). */
@@ -161,6 +183,12 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putString(KEY_LAST, value).apply()
     }
 
+    override fun onCleared() {
+        state.closeTerminalNow()
+        connector.close()
+        super.onCleared()
+    }
+
     companion object {
         private const val KEY_LAST = "last"
         private const val KEY_RECENTS = "recents"
@@ -177,6 +205,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        lifecycle.addObserver(
+            object : DefaultLifecycleObserver {
+                override fun onStart(owner: LifecycleOwner) = vm.onForeground(true)
+                override fun onStop(owner: LifecycleOwner) = vm.onForeground(false)
+            },
+        )
         vm.pickFolderRequest = { folderPicker.launch(null) }
         if (BuildConfig.ALL_FILES_ACCESS) {
             vm.state.commands.register(

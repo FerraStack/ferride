@@ -9,6 +9,7 @@
 //!   workspace search and LSP requests block and belong on `Dispatchers.IO`.
 
 mod document;
+mod host;
 mod lsp;
 mod scm;
 mod theme;
@@ -18,6 +19,9 @@ pub use document::{
     Document, DocumentListener, DocumentSymbol, EditOutcome, LspTextChange, SelectionRange, StyleKind,
     StyleSpan, ViewLine,
 };
+pub use host::{
+    BridgeSpawnSpec, EnvEntry, HostBridge, HostBridgeError, SpawnedFds, TerminalSession, register_host_bridge,
+};
 pub use lsp::{LspCancellation, LspCompletion, LspDiagnostic, LspListener, LspSession};
 pub use scm::{
     GitError, ScmBranch, ScmCancel, ScmChange, ScmCommit, ScmCredential, ScmDiffLine, ScmFileDiff, ScmGroup,
@@ -26,11 +30,12 @@ pub use scm::{
 };
 pub use theme::{TokenStyle, TokenTheme, scope_stack};
 pub use workspace::{
-    EncodingInfo, FileHit, FileNode, MatchRange, OpenedText, SafDoc, SafError, SafTree, SearchCancellation,
-    SearchHit, SearchReport, SymbolHit, WorkspaceHandle, WorkspaceKind, supported_encodings,
+    EncodingInfo, FerruxEntry, FerruxError, FerruxTree, FileHit, FileNode, MatchRange, OpenedText, SafDoc,
+    SafError, SafTree, SearchCancellation, SearchHit, SearchReport, SymbolHit, WorkspaceHandle,
+    WorkspaceKind, supported_encodings,
 };
 
-use ferride_host::{HostStatus, ProcessHost, UnavailableHost};
+use ferride_host::{HostError, HostStatus};
 
 uniffi::setup_scaffolding!();
 
@@ -60,6 +65,17 @@ impl From<ferride_lsp::LspError> for FerrideError {
     }
 }
 
+impl From<HostError> for FerrideError {
+    fn from(e: HostError) -> Self {
+        match e {
+            HostError::Io(io) => FerrideError::Io { msg: io.to_string() },
+            other => FerrideError::HostUnavailable {
+                msg: other.to_string(),
+            },
+        }
+    }
+}
+
 /// Availability of Ferrux, the process host (terminal, language servers).
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum FerruxStatus {
@@ -80,16 +96,29 @@ impl From<HostStatus> for FerruxStatus {
     }
 }
 
-/// The process host in use. Until the Ferrux Host API exists this is the
-/// [`UnavailableHost`] stub, so the terminal panel reports "Requires Ferrux".
-fn process_host() -> &'static dyn ProcessHost {
-    static HOST: UnavailableHost = UnavailableHost;
-    &HOST
-}
-
 #[uniffi::export]
 pub fn ferrux_status() -> FerruxStatus {
-    process_host().status().into()
+    host::current_host_status().into()
+}
+
+/// Binds `dev.ferrux.terminal.TerminalNative` methods when Android loads
+/// `libferride_ffi.so`, so only one copy of `ferrux-term`'s `SessionManager`
+/// exists in the process.
+///
+/// # Safety
+/// `vm` must be the pointer passed by the JVM to `JNI_OnLoad`.
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub unsafe extern "system" fn JNI_OnLoad(
+    vm: *mut ferrux_jni_core::jni::sys::JavaVM,
+    _reserved: *mut std::ffi::c_void,
+) -> ferrux_jni_core::jni::sys::jint {
+    // SAFETY: forwarded from the JVM on `System.loadLibrary("ferride_ffi")`.
+    unsafe {
+        ferrux_jni_core::on_load(vm, "ferride_ffi", |env| {
+            ferrux_jni_core::register_terminal_natives(env, ferrux_jni_core::TERMINAL_CLASS)
+        })
+    }
 }
 
 #[uniffi::export]

@@ -36,9 +36,13 @@ jobs:
   android:
     name: Android · APK + screenshots
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     timeout-minutes: 60
     env:
       NDK_VERSION: 30.0.16248370
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6

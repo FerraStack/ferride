@@ -2,9 +2,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use ferride_workspace::{
-    DocNode, DocumentTree, ENCODINGS, FerruxVfs, LocalVfs, SafVfs, SearchOptions, Vfs, VfsKind,
-    WorkspaceError, copy_tree, fuzzy_score, normalize_rel, read_decoded, read_text, walk_files,
-    write_encoded,
+    DocNode, DocumentTree, ENCODINGS, FerruxFileEntry, FerruxFileTree, FerruxVfs, LocalVfs, SafVfs,
+    SearchOptions, Vfs, VfsKind, WorkspaceError, copy_tree, fuzzy_score, normalize_rel, read_decoded,
+    read_text, walk_files, write_encoded,
 };
 
 use crate::FerrideError;
@@ -153,6 +153,110 @@ impl DocumentTree for SafAdapter {
 
     fn delete(&self, id: &str) -> Result<(), String> {
         self.0.delete(id.to_owned()).map_err(msg)
+    }
+}
+
+/// An entry in Ferrux's home filesystem (`dev.ferrux.api.FileStat`).
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct FerruxEntry {
+    pub name: String,
+    pub is_dir: bool,
+    pub size: i64,
+    pub modified_ms: i64,
+}
+
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum FerruxError {
+    #[error("{msg}")]
+    Failed { msg: String },
+}
+
+impl From<uniffi::UnexpectedUniFFICallbackError> for FerruxError {
+    fn from(e: uniffi::UnexpectedUniFFICallbackError) -> Self {
+        FerruxError::Failed { msg: e.reason }
+    }
+}
+
+/// Callback implemented by Kotlin (`FerruxConnector`) over `FerruxConnection.files`.
+/// Paths are relative to Ferrux's `$HOME` (empty string `""` for `$HOME` itself).
+#[uniffi::export(callback_interface)]
+pub trait FerruxTree: Send + Sync {
+    fn list(&self, rel: String) -> Result<Vec<FerruxEntry>, FerruxError>;
+    fn stat(&self, rel: String) -> Result<FerruxEntry, FerruxError>;
+    fn read(&self, rel: String) -> Result<Vec<u8>, FerruxError>;
+    fn write(&self, rel: String, bytes: Vec<u8>) -> Result<(), FerruxError>;
+    fn create_file(&self, rel: String) -> Result<(), FerruxError>;
+    fn create_dir(&self, rel: String) -> Result<(), FerruxError>;
+    fn rename(&self, from_rel: String, to_rel: String) -> Result<(), FerruxError>;
+    fn delete(&self, rel: String) -> Result<(), FerruxError>;
+}
+
+struct FerruxAdapter {
+    root: String,
+    tree: Box<dyn FerruxTree>,
+}
+
+fn ferrux_msg(e: FerruxError) -> String {
+    e.to_string()
+}
+
+fn to_ferrux_entry(e: FerruxEntry) -> FerruxFileEntry {
+    FerruxFileEntry {
+        name: e.name,
+        is_dir: e.is_dir,
+        size: e.size.max(0) as u64,
+        modified_ms: e.modified_ms,
+    }
+}
+
+impl FerruxFileTree for FerruxAdapter {
+    fn root(&self) -> String {
+        self.root.clone()
+    }
+
+    fn list(&self, rel: &str) -> Result<Vec<FerruxFileEntry>, String> {
+        Ok(self
+            .tree
+            .list(rel.to_owned())
+            .map_err(ferrux_msg)?
+            .into_iter()
+            .map(to_ferrux_entry)
+            .collect())
+    }
+
+    fn stat(&self, rel: &str) -> Result<FerruxFileEntry, String> {
+        self.tree
+            .stat(rel.to_owned())
+            .map(to_ferrux_entry)
+            .map_err(ferrux_msg)
+    }
+
+    fn read(&self, rel: &str) -> Result<Vec<u8>, String> {
+        self.tree.read(rel.to_owned()).map_err(ferrux_msg)
+    }
+
+    fn write(&self, rel: &str, bytes: &[u8]) -> Result<(), String> {
+        self.tree
+            .write(rel.to_owned(), bytes.to_vec())
+            .map_err(ferrux_msg)
+    }
+
+    fn create_file(&self, rel: &str) -> Result<(), String> {
+        self.tree.create_file(rel.to_owned()).map_err(ferrux_msg)
+    }
+
+    fn create_dir(&self, rel: &str) -> Result<(), String> {
+        self.tree.create_dir(rel.to_owned()).map_err(ferrux_msg)
+    }
+
+    fn rename(&self, from_rel: &str, to_rel: &str) -> Result<(), String> {
+        self.tree
+            .rename(from_rel.to_owned(), to_rel.to_owned())
+            .map_err(ferrux_msg)
+    }
+
+    fn delete(&self, rel: &str) -> Result<(), String> {
+        self.tree.delete(rel.to_owned()).map_err(ferrux_msg)
     }
 }
 
@@ -309,14 +413,34 @@ impl WorkspaceHandle {
         })
     }
 
-    /// Ferrux's home directory (every call fails until Ferrux has a file API).
+    /// Ferrux's home directory (every call fails when no live FerruxTree is provided).
     #[uniffi::constructor]
     pub fn open_ferrux() -> Arc<Self> {
         Arc::new(Self {
-            vfs: Arc::new(FerruxVfs),
+            vfs: Arc::new(FerruxVfs::unavailable()),
             local: None,
             symbols: Default::default(),
             root: "ferrux:~".to_owned(),
+        })
+    }
+
+    /// Ferrux's home directory backed by `FerruxConnection.files`.
+    #[uniffi::constructor]
+    pub fn open_ferrux_tree(root: String, tree: Box<dyn FerruxTree>) -> Arc<Self> {
+        let trimmed = root.trim_end_matches('/');
+        let resolved_root = if trimmed.is_empty() {
+            "ferrux:~".to_owned()
+        } else {
+            trimmed.to_owned()
+        };
+        Arc::new(Self {
+            vfs: Arc::new(FerruxVfs::new(Arc::new(FerruxAdapter {
+                root: resolved_root.clone(),
+                tree,
+            }))),
+            local: None,
+            symbols: Default::default(),
+            root: resolved_root,
         })
     }
 

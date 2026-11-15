@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Ferrux (process host) discovery. Package name is a placeholder until Ferrux picks its own. -->
-    <queries>
-        <package android:name="org.ferrastack.ferrux" />
-    </queries>
-
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

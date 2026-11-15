@@ -296,7 +296,7 @@ fn local_vfs_round_trip_and_confinement() {
 
 #[test]
 fn ferrux_is_a_clear_stub() {
-    let vfs = FerruxVfs;
+    let vfs = FerruxVfs::unavailable();
     assert_eq!(vfs.kind(), VfsKind::Ferrux);
     let err = vfs.list("").unwrap_err().to_string();
     assert!(err.contains("Ferrux"), "{err}");
@@ -340,4 +340,87 @@ fn non_utf8_files_open_and_save_in_their_encoding() {
         read_decoded(&vfs, "blob.bin", None),
         Err(WorkspaceError::Binary(_))
     ));
+}
+
+#[test]
+fn ferrux_tree_round_trip() {
+    struct MockFerruxTree {
+        dir: tempfile::TempDir,
+    }
+    impl FerruxFileTree for MockFerruxTree {
+        fn root(&self) -> String {
+            self.dir.path().to_string_lossy().into_owned()
+        }
+        fn list(&self, rel: &str) -> std::result::Result<Vec<FerruxFileEntry>, String> {
+            let mut out = Vec::new();
+            for entry in std::fs::read_dir(self.dir.path().join(rel)).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let meta = entry.metadata().map_err(|e| e.to_string())?;
+                out.push(FerruxFileEntry {
+                    name: entry.file_name().to_string_lossy().into_owned(),
+                    is_dir: meta.is_dir(),
+                    size: meta.len(),
+                    modified_ms: 0,
+                });
+            }
+            Ok(out)
+        }
+        fn stat(&self, rel: &str) -> std::result::Result<FerruxFileEntry, String> {
+            let p = self.dir.path().join(rel);
+            let meta = std::fs::metadata(&p).map_err(|e| e.to_string())?;
+            Ok(FerruxFileEntry {
+                name: p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                is_dir: meta.is_dir(),
+                size: meta.len(),
+                modified_ms: 0,
+            })
+        }
+        fn read(&self, rel: &str) -> std::result::Result<Vec<u8>, String> {
+            std::fs::read(self.dir.path().join(rel)).map_err(|e| e.to_string())
+        }
+        fn write(&self, rel: &str, bytes: &[u8]) -> std::result::Result<(), String> {
+            std::fs::write(self.dir.path().join(rel), bytes).map_err(|e| e.to_string())
+        }
+        fn create_file(&self, rel: &str) -> std::result::Result<(), String> {
+            let p = self.dir.path().join(rel);
+            if let Some(parent) = p.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            std::fs::File::create(p).map_err(|e| e.to_string()).map(drop)
+        }
+        fn create_dir(&self, rel: &str) -> std::result::Result<(), String> {
+            std::fs::create_dir_all(self.dir.path().join(rel)).map_err(|e| e.to_string())
+        }
+        fn rename(&self, from_rel: &str, to_rel: &str) -> std::result::Result<(), String> {
+            std::fs::rename(self.dir.path().join(from_rel), self.dir.path().join(to_rel))
+                .map_err(|e| e.to_string())
+        }
+        fn delete(&self, rel: &str) -> std::result::Result<(), String> {
+            let p = self.dir.path().join(rel);
+            if p.is_dir() {
+                std::fs::remove_dir_all(p).map_err(|e| e.to_string())
+            } else {
+                std::fs::remove_file(p).map_err(|e| e.to_string())
+            }
+        }
+    }
+
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+    let vfs = FerruxVfs::new(Arc::new(MockFerruxTree { dir: tmp }));
+    assert_eq!(vfs.kind(), VfsKind::Ferrux);
+    vfs.create_dir("src").unwrap();
+    vfs.create_file("src/main.rs").unwrap();
+    vfs.write("src/main.rs", b"fn main() {}").unwrap();
+    assert_eq!(read_text(&vfs, "src/main.rs").unwrap(), "fn main() {}");
+    assert_eq!(names(vfs.list("").unwrap()), vec![("src".into(), true)]);
+    vfs.rename("src/main.rs", "src/lib.rs").unwrap();
+    assert_eq!(vfs.stat("src/lib.rs").unwrap().size, 12);
+    vfs.delete("src").unwrap();
+    assert!(vfs.list("").unwrap().is_empty());
+    assert!(vfs.delete("").is_err());
+    assert!(vfs.read("../escape").is_err());
 }

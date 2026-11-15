@@ -216,6 +216,12 @@ android {
         buildConfig = true
     }
 
+    packaging {
+        jniLibs {
+            excludes += "**/libferruxterm.so"
+        }
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -260,6 +266,8 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.coroutines.android)
+    implementation(libs.ferrux.client)
+    implementation(libs.ferrux.terminal.view)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)

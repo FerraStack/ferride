@@ -32,6 +32,8 @@ lsp-types.workspace = true
 log.workspace = true
 thiserror.workspace = true
 uniffi.workspace = true
+ferrux-jni-core = { git = "https://github.com/FerraStack/ferrux", rev = "d8211d04f4a65ecc71ec5653a922f1622deb5795" }
+jni = "0.22"
 
 [dev-dependencies]
 tempfile.workspace = true
