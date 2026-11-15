@@ -122,8 +122,12 @@ fn workspace_round_trip() {
     assert!(WorkspaceHandle::open("/definitely/not/here".into()).is_err());
 }
 
+static HOST_TEST_LOCK: Mutex<()> = Mutex::new(());
+
 #[test]
 fn host_stub_and_languages() {
+    let _guard = HOST_TEST_LOCK.lock().unwrap();
+    host::clear_host_bridge_for_test();
     assert_eq!(ferrux_status(), FerruxStatus::NotInstalled);
     assert!(supported_languages().contains(&"typescript".to_owned()));
     assert_eq!(language_for_file("x.py".into(), None).as_deref(), Some("python"));
@@ -641,4 +645,397 @@ fn background_syntax_parse_updates_highlights_after_budget_timeout() {
     doc.clear_listener();
     doc.replace(0, 1, "".into(), true).unwrap();
     drop(doc);
+}
+
+#[cfg(unix)]
+#[test]
+fn register_host_bridge_and_terminal_session_round_trip() {
+    use std::io::Write;
+    use std::os::fd::IntoRawFd;
+    use std::os::unix::net::UnixStream;
+    use std::sync::Arc;
+
+    struct MockPtyBridge {
+        log: Mutex<Vec<String>>,
+        peer: Mutex<Option<UnixStream>>,
+    }
+
+    impl HostBridge for MockPtyBridge {
+        fn status(&self) -> FerruxStatus {
+            FerruxStatus::Ready {
+                description: "Ferrux test".into(),
+            }
+        }
+
+        fn spawn(&self, spec: BridgeSpawnSpec) -> Result<SpawnedFds, HostBridgeError> {
+            self.log.lock().unwrap().push(format!(
+                "spawn argv={:?} pty={:?}x{:?}",
+                spec.argv, spec.pty_rows, spec.pty_cols
+            ));
+            let (client, peer) = UnixStream::pair().unwrap();
+            *self.peer.lock().unwrap() = Some(peer);
+            Ok(SpawnedFds {
+                handle: 42,
+                stdin_fd: -1,
+                stdout_fd: -1,
+                stderr_fd: -1,
+                pty_fd: client.into_raw_fd(),
+                pty_is_socket: true,
+            })
+        }
+
+        fn resize(&self, handle: i64, rows: i32, cols: i32) -> Result<(), HostBridgeError> {
+            self.log
+                .lock()
+                .unwrap()
+                .push(format!("resize {handle} {rows}x{cols}"));
+            Ok(())
+        }
+
+        fn signal(&self, handle: i64, signo: i32) -> Result<(), HostBridgeError> {
+            self.log.lock().unwrap().push(format!("signal {handle} {signo}"));
+            Ok(())
+        }
+
+        fn kill(&self, handle: i64) -> Result<(), HostBridgeError> {
+            self.log.lock().unwrap().push(format!("kill {handle}"));
+            Ok(())
+        }
+
+        fn close(&self, handle: i64) {
+            self.log.lock().unwrap().push(format!("close {handle}"));
+        }
+
+        fn wait(&self, handle: i64) -> Result<i32, HostBridgeError> {
+            self.log.lock().unwrap().push(format!("wait {handle}"));
+            Ok(0)
+        }
+    }
+
+    struct BridgeRef(Arc<MockPtyBridge>);
+    impl HostBridge for BridgeRef {
+        fn status(&self) -> FerruxStatus {
+            self.0.status()
+        }
+        fn spawn(&self, spec: BridgeSpawnSpec) -> Result<SpawnedFds, HostBridgeError> {
+            self.0.spawn(spec)
+        }
+        fn resize(&self, handle: i64, rows: i32, cols: i32) -> Result<(), HostBridgeError> {
+            self.0.resize(handle, rows, cols)
+        }
+        fn signal(&self, handle: i64, signo: i32) -> Result<(), HostBridgeError> {
+            self.0.signal(handle, signo)
+        }
+        fn kill(&self, handle: i64) -> Result<(), HostBridgeError> {
+            self.0.kill(handle)
+        }
+        fn close(&self, handle: i64) {
+            self.0.close(handle)
+        }
+        fn wait(&self, handle: i64) -> Result<i32, HostBridgeError> {
+            self.0.wait(handle)
+        }
+    }
+
+    let _guard = HOST_TEST_LOCK.lock().unwrap();
+    let bridge = Arc::new(MockPtyBridge {
+        log: Mutex::new(Vec::new()),
+        peer: Mutex::new(None),
+    });
+    register_host_bridge(Box::new(BridgeRef(bridge.clone())));
+    assert_eq!(
+        ferrux_status(),
+        FerruxStatus::Ready {
+            description: "Ferrux test".into()
+        }
+    );
+
+    let session = TerminalSession::spawn(
+        vec!["/system/bin/sh".into()],
+        vec![EnvEntry {
+            key: "TERM".into(),
+            value: "xterm-256color".into(),
+        }],
+        Some("/data/user/0/dev.ferrux/files/home".into()),
+        24,
+        80,
+    )
+    .unwrap();
+    assert!(session.session_id() > 0);
+    assert_eq!(session.process_id(), 42);
+
+    if let Some(peer) = bridge.peer.lock().unwrap().as_mut() {
+        peer.write_all(b"hello-pty").unwrap();
+    }
+    session.resize(30, 100).unwrap();
+    session.signal(15).unwrap();
+    session.kill().unwrap();
+    assert_eq!(session.wait().unwrap(), 0);
+    session.close();
+    bridge.peer.lock().unwrap().take();
+
+    let log = bridge.log.lock().unwrap().clone();
+    assert_eq!(
+        log,
+        vec![
+            "spawn argv=[\"/system/bin/sh\"] pty=Some(24)xSome(80)",
+            "resize 42 30x100",
+            "signal 42 15",
+            "kill 42",
+            "wait 42",
+            "close 42",
+        ]
+    );
+    host::clear_host_bridge_for_test();
+}
+
+#[cfg(unix)]
+#[test]
+fn lsp_session_spawn_pipes_echo_and_stderr() {
+    use std::io::{BufReader, Write};
+    use std::os::fd::IntoRawFd;
+    use std::os::unix::net::UnixStream;
+    use std::sync::Arc;
+
+    use ferride_lsp::codec;
+    use serde_json::{Value, json};
+
+    struct MockLspBridge {
+        closed: Mutex<Vec<i64>>,
+        server_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    }
+
+    impl HostBridge for MockLspBridge {
+        fn status(&self) -> FerruxStatus {
+            FerruxStatus::Ready {
+                description: "Ferrux test".into(),
+            }
+        }
+
+        fn spawn(&self, spec: BridgeSpawnSpec) -> Result<SpawnedFds, HostBridgeError> {
+            assert!(!spec.merge_stderr);
+            assert!(spec.pty_rows.is_none());
+            let (stdin_c, stdin_s) = UnixStream::pair().unwrap();
+            let (stdout_c, mut stdout_s) = UnixStream::pair().unwrap();
+            let (stderr_c, mut stderr_s) = UnixStream::pair().unwrap();
+
+            let th = std::thread::spawn(move || {
+                writeln!(stderr_s, "server booting").unwrap();
+                drop(stderr_s);
+                let mut r = BufReader::new(stdin_s);
+                while let Some(body) = codec::read_message(&mut r).unwrap() {
+                    let m: Value = serde_json::from_slice(&body).unwrap();
+                    match m["method"].as_str() {
+                        Some("initialize") => {
+                            let resp = json!({"jsonrpc":"2.0","id":m["id"],"result":{
+                                "capabilities":{},"serverInfo":{"name":"spawned-ls"}}});
+                            codec::write_message(&mut stdout_s, &serde_json::to_vec(&resp).unwrap()).unwrap();
+                        }
+                        Some("shutdown") => {
+                            let resp = json!({"jsonrpc":"2.0","id":m["id"],"result":null});
+                            codec::write_message(&mut stdout_s, &serde_json::to_vec(&resp).unwrap()).unwrap();
+                        }
+                        Some("exit") => break,
+                        _ => {}
+                    }
+                }
+            });
+            *self.server_thread.lock().unwrap() = Some(th);
+
+            Ok(SpawnedFds {
+                handle: 7,
+                stdin_fd: stdin_c.into_raw_fd(),
+                stdout_fd: stdout_c.into_raw_fd(),
+                stderr_fd: stderr_c.into_raw_fd(),
+                pty_fd: -1,
+                pty_is_socket: false,
+            })
+        }
+
+        fn resize(&self, _handle: i64, _rows: i32, _cols: i32) -> Result<(), HostBridgeError> {
+            Ok(())
+        }
+        fn signal(&self, _handle: i64, _signo: i32) -> Result<(), HostBridgeError> {
+            Ok(())
+        }
+        fn kill(&self, _handle: i64) -> Result<(), HostBridgeError> {
+            Ok(())
+        }
+        fn close(&self, handle: i64) {
+            self.closed.lock().unwrap().push(handle);
+        }
+        fn wait(&self, _handle: i64) -> Result<i32, HostBridgeError> {
+            Ok(0)
+        }
+    }
+
+    struct BridgeRef(Arc<MockLspBridge>);
+    impl HostBridge for BridgeRef {
+        fn status(&self) -> FerruxStatus {
+            self.0.status()
+        }
+        fn spawn(&self, spec: BridgeSpawnSpec) -> Result<SpawnedFds, HostBridgeError> {
+            self.0.spawn(spec)
+        }
+        fn resize(&self, handle: i64, rows: i32, cols: i32) -> Result<(), HostBridgeError> {
+            self.0.resize(handle, rows, cols)
+        }
+        fn signal(&self, handle: i64, signo: i32) -> Result<(), HostBridgeError> {
+            self.0.signal(handle, signo)
+        }
+        fn kill(&self, handle: i64) -> Result<(), HostBridgeError> {
+            self.0.kill(handle)
+        }
+        fn close(&self, handle: i64) {
+            self.0.close(handle)
+        }
+        fn wait(&self, handle: i64) -> Result<i32, HostBridgeError> {
+            self.0.wait(handle)
+        }
+    }
+
+    let _guard = HOST_TEST_LOCK.lock().unwrap();
+    let bridge = Arc::new(MockLspBridge {
+        closed: Mutex::new(Vec::new()),
+        server_thread: Mutex::new(None),
+    });
+    register_host_bridge(Box::new(BridgeRef(bridge.clone())));
+
+    let rec = Arc::new(Recorder::default());
+    let session =
+        LspSession::spawn(vec!["rust-analyzer".into()], vec![], None, Box::new(rec.clone())).unwrap();
+    assert_eq!(session.initialize(None).unwrap(), "spawned-ls");
+    session.shutdown().unwrap();
+    bridge
+        .server_thread
+        .lock()
+        .unwrap()
+        .take()
+        .unwrap()
+        .join()
+        .unwrap();
+
+    for _ in 0..200 {
+        let events = rec.events.lock().unwrap();
+        if events.iter().any(|e| e == "closed") && events.iter().any(|e| e == "msg 4 server booting false") {
+            break;
+        }
+        drop(events);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let events = rec.events.lock().unwrap().clone();
+    assert!(
+        events.contains(&"msg 4 server booting false".to_owned()),
+        "{events:?}"
+    );
+    assert!(events.contains(&"closed".to_owned()), "{events:?}");
+    drop(session);
+    assert_eq!(*bridge.closed.lock().unwrap(), vec![7]);
+    host::clear_host_bridge_for_test();
+}
+
+#[test]
+fn open_ferrux_tree_round_trip() {
+    use std::collections::BTreeMap;
+
+    struct MemFerrux(Mutex<BTreeMap<String, Vec<u8>>>);
+    impl FerruxTree for MemFerrux {
+        fn list(&self, rel: String) -> Result<Vec<FerruxEntry>, FerruxError> {
+            if !rel.is_empty() {
+                return Ok(Vec::new());
+            }
+            Ok(self
+                .0
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(k, v)| FerruxEntry {
+                    name: k.clone(),
+                    is_dir: false,
+                    size: v.len() as i64,
+                    modified_ms: 100,
+                })
+                .collect())
+        }
+
+        fn stat(&self, rel: String) -> Result<FerruxEntry, FerruxError> {
+            if rel.is_empty() {
+                return Ok(FerruxEntry {
+                    name: String::new(),
+                    is_dir: true,
+                    size: 0,
+                    modified_ms: 0,
+                });
+            }
+            let map = self.0.lock().unwrap();
+            let bytes = map.get(&rel).ok_or_else(|| FerruxError::Failed {
+                msg: "missing".into(),
+            })?;
+            Ok(FerruxEntry {
+                name: rel,
+                is_dir: false,
+                size: bytes.len() as i64,
+                modified_ms: 100,
+            })
+        }
+
+        fn read(&self, rel: String) -> Result<Vec<u8>, FerruxError> {
+            self.0
+                .lock()
+                .unwrap()
+                .get(&rel)
+                .cloned()
+                .ok_or_else(|| FerruxError::Failed {
+                    msg: "missing".into(),
+                })
+        }
+
+        fn write(&self, rel: String, bytes: Vec<u8>) -> Result<(), FerruxError> {
+            self.0.lock().unwrap().insert(rel, bytes);
+            Ok(())
+        }
+
+        fn create_file(&self, rel: String) -> Result<(), FerruxError> {
+            self.0.lock().unwrap().entry(rel).or_default();
+            Ok(())
+        }
+
+        fn create_dir(&self, _rel: String) -> Result<(), FerruxError> {
+            Ok(())
+        }
+
+        fn rename(&self, from_rel: String, to_rel: String) -> Result<(), FerruxError> {
+            let mut map = self.0.lock().unwrap();
+            let v = map.remove(&from_rel).ok_or_else(|| FerruxError::Failed {
+                msg: "missing".into(),
+            })?;
+            map.insert(to_rel, v);
+            Ok(())
+        }
+
+        fn delete(&self, rel: String) -> Result<(), FerruxError> {
+            self.0.lock().unwrap().remove(&rel);
+            Ok(())
+        }
+    }
+
+    assert!(WorkspaceHandle::open_ferrux().list_dir("".into()).is_err());
+
+    let mut initial = BTreeMap::new();
+    initial.insert("hello.txt".into(), b"hi\n".to_vec());
+    let ws = WorkspaceHandle::open_ferrux_tree(
+        "/data/user/0/dev.ferrux/files/home".into(),
+        Box::new(MemFerrux(Mutex::new(initial))),
+    );
+    assert_eq!(ws.kind(), WorkspaceKind::Ferrux);
+    let nodes = ws.list_dir("".into()).unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].path, "/data/user/0/dev.ferrux/files/home/hello.txt");
+    assert_eq!(ws.read_file(nodes[0].path.clone()).unwrap(), "hi\n");
+    ws.write_file(
+        "/data/user/0/dev.ferrux/files/home/hello.txt".into(),
+        "updated\n".into(),
+    )
+    .unwrap();
+    assert_eq!(ws.read_file("hello.txt".into()).unwrap(), "updated\n");
 }

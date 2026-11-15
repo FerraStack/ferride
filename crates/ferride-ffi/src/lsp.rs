@@ -1,11 +1,13 @@
+use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
+use ferride_host::{FerruxHost, HostError, ProcessHost, SpawnSpec};
 use ferride_lsp::lsp_types::{
     DiagnosticSeverity, MessageType, Position, Range, TextDocumentContentChangeEvent, TextDocumentSyncKind,
 };
 use ferride_lsp::{CancelToken, LspClient, LspEvent, file_uri};
 
-use crate::{Document, FerrideError};
+use crate::{Document, EnvEntry, FerrideError, host};
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct LspDiagnostic {
@@ -93,13 +95,13 @@ impl LspSession {
         writer: impl std::io::Write + Send + 'static,
         listener: Box<dyn LspListener>,
     ) -> Arc<Self> {
-        Self::from_streams_with_closer(reader, writer, listener, || {})
+        Self::from_streams_with_closer(reader, writer, Arc::from(listener), || {})
     }
 
     fn from_streams_with_closer(
         reader: impl std::io::Read + Send + 'static,
         writer: impl std::io::Write + Send + 'static,
-        listener: Box<dyn LspListener>,
+        listener: Arc<dyn LspListener>,
         closer: impl FnOnce() + Send + 'static,
     ) -> Arc<Self> {
         let client = LspClient::start_with_closer(
@@ -144,10 +146,68 @@ impl LspSession {
         );
         Arc::new(Self { client })
     }
+
+    pub(crate) fn spawn_with_host(
+        host: &FerruxHost,
+        argv: Vec<String>,
+        env: Vec<EnvEntry>,
+        cwd: Option<String>,
+        listener: Box<dyn LspListener>,
+    ) -> Result<Arc<Self>, FerrideError> {
+        let spec = SpawnSpec {
+            argv,
+            env: env.into_iter().map(|e| (e.key, e.value)).collect(),
+            cwd,
+            pty: None,
+            merge_stderr: false,
+        };
+        let mut proc = host.spawn(&spec)?;
+        let (stdout, stdin) = proc.take_io().ok_or_else(|| FerrideError::HostUnavailable {
+            msg: "Ferrux process did not provide stdio pipes".into(),
+        })?;
+        let listener: Arc<dyn LspListener> = Arc::from(listener);
+        if let Some(stderr) = proc.take_stderr() {
+            let err_listener = Arc::clone(&listener);
+            let _ = std::thread::Builder::new()
+                .name("ferride-lsp-stderr".into())
+                .spawn(move || {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines().map_while(Result::ok) {
+                        if !line.is_empty() {
+                            err_listener.on_message(4, line, false);
+                        }
+                    }
+                });
+        }
+        Ok(Self::from_streams_with_closer(
+            stdout,
+            stdin,
+            listener,
+            move || {
+                let _ = proc.kill();
+                drop(proc);
+            },
+        ))
+    }
 }
 
 #[uniffi::export]
 impl LspSession {
+    /// Spawns a language server in Ferrux (pipes mode, `merge_stderr = false`),
+    /// routing stderr lines to [`LspListener::on_message`] at log level.
+    #[uniffi::constructor]
+    pub fn spawn(
+        argv: Vec<String>,
+        env: Vec<EnvEntry>,
+        cwd: Option<String>,
+        listener: Box<dyn LspListener>,
+    ) -> Result<Arc<Self>, FerrideError> {
+        let host = host::current_ferrux_host().ok_or_else(|| FerrideError::HostUnavailable {
+            msg: HostError::NotInstalled.to_string(),
+        })?;
+        Self::spawn_with_host(&host, argv, env, cwd, listener)
+    }
+
     /// Takes ownership of two file descriptors (e.g. from
     /// `ParcelFileDescriptor.detachFd()`): one to read server output from and
     /// one to write requests to. They may be the same socket fd.

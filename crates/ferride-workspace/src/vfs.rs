@@ -611,16 +611,58 @@ impl SafVfs {
 
 // ----- Ferrux -------------------------------------------------------------------
 
-/// Ferrux's home directory. Placeholder until Ferrux ships its file API (AIDL
-/// + file descriptors, see `ferride-host`); every operation says so.
-#[derive(Debug, Clone, Default)]
-pub struct FerruxVfs;
+/// One file or directory entry returned by [`FerruxFileTree`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FerruxFileEntry {
+    pub name: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub modified_ms: i64,
+}
+
+/// The Android side of a Ferrux `$HOME` tree, backed by `FerruxConnection.files`.
+pub trait FerruxFileTree: Send + Sync {
+    fn root(&self) -> String;
+    fn list(&self, rel: &str) -> std::result::Result<Vec<FerruxFileEntry>, String>;
+    fn stat(&self, rel: &str) -> std::result::Result<FerruxFileEntry, String>;
+    fn read(&self, rel: &str) -> std::result::Result<Vec<u8>, String>;
+    fn write(&self, rel: &str, bytes: &[u8]) -> std::result::Result<(), String>;
+    fn create_file(&self, rel: &str) -> std::result::Result<(), String>;
+    fn create_dir(&self, rel: &str) -> std::result::Result<(), String>;
+    fn rename(&self, from_rel: &str, to_rel: &str) -> std::result::Result<(), String>;
+    fn delete(&self, rel: &str) -> std::result::Result<(), String>;
+}
+
+/// Ferrux's home directory, backed either by [`FerruxFileTree`] (`FerruxConnection.files`)
+/// or an unavailable stub when Ferrux isn't connected.
+#[derive(Clone, Default)]
+pub struct FerruxVfs {
+    tree: Option<Arc<dyn FerruxFileTree>>,
+}
+
+impl std::fmt::Debug for FerruxVfs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FerruxVfs")
+            .field("connected", &self.tree.is_some())
+            .finish()
+    }
+}
 
 impl FerruxVfs {
-    fn unavailable<T>() -> Result<T> {
-        Err(WorkspaceError::Unavailable(
-            "Ferrux file access isn't available yet: install Ferrux and update both apps".into(),
-        ))
+    pub fn new(tree: Arc<dyn FerruxFileTree>) -> Self {
+        Self { tree: Some(tree) }
+    }
+
+    pub fn unavailable() -> Self {
+        Self { tree: None }
+    }
+
+    fn tree(&self) -> Result<&dyn FerruxFileTree> {
+        self.tree.as_deref().ok_or_else(|| {
+            WorkspaceError::Unavailable(
+                "Ferrux file access isn't available yet: install Ferrux and connect".into(),
+            )
+        })
     }
 }
 
@@ -633,36 +675,77 @@ impl Vfs for FerruxVfs {
         "Ferrux home".into()
     }
 
-    fn list(&self, _dir: &str) -> Result<Vec<VfsEntry>> {
-        Self::unavailable()
+    fn list(&self, dir: &str) -> Result<Vec<VfsEntry>> {
+        let rel = normalize_rel(dir)?;
+        let tree = self.tree()?;
+        let mut entries: Vec<VfsEntry> = tree
+            .list(&rel)
+            .map_err(provider(&rel))?
+            .into_iter()
+            .filter(|e| e.name != ".git")
+            .map(|e| VfsEntry {
+                rel_path: join_rel(&rel, &e.name),
+                name: e.name,
+                is_dir: e.is_dir,
+                size: e.size,
+                modified_ms: e.modified_ms,
+            })
+            .collect();
+        sort_entries(&mut entries);
+        Ok(entries)
     }
 
-    fn stat(&self, _path: &str) -> Result<VfsStat> {
-        Self::unavailable()
+    fn stat(&self, path: &str) -> Result<VfsStat> {
+        let rel = normalize_rel(path)?;
+        let st = self.tree()?.stat(&rel).map_err(provider(&rel))?;
+        Ok(VfsStat {
+            is_dir: st.is_dir,
+            size: st.size,
+            modified_ms: st.modified_ms,
+        })
     }
 
-    fn read(&self, _path: &str) -> Result<Vec<u8>> {
-        Self::unavailable()
+    fn read(&self, path: &str) -> Result<Vec<u8>> {
+        let rel = normalize_rel(path)?;
+        self.tree()?.read(&rel).map_err(provider(&rel))
     }
 
-    fn write(&self, _path: &str, _bytes: &[u8]) -> Result<()> {
-        Self::unavailable()
+    fn write(&self, path: &str, bytes: &[u8]) -> Result<()> {
+        let rel = normalize_rel(path)?;
+        self.tree()?.write(&rel, bytes).map_err(provider(&rel))
     }
 
-    fn create_file(&self, _path: &str) -> Result<()> {
-        Self::unavailable()
+    fn create_file(&self, path: &str) -> Result<()> {
+        let rel = normalize_rel(path)?;
+        if rel.is_empty() {
+            return Err(WorkspaceError::OutsideWorkspace(PathBuf::from(path)));
+        }
+        self.tree()?.create_file(&rel).map_err(provider(&rel))
     }
 
-    fn create_dir(&self, _path: &str) -> Result<()> {
-        Self::unavailable()
+    fn create_dir(&self, path: &str) -> Result<()> {
+        let rel = normalize_rel(path)?;
+        if rel.is_empty() {
+            return Err(WorkspaceError::OutsideWorkspace(PathBuf::from(path)));
+        }
+        self.tree()?.create_dir(&rel).map_err(provider(&rel))
     }
 
-    fn rename(&self, _from: &str, _to: &str) -> Result<()> {
-        Self::unavailable()
+    fn rename(&self, from: &str, to: &str) -> Result<()> {
+        let from = normalize_rel(from)?;
+        let to = normalize_rel(to)?;
+        if from.is_empty() || to.is_empty() {
+            return Err(WorkspaceError::OutsideWorkspace(PathBuf::from(&from)));
+        }
+        self.tree()?.rename(&from, &to).map_err(provider(&from))
     }
 
-    fn delete(&self, _path: &str) -> Result<()> {
-        Self::unavailable()
+    fn delete(&self, path: &str) -> Result<()> {
+        let rel = normalize_rel(path)?;
+        if rel.is_empty() {
+            return Err(WorkspaceError::OutsideWorkspace(PathBuf::from(path)));
+        }
+        self.tree()?.delete(&rel).map_err(provider(&rel))
     }
 }
 

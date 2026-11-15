@@ -8,11 +8,13 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ferride.core.DocumentSymbol
+import dev.ferride.core.EnvEntry
 import dev.ferride.core.FerruxStatus
 import dev.ferride.core.FileHit
 import dev.ferride.core.FileNode
 import dev.ferride.core.SearchReport
 import dev.ferride.core.SymbolHit
+import dev.ferride.core.TerminalSession
 import dev.ferride.core.WorkspaceKind
 import dev.ferride.editor.EditorActions
 import dev.ferride.editor.EditorModel
@@ -26,6 +28,7 @@ import dev.ferride.theme.BuiltInThemes
 import dev.ferride.theme.DarkModern
 import dev.ferride.theme.LightModern
 import dev.ferride.theme.WorkbenchColors
+import java.io.Closeable
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -130,10 +133,42 @@ interface WorkspaceHost {
     fun pickFolder()
     /** Opens a real directory (blocks; called on the IO dispatcher). */
     fun openLocal(path: String): WorkspaceBackend
+    /** Opens Ferrux's `$HOME` directory when connected (blocks; called on the IO dispatcher). */
+    fun openFerruxHome(): WorkspaceBackend? = null
     /** Reopens a Recent entry (blocks; called on the IO dispatcher). Fails if its grant is gone. */
     fun openRecent(recent: RecentFolder): WorkspaceBackend = openLocal(recent.root)
     fun loadRecents(): List<RecentFolder> = emptyList()
     fun saveRecents(recents: List<RecentFolder>) {}
+}
+
+/** A live PTY session hosted in Ferrux and attached to `ferrux-jni-core`. */
+interface TerminalSessionHandle : Closeable {
+    val sessionId: Long
+    fun resize(rows: Int, cols: Int)
+    fun signal(signo: Int)
+    fun kill()
+    /** Blocks until the remote process exits; returns exit code (`0..255`) or `-signal`. */
+    fun waitForExit(): Int
+}
+
+/** Spawns PTY terminal sessions (backed by Rust's [TerminalSession] in production, fake in tests). */
+interface TerminalLauncher {
+    fun spawn(argv: List<String>, env: Map<String, String>, cwd: String?, rows: Int, cols: Int): TerminalSessionHandle
+}
+
+object RustTerminalLauncher : TerminalLauncher {
+    override fun spawn(argv: List<String>, env: Map<String, String>, cwd: String?, rows: Int, cols: Int): TerminalSessionHandle {
+        val entries = env.map { (k, v) -> EnvEntry(k, v) }
+        val session = TerminalSession.spawn(argv, entries, cwd, rows, cols)
+        return object : TerminalSessionHandle {
+            override val sessionId: Long get() = session.sessionId()
+            override fun resize(rows: Int, cols: Int) = session.resize(rows, cols)
+            override fun signal(signo: Int) = session.signal(signo)
+            override fun kill() = session.kill()
+            override fun waitForExit(): Int = session.wait()
+            override fun close() = session.close()
+        }
+    }
 }
 
 /** Where `settings.json` lives (a file in the app; memory in tests). */
@@ -162,6 +197,7 @@ class WorkbenchState(
     var host: WorkspaceHost? = null,
     scmProvider: ScmProvider = NoScmProvider,
     credentialStore: CredentialStore = InMemoryCredentialStore(),
+    var terminalLauncher: TerminalLauncher? = null,
 ) {
     val commands = CommandRegistry()
 
@@ -291,6 +327,22 @@ class WorkbenchState(
         private set
     var branch by mutableStateOf<String?>(null)
         private set
+
+    var terminalSession by mutableStateOf<TerminalSessionHandle?>(null)
+        private set
+    var terminalStarting by mutableStateOf(false)
+        private set
+    var terminalExitCode by mutableStateOf<Int?>(null)
+        private set
+    var terminalError by mutableStateOf<String?>(null)
+        private set
+    var terminalTitle by mutableStateOf<String?>(null)
+        private set
+    var terminalRows by mutableIntStateOf(DEFAULT_TERMINAL_ROWS)
+        private set
+    var terminalCols by mutableIntStateOf(DEFAULT_TERMINAL_COLS)
+        private set
+    private var terminalGeneration = 0
 
     /** The editor view currently attached to the active tab (set by the UI). */
     var editor: EditorActions? = null
@@ -446,6 +498,144 @@ class WorkbenchState(
             result.onSuccess { local ->
                 if (openWorkspace(local)) message = "Copied to ${local.root}. Git and search now work on this copy."
             }.onFailure { message = "Couldn't copy the folder: ${it.message}" }
+        }
+    }
+
+    /** Re-queries Ferrux availability from the backend and updates [ferrux]. */
+    fun refreshFerruxStatus() {
+        scope.launch {
+            val next = withContext(io) { runCatching { backend.ferrux() }.getOrDefault(FerruxStatus.NotInstalled) }
+            val prev = ferrux
+            ferrux = next
+            if (prev is FerruxStatus.Ready && next !is FerruxStatus.Ready) {
+                closeTerminal()
+            } else if (next is FerruxStatus.Ready && panelVisible && panelTab == PanelTab.Terminal) {
+                startTerminalIfNeeded()
+            }
+        }
+    }
+
+    /** Opens Ferrux's `$HOME` directory as the workspace when connected. */
+    fun openFerruxHome() {
+        val h = host ?: return
+        scope.launch {
+            val r = withContext(io) { runCatching { h.openFerruxHome() } }
+            r.onSuccess { b ->
+                if (b != null) openWorkspace(b) else message = "Couldn't connect to Ferrux"
+            }.onFailure { message = "Couldn't open Ferrux home: ${it.message}" }
+        }
+    }
+
+    fun startTerminalIfNeeded() {
+        if (ferrux !is FerruxStatus.Ready) return
+        if (terminalSession == null && !terminalStarting && terminalExitCode == null && terminalError == null) {
+            startTerminal()
+        }
+    }
+
+    fun startTerminal() {
+        val launcher = terminalLauncher ?: return
+        if (terminalStarting || ferrux !is FerruxStatus.Ready) return
+        val previous = terminalSession
+        terminalSession = null
+        terminalExitCode = null
+        terminalError = null
+        terminalTitle = null
+        terminalStarting = true
+        val generation = ++terminalGeneration
+        val rows = terminalRows.coerceAtLeast(1)
+        val cols = terminalCols.coerceAtLeast(1)
+        val cwd = if (backend.kind == WorkspaceKind.FERRUX && backend.root.startsWith('/')) backend.root else null
+        val env = mapOf("TERM" to "xterm-256color")
+        val argv = listOf("/system/bin/sh")
+        scope.launch {
+            if (previous != null) withContext(io) { runCatching { previous.close() } }
+            val spawned = withContext(io) {
+                runCatching { launcher.spawn(argv, env, cwd, rows, cols) }
+            }
+            if (generation != terminalGeneration) {
+                spawned.getOrNull()?.let { withContext(io) { runCatching { it.close() } } }
+                return@launch
+            }
+            terminalStarting = false
+            spawned.onSuccess { session ->
+                terminalSession = session
+                log("Started terminal shell (/system/bin/sh)")
+                launchTerminalWait(generation, session)
+            }.onFailure { err ->
+                terminalError = err.message ?: "Couldn't start terminal"
+                log("Terminal failed: $terminalError")
+            }
+        }
+    }
+
+    fun restartTerminal() {
+        terminalStarting = false
+        terminalExitCode = null
+        terminalError = null
+        startTerminal()
+    }
+
+    fun onTerminalGridResized(rows: Int, cols: Int) {
+        if (rows <= 0 || cols <= 0) return
+        if (rows == terminalRows && cols == terminalCols) return
+        terminalRows = rows
+        terminalCols = cols
+        val session = terminalSession ?: return
+        if (terminalExitCode != null) return
+        scope.launch(io) {
+            runCatching { session.resize(rows, cols) }
+        }
+    }
+
+    fun onTerminalTitle(title: String) {
+        terminalTitle = title
+    }
+
+    fun onTerminalNativeError(errorMessage: String) {
+        terminalError = errorMessage
+    }
+
+    fun closeTerminal() {
+        terminalGeneration++
+        val old = terminalSession
+        terminalSession = null
+        terminalStarting = false
+        terminalExitCode = null
+        terminalError = null
+        terminalTitle = null
+        if (old != null) {
+            scope.launch(io) { runCatching { old.close() } }
+        }
+    }
+
+    /** Synchronous terminal teardown for lifecycle shutdown when [scope] is being cancelled. */
+    fun closeTerminalNow() {
+        terminalGeneration++
+        val old = terminalSession
+        terminalSession = null
+        terminalStarting = false
+        terminalExitCode = null
+        terminalError = null
+        terminalTitle = null
+        if (old != null) runCatching { old.close() }
+    }
+
+    private fun launchTerminalWait(generation: Int, session: TerminalSessionHandle) {
+        scope.launch {
+            val result = withContext(io) { runCatching { session.waitForExit() } }
+            if (generation != terminalGeneration) return@launch
+            result.onSuccess { code ->
+                terminalExitCode = code
+                when {
+                    code == -9 -> log("Terminal killed by signal 9 (Android phantom-process limit?)")
+                    code < 0 -> log("Terminal exited with signal ${-code}")
+                    else -> log("Terminal exited with code $code")
+                }
+            }.onFailure { err ->
+                terminalError = err.message ?: "Terminal connection lost"
+                log("Terminal ended: $terminalError")
+            }
         }
     }
 
@@ -962,6 +1152,7 @@ class WorkbenchState(
         } else {
             panelTab = tab
             panelVisible = true
+            if (tab == PanelTab.Terminal) startTerminalIfNeeded()
         }
     }
 
@@ -1152,6 +1343,12 @@ class WorkbenchState(
             "File",
             enabled = { host != null && backend.kind == WorkspaceKind.SAF },
         ) { copyIntoProjects() }
+        cmd(
+            CommandIds.OPEN_FERRUX_HOME,
+            "Open Ferrux Home…",
+            "File",
+            enabled = { host != null && ferrux is FerruxStatus.Ready },
+        ) { openFerruxHome() }
         cmd(CommandIds.GOTO_LINE, "Go to Line/Column…", "Go", KeyChord.ctrl(KeyEvent.KEYCODE_G), hasEditor) {
             openPalette(PaletteMode.GotoLine)
         }
@@ -1356,6 +1553,8 @@ class WorkbenchState(
         const val WELCOME_PATH = "ferride:welcome"
         private const val MAX_RECENT_FOLDERS = 10
         private const val MAX_RECENT = 5
+        private const val DEFAULT_TERMINAL_ROWS = 24
+        private const val DEFAULT_TERMINAL_COLS = 80
     }
 }
 

@@ -6,6 +6,7 @@ import dev.ferride.core.OpenedText
 import dev.ferride.core.supportedEncodings
 import dev.ferride.core.FileHit
 import dev.ferride.core.FileNode
+import dev.ferride.core.FerruxTree
 import dev.ferride.core.MatchRange
 import dev.ferride.core.SearchHit
 import dev.ferride.core.SearchCancellation
@@ -108,6 +109,9 @@ class RustWorkspaceBackend(private val handle: WorkspaceHandle) : WorkspaceBacke
 
         /** A system-picker folder; [uri] (the tree URI) prefixes every path. Blocks (queries the provider). */
         fun openSaf(uri: String, tree: SafTree) = RustWorkspaceBackend(WorkspaceHandle.openSaf(uri, tree))
+
+        /** Ferrux's `$HOME` directory backed by `FerruxConnection.files`. */
+        fun openFerruxTree(root: String, tree: FerruxTree) = RustWorkspaceBackend(WorkspaceHandle.openFerruxTree(root, tree))
     }
 }
 
@@ -130,6 +134,7 @@ class FakeWorkspaceBackend(
     override val root: String = if (kind == WorkspaceKind.SAF) "content://sample.documents/tree/$name" else "/sample/$name",
     /** Editor models for opened files (tests pass `RustEditorModel::create` for real highlighting). */
     private val modelFactory: (text: String, fileName: String) -> EditorModel = ::FakeEditorModel,
+    private val ferruxProvider: () -> FerruxStatus = { FerruxStatus.NotInstalled },
 ) : WorkspaceBackend {
     override val supportsTextSearch: Boolean get() = kind != WorkspaceKind.SAF
 
@@ -255,7 +260,7 @@ class FakeWorkspaceBackend(
     }
 
     override fun createModel(text: String, fileName: String): EditorModel = modelFactory(text, fileName)
-    override fun ferrux(): FerruxStatus = FerruxStatus.NotInstalled
+    override fun ferrux(): FerruxStatus = ferruxProvider()
     override fun gitBranch(): String? = branch
     override fun copyInto(dest: String): String = dest
 }

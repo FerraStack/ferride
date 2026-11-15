@@ -171,6 +171,7 @@ object CommandIds {
     const val COPY_PATH = "copyFilePath"
     const val COPY_RELATIVE_PATH = "copyRelativeFilePath"
     const val COPY_INTO_PROJECTS = "ferride.workspace.copyIntoProjects"
+    const val OPEN_FERRUX_HOME = "ferride.workspace.openFerruxHome"
     const val CLOSE_EDITOR = "workbench.action.closeActiveEditor"
     const val NEXT_EDITOR = "workbench.action.nextEditor"
     const val PREVIOUS_EDITOR = "workbench.action.previousEditor"

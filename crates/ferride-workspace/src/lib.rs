@@ -18,8 +18,8 @@ pub use encoding::{Decoded, ENCODINGS, TextEncoding};
 pub use fuzzy::{FileMatch, fuzzy_score};
 pub use search::{SearchOptions, SearchResults, TextMatch};
 pub use vfs::{
-    DocNode, DocumentTree, FerruxVfs, LocalVfs, SafVfs, Vfs, VfsEntry, VfsKind, VfsStat, copy_tree,
-    normalize_rel, read_decoded, read_text, walk_files, write_encoded,
+    DocNode, DocumentTree, FerruxFileEntry, FerruxFileTree, FerruxVfs, LocalVfs, SafVfs, Vfs, VfsEntry,
+    VfsKind, VfsStat, copy_tree, normalize_rel, read_decoded, read_text, walk_files, write_encoded,
 };
 
 /// Files larger than this are not opened in the editor or searched.
