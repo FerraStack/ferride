@@ -154,7 +154,7 @@ android {
         minSdk = 30
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
         // Release APKs for GitHub are split per ABI (below); AGP refuses abiFilters
         // together with ABI splits, and the splits' include list does the same job.
         if (!abiSplits) {
@@ -192,15 +192,30 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+            }
+            storePassword = System.getenv("STORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "upload"
+            keyPassword = System.getenv("KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             // R8: shrinks Compose and material-icons-extended (most of the dex) and unused resources.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // CI installs the release build on the emulator to smoke-test R8's output:
-            // `-Pferride.signReleaseWithDebugKey` signs it with the debug key (never for publishing).
-            if (providers.gradleProperty("ferride.signReleaseWithDebugKey").isPresent) {
+            val releaseKeystorePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+            if (releaseKeystorePath != null && file(releaseKeystorePath).isFile) {
+                signingConfig = signingConfigs.getByName("release")
+            } else if (providers.gradleProperty("ferride.signReleaseWithDebugKey").isPresent) {
+                // CI installs the release build on the emulator to smoke-test R8's output:
+                // `-Pferride.signReleaseWithDebugKey` signs it with the debug key (never for publishing).
                 signingConfig = signingConfigs.getByName("debug")
             }
         }

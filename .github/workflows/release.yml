@@ -1,0 +1,200 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # For retries: select the existing release tag, not a branch.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Require a version tag matching the app
+        id: version
+        run: |
+          python3 - <<'EOF'
+          import os
+          from pathlib import Path
+          import re
+          import sys
+
+          ref = os.environ.get("GITHUB_REF", "")
+          match = re.fullmatch(
+              r"refs/tags/v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
+              r"(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?)",
+              ref,
+          )
+          if not match:
+              sys.exit("::error::Release requires a tag such as v1.0.0 or v1.0.0-rc.1, not a branch.")
+          version = match[1]
+          build_file = Path("android/app/build.gradle.kts").read_text()
+          app_version = re.search(r'^\s*versionName\s*=\s*"([^"]+)"', build_file, re.MULTILINE)
+          if app_version is None or app_version[1] != version:
+              sys.exit(f"::error::Tag version {version} must match versionName in android/app/build.gradle.kts.")
+          print(f"Release version: {version}")
+          if output := os.environ.get("GITHUB_OUTPUT"):
+              with open(output, "a") as stream:
+                  stream.write(f"version={version}\n")
+          EOF
+
+  build:
+    name: Build release APKs
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
+      NDK_VERSION: 30.0.16248370
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install pinned Rust toolchain (rust-toolchain.toml)
+        run: |
+          rustup toolchain install || rustup show
+          rustup target add aarch64-linux-android x86_64-linux-android
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: android
+      # The prebuilt download comes from GitHub releases, which intermittently
+      # answers 504; when it does, build the same version from crates.io instead
+      # of failing the job (install-action's cargo-binstall fallback can't).
+      - name: Install cargo-ndk (prebuilt)
+        id: cargo-ndk
+        continue-on-error: true
+        uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2.90.2
+        with:
+          tool: cargo-ndk@4.1.2
+      - name: Install cargo-ndk (from source, prebuilt download failed)
+        if: steps.cargo-ndk.outcome == 'failure'
+        run: cargo install cargo-ndk --version 4.1.2 --locked
+      - run: cargo ndk --version
+      - name: Install pinned NDK (r30; links 16 KB-aligned ELFs)
+        run: |
+          if [ ! -d "$ANDROID_HOME/ndk/$NDK_VERSION" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          fi
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          grep Pkg.Revision "$ANDROID_HOME/ndk/$NDK_VERSION/source.properties"
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Prepare release signing
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" ]]; then
+            for name in STORE_PASSWORD KEY_PASSWORD; do
+              if [[ -z "${!name}" ]]; then
+                echo "::error::ANDROID_KEYSTORE_BASE64 is set, but ${name} is missing."
+                exit 1
+              fi
+            done
+            keystore="$RUNNER_TEMP/ferride-release.jks"
+            umask 077
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+            echo "keystore_path=$keystore" >> "$GITHUB_OUTPUT"
+            echo "gradle_signing_flag=" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::ANDROID_KEYSTORE_BASE64 not set; signing release APKs with the debug key."
+            echo "keystore_path=" >> "$GITHUB_OUTPUT"
+            echo "gradle_signing_flag=-Pferride.signReleaseWithDebugKey=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build release APKs (foss + play)
+        working-directory: android
+        env:
+          KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_path }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        # Keep signing credentials out of Gradle's configuration cache.
+        run: |
+          set -euo pipefail
+          args=(--max-workers=4 :app:assembleFossRelease :app:assemblePlayRelease --no-configuration-cache --stacktrace --console=plain)
+          if [[ -n "${{ steps.signing.outputs.gradle_signing_flag }}" ]]; then
+            args+=("${{ steps.signing.outputs.gradle_signing_flag }}")
+          fi
+          ./gradlew "${args[@]}"
+      - name: Verify signatures, alignment, and prepare downloads
+        run: |
+          set -euo pipefail
+          build_tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          mkdir -p dist
+          for flavor in foss play; do
+            for abi in arm64-v8a x86_64; do
+              src="android/app/build/outputs/apk/${flavor}/release/app-${flavor}-${abi}-release.apk"
+              dst="dist/ferride-${flavor}-${abi}-${VERSION}.apk"
+              "$build_tools/apksigner" verify --verbose "$src"
+              "$build_tools/zipalign" -c -P 16 -v 4 "$src" | tail -n 3
+              cp "$src" "$dst"
+            done
+          done
+          cd dist
+          sha256sum -- *.apk > SHA256SUMS
+      - name: Save release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove signing key
+        if: always() && steps.signing.outputs.keystore_path != ''
+        env:
+          KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_path }}
+        run: rm -f -- "$KEYSTORE_PATH"
+
+  publish:
+    name: Publish GitHub Release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist
+      - name: Publish APKs and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum --check SHA256SUMS
+          # Never overwrite an existing release's binaries on a rerun.
+          args=(--verify-tag --generate-notes --title "Ferride ${TAG}")
+          if [[ "$TAG" == *-* ]]; then
+            args+=(--prerelease --latest=false)
+          fi
+          gh release create "$TAG" ./*.apk SHA256SUMS "${args[@]}"
