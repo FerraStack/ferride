@@ -16,29 +16,40 @@ if [ ${#pngs[@]} -eq 0 ]; then
 fi
 
 work="$(mktemp -d)"
-git -C "$work" init -q
-git -C "$work" config user.name "github-actions[bot]"
-git -C "$work" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-git -C "$work" remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-if git -C "$work" fetch -q --depth 1 origin ci-screenshots 2>/dev/null; then
-  git -C "$work" checkout -q -b ci-screenshots FETCH_HEAD
-else
-  git -C "$work" checkout -q --orphan ci-screenshots
-  printf 'Screenshots posted by CI for pull requests. Not source code.\n' > "$work/README.md"
-  git -C "$work" add README.md
-fi
-mkdir -p "$work/$dest"
-cp "${pngs[@]}" "$work/$dest/"
-git -C "$work" add "$dest"
-git -C "$work" commit -q -m "Screenshots for PR #${PR} (run ${RUN_ID})"
 pushed=0
 for attempt in 1 2 3 4 5; do
-  if git -C "$work" push -q origin ci-screenshots; then
-    pushed=1
-    break
+  rm -rf "$work/repo"
+  git -C "$work" init -q repo
+  git -C "$work/repo" config user.name "github-actions[bot]"
+  git -C "$work/repo" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+  git -C "$work/repo" remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+  head=""
+  if git -C "$work/repo" fetch -q --depth 1 origin ci-screenshots 2>/dev/null; then
+    head="$(git -C "$work/repo" rev-parse FETCH_HEAD)"
+    git -C "$work/repo" checkout -q -b ci-screenshots FETCH_HEAD
+  else
+    git -C "$work/repo" checkout -q --orphan ci-screenshots
+    printf 'Screenshots posted by CI for pull requests. Not source code.\n' > "$work/repo/README.md"
+    git -C "$work/repo" add README.md
   fi
-  echo "push attempt $attempt failed; rebasing onto the latest ci-screenshots"
-  git -C "$work" pull -q --rebase origin ci-screenshots || true
+  git -C "$work/repo" rm -rfq --ignore-unmatch "pr-${PR}" || rm -rf "$work/repo/pr-${PR}"
+  mkdir -p "$work/repo/$dest"
+  cp "${pngs[@]}" "$work/repo/$dest/"
+  git -C "$work/repo" add -A "pr-${PR}"
+  tree="$(git -C "$work/repo" write-tree)"
+  commit="$(git -C "$work/repo" commit-tree "$tree" -m "Screenshots for PR #${PR} (run ${RUN_ID})")"
+  if [ -n "$head" ]; then
+    if git -C "$work/repo" push -q --force-with-lease="ci-screenshots:${head}" origin "${commit}:refs/heads/ci-screenshots"; then
+      pushed=1
+      break
+    fi
+  else
+    if git -C "$work/repo" push -q origin "${commit}:refs/heads/ci-screenshots"; then
+      pushed=1
+      break
+    fi
+  fi
+  echo "push attempt $attempt failed; retrying against latest ci-screenshots"
   sleep $((attempt * 2))
 done
 if [ "$pushed" != 1 ]; then
