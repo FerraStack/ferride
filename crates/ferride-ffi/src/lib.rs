@@ -22,7 +22,7 @@ pub use document::{
 pub use host::{
     BridgeSpawnSpec, EnvEntry, HostBridge, HostBridgeError, SpawnedFds, TerminalSession, register_host_bridge,
 };
-pub use lsp::{LspCancellation, LspCompletion, LspDiagnostic, LspListener, LspSession};
+pub use lsp::{LspCancellation, LspCompletion, LspDiagnostic, LspListener, LspSession, LspTextEdit};
 pub use scm::{
     GitError, ScmBranch, ScmCancel, ScmChange, ScmCommit, ScmCredential, ScmDiffLine, ScmFileDiff, ScmGroup,
     ScmHead, ScmHunk, ScmIdentity, ScmLineChange, ScmLineChangeKind, ScmNetworkListener, ScmRefKind,

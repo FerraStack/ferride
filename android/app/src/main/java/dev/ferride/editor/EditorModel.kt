@@ -92,11 +92,20 @@ interface EditorModel {
     fun markSaved(version: Long = this.version)
     /** True after [close]; a closed model must not be touched. */
     val isClosed: Boolean
+    /** Native Rust document for incremental LSP sync; null for fakes and previews. */
+    val nativeDocument: Document? get() = null
+    fun enableLspSync(enabled: Boolean) {}
+
     /** Frees the underlying document. Idempotent. */
     fun close()
 }
 
 class RustEditorModel(private val doc: Document, override val fileName: String) : EditorModel {
+    override val nativeDocument: Document get() = doc
+    override fun enableLspSync(enabled: Boolean) {
+        if (!isClosed) doc.enableLspSync(enabled)
+    }
+
     override var language: String?
         get() = doc.language()
         set(value) = doc.setLanguage(value)

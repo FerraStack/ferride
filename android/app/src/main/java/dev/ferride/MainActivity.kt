@@ -28,6 +28,7 @@ import dev.ferride.scm.KeystoreCredentialStore
 import dev.ferride.scm.RustScmProvider
 import dev.ferride.theme.VsCodeTheme
 import dev.ferride.ui.FerrideWorkbench
+import dev.ferride.workbench.RustLspLauncher
 import dev.ferride.workbench.RustTerminalLauncher
 import dev.ferride.workbench.RustWorkspaceBackend
 import dev.ferride.workbench.SampleProject
@@ -129,6 +130,7 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
         scmProvider = RustScmProvider,
         credentialStore = KeystoreCredentialStore(app),
         terminalLauncher = RustTerminalLauncher,
+        lspLauncher = RustLspLauncher,
     ).also {
         connector.onStatusChanged = { it.refreshFerruxStatus() }
         connector.setWorkspaceOpen(true)
@@ -184,6 +186,7 @@ class FerrideViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        state.closeLspNow()
         state.closeTerminalNow()
         connector.close()
         super.onCleared()

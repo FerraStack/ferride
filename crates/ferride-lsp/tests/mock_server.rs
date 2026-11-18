@@ -31,7 +31,8 @@ fn spawn_mock(stream: UnixStream) -> thread::JoinHandle<Vec<Value>> {
                         "capabilities": {
                             "textDocumentSync": 2,
                             "completionProvider": {"triggerCharacters": ["."]},
-                            "hoverProvider": true
+                            "hoverProvider": true,
+                            "documentFormattingProvider": true
                         },
                         "serverInfo": {"name": "mock", "version": "1"}
                     }}),
@@ -76,6 +77,13 @@ fn spawn_mock(stream: UnixStream) -> thread::JoinHandle<Vec<Value>> {
                         "contents": {"kind": "markdown", "value": "**fn** main()"}
                     }}),
                 ),
+                Some("textDocument/formatting") => send(
+                    &mut writer,
+                    json!({"jsonrpc": "2.0", "id": id, "result": [{
+                        "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 15}},
+                        "newText": "fn main() { x; }"
+                    }]}),
+                ),
                 Some("broken") => send(
                     &mut writer,
                     json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32603, "message": "boom"}}),
@@ -104,6 +112,8 @@ fn full_session_against_mock_server() {
     let init = client.initialize(Some(root), "ferride-test").unwrap();
     assert_eq!(init.server_info.unwrap().name, "mock");
     assert!(client.server_capabilities().unwrap().hover_provider.is_some());
+    assert!(client.supports_formatting());
+    assert_eq!(client.completion_trigger_characters(), vec!["."]);
 
     let uri = file_uri("/work/proj/main.rs").unwrap();
     client
@@ -138,6 +148,10 @@ fn full_session_against_mock_server() {
 
     let hover = client.hover(uri.clone(), Position::new(0, 4)).unwrap();
     assert_eq!(hover.as_deref(), Some("**fn** main()"));
+
+    let edits = client.formatting(uri.clone(), 4, true).unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "fn main() { x; }");
 
     match client.request_raw("broken", Value::Null) {
         Err(LspError::Response { code, message }) => {
@@ -175,6 +189,7 @@ fn full_session_against_mock_server() {
             "textDocument/didChange",
             "textDocument/completion",
             "textDocument/hover",
+            "textDocument/formatting",
             "broken",
             "never",
             "$/cancelRequest",

@@ -37,6 +37,7 @@ data class KeyChord(
             KeyEvent.KEYCODE_ESCAPE -> "Esc"
             KeyEvent.KEYCODE_EQUALS -> "="
             KeyEvent.KEYCODE_MINUS -> "-"
+            KeyEvent.KEYCODE_SPACE -> "Space"
             in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z -> ('A' + (code - KeyEvent.KEYCODE_A)).toString()
             in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> ('0' + (code - KeyEvent.KEYCODE_0)).toString()
             in KeyEvent.KEYCODE_F1..KeyEvent.KEYCODE_F12 -> "F${code - KeyEvent.KEYCODE_F1 + 1}"
@@ -198,6 +199,9 @@ object CommandIds {
     const val CUT = "editor.action.clipboardCutAction"
     const val PASTE = "editor.action.clipboardPasteAction"
     const val FORMAT = "editor.action.formatDocument"
+    const val TRIGGER_SUGGEST = "editor.action.triggerSuggest"
+    const val SHOW_HOVER = "editor.action.showHover"
+    const val RESTART_LSP = "ferride.lsp.restart"
     const val FIND = "actions.find"
     const val ZOOM_IN = "editor.action.fontZoomIn"
     const val ZOOM_OUT = "editor.action.fontZoomOut"

@@ -70,6 +70,12 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
     /** Called on the main thread when a background syntax reparse updates highlights. */
     var onSyntaxUpdated: (() -> Unit)? = null
 
+    /** Optional pre-handler for hardware keys (used by completion/hover popups). */
+    var onInterceptKeyDown: ((Int, KeyEvent) -> Boolean)? = null
+
+    /** Line height in pixels for anchoring floating popups near the caret. */
+    val textLineHeightPx: Float get() = lineHeight
+
     /**
      * The floating selection toolbar should show at [SelectionUi] (or hide, on
      * `null`). The host draws it (Compose) and calls [onSelectionToolbarAction].
@@ -474,6 +480,19 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
         val r = rowIn(breaks, col)
         val x = (if (r > 0) indentOf(line) else 0f) + xOf(lay, col) - xOf(lay, breaks[r])
         return x to (rowStartOf(line) + r) * lineHeight
+    }
+
+    /**
+     * Caret bottom-left anchor in view pixel coordinates for floating completion
+     * or hover popups, clamped inside the view bounds.
+     */
+    fun caretPopupAnchor(offset: Int = liveModel?.selection?.head ?: 0): Pair<Float, Float> {
+        val m = liveModel ?: return 0f to lineHeight
+        val clampedOffset = offset.coerceIn(0, m.length)
+        val (cx, cy) = caretPoint(clampedOffset)
+        val x = (textLeft - sx + cx).coerceIn(0f, max(0f, width.toFloat()))
+        val y = (cy - sy + lineHeight).coerceIn(0f, max(0f, height.toFloat()))
+        return x to y
     }
 
     // ----- drawing --------------------------------------------------------------------
@@ -1524,6 +1543,7 @@ class CodeEditorView(context: Context) : View(context), EditorActions {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         val m = liveModel ?: return super.onKeyDown(keyCode, event)
+        if (onInterceptKeyDown?.invoke(keyCode, event) == true) return true
         hideSelectionControls()
         val shift = event.isShiftPressed
         when (keyCode) {

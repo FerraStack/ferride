@@ -201,8 +201,12 @@ class WorkbenchState(
     scmProvider: ScmProvider = NoScmProvider,
     credentialStore: CredentialStore = InMemoryCredentialStore(),
     var terminalLauncher: TerminalLauncher? = null,
+    lspLauncher: LspLauncher? = null,
 ) {
     val commands = CommandRegistry()
+
+    /** Language Server Protocol manager (diagnostics, completion, hover, formatting). */
+    val lsp = LspManager(this, scope, io, lspLauncher)
 
     /** Source Control (git) for the workspace folder. */
     val scm = ScmState(this, scmProvider, scope, io, credentialStore)
@@ -447,6 +451,7 @@ class WorkbenchState(
             scm.start()
             loadDir(backend.root)
             if (openFirst != null) openFile("${backend.root}/$openFirst", preview = false)
+            if (ferrux is FerruxStatus.Ready) lsp.syncEnvironment(tabs)
         }
     }
 
@@ -460,6 +465,7 @@ class WorkbenchState(
             message = "Save or close editors with unsaved changes before opening another folder"
             return false
         }
+        lsp.closeAll()
         tabs.forEach { retire(it.model) }
         tabs.clear()
         activeIndex = -1
@@ -477,6 +483,7 @@ class WorkbenchState(
         scope.launch {
             branch = withContext(io) { runCatching { next.gitBranch() }.getOrNull() }
             loadDir(next.root)
+            lsp.syncEnvironment(tabs)
         }
         return true
     }
@@ -512,8 +519,10 @@ class WorkbenchState(
             ferrux = next
             if (prev is FerruxStatus.Ready && next !is FerruxStatus.Ready) {
                 closeTerminal()
-            } else if (next is FerruxStatus.Ready && panelVisible && panelTab == PanelTab.Terminal) {
-                startTerminalIfNeeded()
+                lsp.closeAll()
+            } else if (next is FerruxStatus.Ready) {
+                if (panelVisible && panelTab == PanelTab.Terminal) startTerminalIfNeeded()
+                lsp.syncEnvironment(tabs)
             }
         }
     }
@@ -624,6 +633,10 @@ class WorkbenchState(
         if (old != null) runCatching { old.close() }
     }
 
+    fun closeLspNow() {
+        lsp.closeNow()
+    }
+
     private fun launchTerminalWait(generation: Int, session: TerminalSessionHandle) {
         scope.launch {
             val result = withContext(io) { runCatching { session.waitForExit() } }
@@ -664,7 +677,12 @@ class WorkbenchState(
             val text = settingsStore.read() ?: ""
             settingsStore.write(new.applyTo(text, old))
         }
-        result.onSuccess { settings = new }.onFailure { message = "Couldn't save settings: ${it.message}" }
+        result.onSuccess {
+            settings = new
+            if (new.lspEnabled != old.lspEnabled || new.lspServers != old.lspServers) {
+                lsp.syncEnvironment(tabs)
+            }
+        }.onFailure { message = "Couldn't save settings: ${it.message}" }
     }
 
     // ----- explorer --------------------------------------------------------
@@ -773,10 +791,14 @@ class WorkbenchState(
     private fun retarget(from: String, to: String) {
         tabs.forEachIndexed { i, tab ->
             if (tab.kind == TabKind.File && (tab.path == from || tab.path.startsWith("$from/"))) {
+                lsp.onTabClosed(tab)
                 val moved = EditorTab(to + tab.path.removePrefix(from), tab.model, tab.kind)
                 moved.preview = tab.preview
                 moved.dirty = tab.dirty
+                moved.encoding = tab.encoding
+                moved.encodingLabel = tab.encodingLabel
                 tabs[i] = moved
+                lsp.onTabOpened(moved)
             }
         }
         if (expanded.remove(from)) expanded += to
@@ -866,10 +888,19 @@ class WorkbenchState(
 
     // ----- editors ---------------------------------------------------------
 
+    fun selectTab(index: Int) {
+        if (index !in tabs.indices) return
+        if (activeIndex != index) {
+            lsp.dismissCompletion()
+            lsp.dismissHover()
+            activeIndex = index
+        }
+    }
+
     fun openFile(path: String, preview: Boolean = true, line: Int? = null) {
         val existing = tabs.indexOfFirst { it.path == path }
         if (existing >= 0) {
-            activeIndex = existing
+            selectTab(existing)
             if (!preview) tabs[existing].preview = false
             line?.let { l -> editor?.goToLine(l) }
             return
@@ -900,8 +931,11 @@ class WorkbenchState(
     }
 
     private fun addTab(tab: EditorTab) {
+        lsp.dismissCompletion()
+        lsp.dismissHover()
         val previewIndex = tabs.indexOfFirst { it.preview && !it.dirty }
         if (tab.preview && previewIndex >= 0) {
+            lsp.onTabClosed(tabs[previewIndex])
             retire(tabs[previewIndex].model)
             tabs[previewIndex] = tab
             activeIndex = previewIndex
@@ -909,12 +943,13 @@ class WorkbenchState(
             tabs += tab
             activeIndex = tabs.lastIndex
         }
+        lsp.onTabOpened(tab)
     }
 
     /** Opens (or focuses) the Settings editor tab. */
     fun openSettings() {
         val i = tabs.indexOfFirst { it.kind == TabKind.Settings }
-        if (i >= 0) activeIndex = i else addTab(EditorTab(SETTINGS_PATH, null, TabKind.Settings))
+        if (i >= 0) selectTab(i) else addTab(EditorTab(SETTINGS_PATH, null, TabKind.Settings))
         if (!sideBarDocked) sideBarVisible = false
     }
 
@@ -922,7 +957,7 @@ class WorkbenchState(
     fun openSettingsJson() {
         val i = tabs.indexOfFirst { it.kind == TabKind.SettingsJson }
         if (i >= 0) {
-            activeIndex = i
+            selectTab(i)
             return
         }
         val text = settingsStore.read() ?: settings.toJson()
@@ -971,6 +1006,7 @@ class WorkbenchState(
 
     fun closeTab(index: Int) {
         val tab = tabs.getOrNull(index) ?: return
+        lsp.onTabClosed(tab)
         retire(tab.model)
         tabs.removeAt(index)
         activeIndex = when {
@@ -986,6 +1022,7 @@ class WorkbenchState(
         if (contentChanged) tab.preview = false
         tab.dirty = tab.model?.isDirty == true
         tab.revision++
+        lsp.onEditorChanged(tab, contentChanged)
     }
 
     /**
@@ -1001,7 +1038,11 @@ class WorkbenchState(
             runCatching { settingsStore.write(text) }
                 .onSuccess {
                     Settings.parseResult(text).fold(
-                        onSuccess = { settings = it; settingsError = null },
+                        onSuccess = {
+                            settings = it
+                            settingsError = null
+                            lsp.syncEnvironment(tabs)
+                        },
                         onFailure = { settingsError = it.message; message = "settings.json has errors: ${it.message}" },
                     )
                     model.markSaved(version)
@@ -1020,6 +1061,7 @@ class WorkbenchState(
                     tab.dirty = model.isDirty
                 }
                 log("Saved ${tab.name}")
+                lsp.onSaved(tab)
                 scm.refresh()
                 then()
             }.onFailure { message = "Couldn't save ${tab.name}: ${it.message}" }
@@ -1178,6 +1220,8 @@ class WorkbenchState(
     fun escape() {
         when {
             paletteOpen -> paletteOpen = false
+            lsp.hoverPopup != null -> lsp.dismissHover()
+            lsp.completionPopup != null -> lsp.dismissCompletion()
             sideBarVisible && !sideBarDocked -> sideBarVisible = false
             find.visible -> closeFind()
             else -> editor?.escape()
@@ -1299,7 +1343,7 @@ class WorkbenchState(
     /** Global keybinding dispatch for hardware keyboards. */
     fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_ESCAPE && event.action == KeyEvent.ACTION_DOWN &&
-            (paletteOpen || find.visible || (sideBarVisible && !sideBarDocked))
+            (paletteOpen || lsp.hoverPopup != null || lsp.completionPopup != null || find.visible || (sideBarVisible && !sideBarDocked))
         ) {
             escape()
             return true
@@ -1308,6 +1352,46 @@ class WorkbenchState(
         if (!cmd.enabled()) return false
         cmd.run()
         return true
+    }
+
+    /** Intercepts navigation/accept keys inside the editor while LSP popups are showing. */
+    fun onEditorKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN) return false
+        val popup = lsp.completionPopup
+        if (popup != null) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    lsp.moveCompletionSelection(-1)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    lsp.moveCompletionSelection(1)
+                    return true
+                }
+                KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                    if (popup.filteredItems.isNotEmpty()) {
+                        lsp.acceptCompletion()
+                        return true
+                    }
+                    lsp.dismissCompletion()
+                }
+                KeyEvent.KEYCODE_TAB -> {
+                    if (!event.isCtrlPressed && popup.filteredItems.isNotEmpty()) {
+                        lsp.acceptCompletion()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_ESCAPE -> {
+                    lsp.dismissCompletion()
+                    return true
+                }
+            }
+        }
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE && lsp.hoverPopup != null) {
+            lsp.dismissHover()
+            return true
+        }
+        return false
     }
 
     private fun registerCommands() {
@@ -1375,10 +1459,10 @@ class WorkbenchState(
             requestCloseTab(activeIndex)
         }
         cmd(CommandIds.NEXT_EDITOR, "Open Next Editor", "View", KeyChord.ctrl(KeyEvent.KEYCODE_PAGE_DOWN), { tabs.isNotEmpty() }) {
-            activeIndex = (activeIndex + 1) % tabs.size
+            selectTab((activeIndex + 1) % tabs.size)
         }
         cmd(CommandIds.PREVIOUS_EDITOR, "Open Previous Editor", "View", KeyChord.ctrl(KeyEvent.KEYCODE_PAGE_UP), { tabs.isNotEmpty() }) {
-            activeIndex = (activeIndex - 1 + tabs.size) % tabs.size
+            selectTab((activeIndex - 1 + tabs.size) % tabs.size)
         }
         cmd(CommandIds.TOGGLE_SIDEBAR, "Toggle Primary Side Bar Visibility", "View", KeyChord.ctrl(KeyEvent.KEYCODE_B)) {
             sideBarVisible = !sideBarVisible
@@ -1426,8 +1510,22 @@ class WorkbenchState(
         editCmd(CommandIds.COPY, "Copy", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_C)) { editor?.copy() }
         editCmd(CommandIds.CUT, "Cut", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_X)) { editor?.cut() }
         editCmd(CommandIds.PASTE, "Paste", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_V)) { editor?.paste() }
+        editCmd(CommandIds.TRIGGER_SUGGEST, "Trigger Suggest", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_SPACE)) {
+            lsp.triggerCompletion()
+        }
+        editCmd(CommandIds.SHOW_HOVER, "Show Hover", "Edit", KeyChord(KeyEvent.KEYCODE_I, ctrl = true, alt = true)) {
+            lsp.requestHover()
+        }
         cmd(CommandIds.FORMAT, "Format Document", null, KeyChord(KeyEvent.KEYCODE_F, shift = true, alt = true), hasEditor) {
-            message = "Formatting needs a language server (requires Ferrux)"
+            lsp.formatDocument()
+        }
+        cmd(
+            CommandIds.RESTART_LSP,
+            "Restart Language Server",
+            "LSP",
+            enabled = { ferrux is FerruxStatus.Ready && settings.lspEnabled },
+        ) {
+            lsp.restartActive(activeTab, tabs)
         }
         cmd(CommandIds.FIND, "Find", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_F), hasEditor) { openFind(replace = false) }
         cmd(CommandIds.REPLACE, "Replace", "Edit", KeyChord.ctrl(KeyEvent.KEYCODE_H), hasEditor) { openFind(replace = true) }
@@ -1488,6 +1586,7 @@ class WorkbenchState(
             r.onFailure { message = it.message }.onSuccess { (opened, model) ->
                 val i = tabs.indexOfFirst { it === tab }
                 if (i < 0) return@onSuccess
+                lsp.onTabClosed(tab)
                 val reopened = EditorTab(tab.path, model, tab.kind).also {
                     it.preview = false
                     it.encoding = opened.encoding
@@ -1495,6 +1594,7 @@ class WorkbenchState(
                 }
                 tabs[i] = reopened
                 retire(tab.model)
+                lsp.onTabOpened(reopened)
                 log("Reopened ${tab.name} with ${opened.encodingLabel}")
             }
         }
@@ -1536,6 +1636,7 @@ class WorkbenchState(
             if (model == null || model.isClosed) return
             apply(model)
             tab.revision++
+            lsp.onLanguageChanged(tab)
             log("Language mode of ${tab.name}: ${Languages.displayName(model.language)}")
         }
         val languages = (Languages.all.map { it.id to it.name } + (Languages.PLAIN_TEXT_ID to Languages.PLAIN_TEXT_NAME))

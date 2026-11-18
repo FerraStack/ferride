@@ -10,7 +10,13 @@ package dev.ferride.workbench
  * (`ferride-syntax`); this is only the presentation side. A JVM test checks
  * that both list the same ids.
  */
-data class LanguageInfo(val id: String, val name: String, val iconFile: String, val server: String)
+data class LanguageInfo(
+    val id: String,
+    val name: String,
+    val iconFile: String,
+    val server: String,
+    val serverCommands: List<List<String>> = emptyList(),
+)
 
 object Languages {
     /** Plain text: no grammar. VS Code's id for it is `plaintext`. */
@@ -19,24 +25,52 @@ object Languages {
 
     /** Every bundled grammar, sorted by name like VS Code's language picker. */
     val all: List<LanguageInfo> = listOf(
-        LanguageInfo("c", "C", "x.c", "clangd"),
-        LanguageInfo("cpp", "C++", "x.cpp", "clangd"),
-        LanguageInfo("css", "CSS", "x.css", "vscode-css-language-server"),
-        LanguageInfo("go", "Go", "x.go", "gopls"),
-        LanguageInfo("html", "HTML", "x.html", "vscode-html-language-server"),
-        LanguageInfo("java", "Java", "x.java", "jdtls"),
-        LanguageInfo("javascript", "JavaScript", "x.js", "typescript-language-server"),
-        LanguageInfo("json", "JSON", "x.json", "vscode-json-language-server"),
-        LanguageInfo("kotlin", "Kotlin", "x.kt", "kotlin-language-server"),
-        LanguageInfo("markdown", "Markdown", "x.md", "marksman"),
-        LanguageInfo("python", "Python", "x.py", "basedpyright / pyright"),
-        LanguageInfo("rust", "Rust", "x.rs", "rust-analyzer"),
-        LanguageInfo("shellscript", "Shell Script", "x.sh", "bash-language-server"),
-        LanguageInfo("sql", "SQL", "x.sql", "sqls"),
-        LanguageInfo("toml", "TOML", "x.toml", "taplo"),
-        LanguageInfo("typescript", "TypeScript", "x.ts", "typescript-language-server"),
-        LanguageInfo("typescriptreact", "TypeScript JSX", "x.tsx", "typescript-language-server"),
-        LanguageInfo("yaml", "YAML", "x.yaml", "yaml-language-server"),
+        LanguageInfo("c", "C", "x.c", "clangd", listOf(listOf("clangd"))),
+        LanguageInfo("cpp", "C++", "x.cpp", "clangd", listOf(listOf("clangd"))),
+        LanguageInfo("css", "CSS", "x.css", "vscode-css-language-server", listOf(listOf("vscode-css-language-server", "--stdio"))),
+        LanguageInfo("go", "Go", "x.go", "gopls", listOf(listOf("gopls"))),
+        LanguageInfo("html", "HTML", "x.html", "vscode-html-language-server", listOf(listOf("vscode-html-language-server", "--stdio"))),
+        LanguageInfo("java", "Java", "x.java", "jdtls", listOf(listOf("jdtls"))),
+        LanguageInfo(
+            "javascript",
+            "JavaScript",
+            "x.js",
+            "typescript-language-server",
+            listOf(listOf("typescript-language-server", "--stdio"), listOf("vtsls", "--stdio")),
+        ),
+        LanguageInfo("json", "JSON", "x.json", "vscode-json-language-server", listOf(listOf("vscode-json-language-server", "--stdio"))),
+        LanguageInfo("kotlin", "Kotlin", "x.kt", "kotlin-language-server", listOf(listOf("kotlin-language-server"))),
+        LanguageInfo("markdown", "Markdown", "x.md", "marksman", listOf(listOf("marksman", "server"))),
+        LanguageInfo(
+            "python",
+            "Python",
+            "x.py",
+            "basedpyright / pyright",
+            listOf(
+                listOf("basedpyright-langserver", "--stdio"),
+                listOf("pyright-langserver", "--stdio"),
+                listOf("pylsp"),
+            ),
+        ),
+        LanguageInfo("rust", "Rust", "x.rs", "rust-analyzer", listOf(listOf("rust-analyzer"))),
+        LanguageInfo("shellscript", "Shell Script", "x.sh", "bash-language-server", listOf(listOf("bash-language-server", "start"))),
+        LanguageInfo("sql", "SQL", "x.sql", "sqls", listOf(listOf("sqls"))),
+        LanguageInfo("toml", "TOML", "x.toml", "taplo", listOf(listOf("taplo", "lsp", "stdio"))),
+        LanguageInfo(
+            "typescript",
+            "TypeScript",
+            "x.ts",
+            "typescript-language-server",
+            listOf(listOf("typescript-language-server", "--stdio"), listOf("vtsls", "--stdio")),
+        ),
+        LanguageInfo(
+            "typescriptreact",
+            "TypeScript JSX",
+            "x.tsx",
+            "typescript-language-server",
+            listOf(listOf("typescript-language-server", "--stdio"), listOf("vtsls", "--stdio")),
+        ),
+        LanguageInfo("yaml", "YAML", "x.yaml", "yaml-language-server", listOf(listOf("yaml-language-server", "--stdio"))),
     )
 
     private val byId = all.associateBy { it.id }

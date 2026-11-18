@@ -111,10 +111,38 @@ jobs:
           done
       - name: APK sizes
         run: ls -l android/app/build/outputs/apk/*/debug/*.apk
+      - name: Build Ferrux companion APK (for cross-app emulator E2E)
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          ferride_signer="$("$apksigner" verify --print-certs android/app/build/outputs/apk/play/debug/app-play-debug.apk | sed -n 's/.*SHA-256 digest: //p' | head -n1 | tr -d '[:space:]')"
+          test -n "$ferride_signer"
+          toolchain="$(rustup show active-toolchain | awk '{print $1}')"
+          ferrux_dir="$RUNNER_TEMP/ferrux"
+          rm -rf "$ferrux_dir"
+          git clone --depth 1 https://github.com/FerraStack/ferrux.git "$ferrux_dir"
+          (
+            cd "$ferrux_dir"
+            RUSTUP_TOOLCHAIN="$toolchain" ANDROID_NDK_ROOT="$ANDROID_NDK_HOME" \
+              cargo ndk -t x86_64 --platform 30 \
+                -o android/app/src/main/jniLibs \
+                build --locked --release -p ferrux-android
+          )
+          (
+            cd "$ferrux_dir/android"
+            ./gradlew --max-workers=4 :app:assembleDebug \
+              -Pferrux.skipCargo=true -Pferrux.api.knownSigners="$ferride_signer"
+          )
       - uses: actions/upload-artifact@v7
         with:
           name: ferride-debug-apk
           path: android/app/build/outputs/apk/play/debug/app-play-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        with:
+          name: ferrux-debug-apk
+          path: ${{ runner.temp }}/ferrux/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
@@ -151,6 +179,10 @@ jobs:
           path: apk
       - uses: actions/download-artifact@v8
         with:
+          name: ferrux-debug-apk
+          path: ferrux-apk
+      - uses: actions/download-artifact@v8
+        with:
           name: ferride-release-apks-debug-signed
           path: apk-release
       - name: Enable KVM
@@ -168,12 +200,19 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           script: |
             bash .github/scripts/emulator-screenshots.sh apk/app-play-debug.apk screenshots-emulator
+            bash .github/scripts/emulator-ferrux-e2e.sh apk/app-play-debug.apk ferrux-apk/app-debug.apk e2e-ferrux
             bash .github/scripts/emulator-release-smoke.sh apk-release/app-play-x86_64-release.apk screenshots-emulator
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: screenshots-emulator
           path: screenshots-emulator/
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ferrux-e2e-output
+          path: e2e-ferrux/
           if-no-files-found: warn
 
   screenshots-comment:
