@@ -115,8 +115,7 @@ mock_lsp_sh='send() { printf "Content-Length: %d\r\n\r\n%s" "${#1}" "$1"; }; len
 
 settings_json="$(python3 -c 'import json,sys; print(json.dumps({"ferride.lsp.enabled": True, "ferride.lsp.servers": {"rust": ["/system/bin/sh", "-c", sys.argv[1]]}}, indent=2))' "$mock_lsp_sh")"
 
-adb shell run-as "$FERRIDE" mkdir -p files
-printf '%s\n' "$settings_json" | adb shell run-as "$FERRIDE" sh -c 'cat > files/settings.json'
+printf '%s\n' "$settings_json" | adb shell "run-as $FERRIDE sh -c 'mkdir -p files && cat > files/settings.json'"
 
 adb logcat -c || true
 adb shell am start -W -n "$FERRIDE/.MainActivity" >/dev/null
