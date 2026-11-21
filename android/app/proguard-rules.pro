@@ -9,5 +9,7 @@
 -keepclassmembers class * extends com.sun.jna.Structure { *; }
 -keep class dev.ferride.core.** { *; }
 -keepattributes Signature, InnerClasses, EnclosingMethod, *Annotation*
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 -dontwarn java.awt.**
 -dontwarn com.sun.jna.**

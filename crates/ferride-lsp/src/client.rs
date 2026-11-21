@@ -11,12 +11,13 @@ use lsp_types::request::{self as req, Request};
 use lsp_types::{
     ClientCapabilities, CompletionClientCapabilities, CompletionItem, CompletionParams, CompletionResponse,
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, GeneralClientCapabilities, Hover, HoverClientCapabilities, HoverContents,
-    HoverParams, InitializeParams, InitializeResult, InitializedParams, MarkedString, MarkupKind,
-    MessageType, PartialResultParams, Position, PositionEncodingKind, PublishDiagnosticsClientCapabilities,
+    DidSaveTextDocumentParams, DocumentFormattingClientCapabilities, DocumentFormattingParams,
+    FormattingOptions, GeneralClientCapabilities, Hover, HoverClientCapabilities, HoverContents, HoverParams,
+    InitializeParams, InitializeResult, InitializedParams, MarkedString, MarkupKind, MessageType, OneOf,
+    PartialResultParams, Position, PositionEncodingKind, PublishDiagnosticsClientCapabilities,
     ServerCapabilities, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
     TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextDocumentSyncCapability,
-    TextDocumentSyncClientCapabilities, TextDocumentSyncKind, Uri, VersionedTextDocumentIdentifier,
+    TextDocumentSyncClientCapabilities, TextDocumentSyncKind, TextEdit, Uri, VersionedTextDocumentIdentifier,
     WindowClientCapabilities, WorkDoneProgressParams, WorkspaceFolder,
 };
 use serde::Serialize;
@@ -430,6 +431,56 @@ impl LspClient {
         )?;
         Ok(resp.map(|h| hover_to_text(h.contents)))
     }
+
+    pub fn formatting(
+        &self,
+        uri: Uri,
+        tab_size: u32,
+        insert_spaces: bool,
+    ) -> Result<Vec<TextEdit>, LspError> {
+        self.formatting_with(uri, tab_size, insert_spaces, None)
+    }
+
+    pub fn formatting_with(
+        &self,
+        uri: Uri,
+        tab_size: u32,
+        insert_spaces: bool,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Vec<TextEdit>, LspError> {
+        let resp: Option<Vec<TextEdit>> = self.request_with::<req::Formatting>(
+            DocumentFormattingParams {
+                text_document: TextDocumentIdentifier { uri },
+                options: FormattingOptions {
+                    tab_size,
+                    insert_spaces,
+                    ..Default::default()
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            },
+            cancel,
+        )?;
+        Ok(resp.unwrap_or_default())
+    }
+
+    pub fn supports_formatting(&self) -> bool {
+        match lock(&self.capabilities)
+            .as_ref()
+            .and_then(|c| c.document_formatting_provider.as_ref())
+        {
+            Some(OneOf::Left(b)) => *b,
+            Some(OneOf::Right(_)) => true,
+            None => false,
+        }
+    }
+
+    pub fn completion_trigger_characters(&self) -> Vec<String> {
+        lock(&self.capabilities)
+            .as_ref()
+            .and_then(|c| c.completion_provider.as_ref())
+            .and_then(|p| p.trigger_characters.clone())
+            .unwrap_or_default()
+    }
 }
 
 impl Drop for LspClient {
@@ -477,6 +528,7 @@ fn client_capabilities() -> ClientCapabilities {
                 content_format: Some(vec![MarkupKind::Markdown, MarkupKind::PlainText]),
                 ..Default::default()
             }),
+            formatting: Some(DocumentFormattingClientCapabilities::default()),
             publish_diagnostics: Some(PublishDiagnosticsClientCapabilities {
                 version_support: Some(true),
                 ..Default::default()

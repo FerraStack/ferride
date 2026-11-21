@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -246,6 +247,7 @@ private fun TerminalViewport(session: TerminalSessionHandle, state: WorkbenchSta
                 textSizeSp = state.settings.fontSize.toFloat().coerceIn(8f, 32f)
                 isFocusable = true
                 isFocusableInTouchMode = true
+                clipToOutline = true
             }.also { terminalView = it }
         },
         update = { view ->
@@ -260,7 +262,7 @@ private fun TerminalViewport(session: TerminalSessionHandle, state: WorkbenchSta
             if (view.textSizeSp != wantSp) view.textSizeSp = wantSp
         },
         onRelease = { if (terminalView === it) terminalView = null },
-        modifier = modifier,
+        modifier = modifier.clipToBounds(),
     )
 }
 

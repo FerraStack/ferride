@@ -304,7 +304,7 @@ fun StatusBar(state: WorkbenchState, compact: Boolean) {
                 StatusItem(null, "LF") {}
             }
             StatusItem(null, languageDisplayName(m.language)) { state.commands.execute(CommandIds.CHANGE_LANGUAGE_MODE) }
-            if (!compact) StatusItem(null, "{ } LSP: off") { state.showView(SideView.Languages) }
+            if (!compact) StatusItem(null, "{ } LSP: ${state.lsp.statusSummary(tab)}") { state.showView(SideView.Languages) }
         }
         StatusItem(Icons.Outlined.Notifications, null) { state.showPanel(PanelTab.Output) }
     }

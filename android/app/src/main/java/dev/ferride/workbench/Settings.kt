@@ -34,6 +34,10 @@ data class Settings(
     val gitUserEmail: String = "",
     /** Commit all changes when nothing is staged (VS Code's smart commit). */
     val gitEnableSmartCommit: Boolean = false,
+    /** Enable Language Server Protocol integration via Ferrux. */
+    val lspEnabled: Boolean = true,
+    /** Optional per-language server command overrides (`languageId` -> argv). */
+    val lspServers: Map<String, List<String>> = emptyMap(),
     private val unknown: Map<String, Any?> = emptyMap(),
 ) {
     /** Known keys → JSON-ready values (`null` = leave the key out). */
@@ -56,6 +60,8 @@ data class Settings(
         GIT_USER_NAME to gitUserName.ifEmpty { null },
         GIT_USER_EMAIL to gitUserEmail.ifEmpty { null },
         GIT_SMART_COMMIT to gitEnableSmartCommit,
+        FERRIDE_LSP_ENABLED to lspEnabled,
+        FERRIDE_LSP_SERVERS to lspServers.takeIf { it.isNotEmpty() },
     )
 
     /**
@@ -92,6 +98,8 @@ data class Settings(
         if (gitUserName.isNotEmpty()) o.put(GIT_USER_NAME, gitUserName)
         if (gitUserEmail.isNotEmpty()) o.put(GIT_USER_EMAIL, gitUserEmail)
         o.put(GIT_SMART_COMMIT, gitEnableSmartCommit)
+        o.put(FERRIDE_LSP_ENABLED, lspEnabled)
+        if (lspServers.isNotEmpty()) o.put(FERRIDE_LSP_SERVERS, lspServersToJsonObject(lspServers))
         return o.toString(2)
     }
 
@@ -114,12 +122,14 @@ data class Settings(
         const val GIT_USER_NAME = "git.user.name"
         const val GIT_USER_EMAIL = "git.user.email"
         const val GIT_SMART_COMMIT = "git.enableSmartCommit"
+        const val FERRIDE_LSP_ENABLED = "ferride.lsp.enabled"
+        const val FERRIDE_LSP_SERVERS = "ferride.lsp.servers"
 
         private val KNOWN = setOf(
             EDITOR_FONT_SIZE, EDITOR_TAB_SIZE, EDITOR_INSERT_SPACES, EDITOR_WORD_WRAP, EDITOR_LINE_NUMBERS,
             EDITOR_MINIMAP, EDITOR_STICKY_SCROLL, EDITOR_INDENT_GUIDES, EDITOR_LINE_HIGHLIGHT, EDITOR_BRACKET_PAIRS, FILES_AUTO_SAVE,
             WORKBENCH_COLOR_THEME, WINDOW_AUTO_DETECT, FERRIDE_EXTRA_KEYS, WORKBENCH_STARTUP_EDITOR,
-            GIT_USER_NAME, GIT_USER_EMAIL, GIT_SMART_COMMIT,
+            GIT_USER_NAME, GIT_USER_EMAIL, GIT_SMART_COMMIT, FERRIDE_LSP_ENABLED, FERRIDE_LSP_SERVERS,
         )
 
         /** Parses settings; malformed input falls back to defaults (use [parseResult] to detect it). */
@@ -154,8 +164,37 @@ data class Settings(
                 gitUserName = o.optString(GIT_USER_NAME, ""),
                 gitUserEmail = o.optString(GIT_USER_EMAIL, ""),
                 gitEnableSmartCommit = o.optBoolean(GIT_SMART_COMMIT, d.gitEnableSmartCommit),
+                lspEnabled = o.optBoolean(FERRIDE_LSP_ENABLED, d.lspEnabled),
+                lspServers = parseLspServers(o.optJSONObject(FERRIDE_LSP_SERVERS)),
                 unknown = unknown,
             )
+        }
+
+        private fun parseLspServers(obj: JSONObject?): Map<String, List<String>> {
+            if (obj == null) return emptyMap()
+            val out = LinkedHashMap<String, List<String>>()
+            for (lang in obj.keys()) {
+                val raw = obj.opt(lang) ?: continue
+                val argv = when (raw) {
+                    is org.json.JSONArray -> (0 until raw.length()).mapNotNull { i ->
+                        raw.optString(i).takeIf { it.isNotBlank() }
+                    }
+                    is String -> raw.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                    else -> emptyList()
+                }
+                if (argv.isNotEmpty()) out[lang] = argv
+            }
+            return out
+        }
+
+        private fun lspServersToJsonObject(map: Map<String, List<String>>): JSONObject {
+            val out = JSONObject()
+            for ((lang, argv) in map) {
+                val arr = org.json.JSONArray()
+                argv.forEach(arr::put)
+                out.put(lang, arr)
+            }
+            return out
         }
 
         fun load(file: File): Settings = if (file.exists()) parse(file.readText()) else Settings()
@@ -163,6 +202,14 @@ data class Settings(
         fun jsonValue(v: Any?): String? = when (v) {
             null -> null
             is String -> Jsonc.quote(v)
+            is JSONObject -> v.toString()
+            is Map<*, *> -> JSONObject().also { obj ->
+                v.forEach { (k, item) ->
+                    if (k != null && item is List<*>) {
+                        obj.put(k.toString(), org.json.JSONArray().also { arr -> item.forEach(arr::put) })
+                    }
+                }
+            }.toString()
             else -> v.toString()
         }
     }

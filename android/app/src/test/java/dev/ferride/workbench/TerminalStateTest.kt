@@ -32,10 +32,10 @@ class TerminalStateTest {
         private val exitGate: CountDownLatch = CountDownLatch(0),
         private val exitCode: Int = 0,
     ) : TerminalSessionHandle {
-        val resizes = mutableListOf<Pair<Int, Int>>()
+        val resizes = java.util.concurrent.CopyOnWriteArrayList<Pair<Int, Int>>()
         val resizedLatch = CountDownLatch(1)
-        var killed = false
-        var closed = false
+        @Volatile var killed = false
+        @Volatile var closed = false
 
         override fun resize(rows: Int, cols: Int) {
             resizes += rows to cols
@@ -63,13 +63,13 @@ class TerminalStateTest {
     private class FakeLauncher(
         private val sessionFactory: (Long) -> FakeSession = { id -> FakeSession(id) },
     ) : TerminalLauncher {
-        val calls = mutableListOf<SpawnCall>()
-        val sessions = mutableListOf<FakeSession>()
-        private var nextId = 100L
+        val calls = java.util.concurrent.CopyOnWriteArrayList<SpawnCall>()
+        val sessions = java.util.concurrent.CopyOnWriteArrayList<FakeSession>()
+        private val nextId = java.util.concurrent.atomic.AtomicLong(100L)
 
         override fun spawn(argv: List<String>, env: Map<String, String>, cwd: String?, rows: Int, cols: Int): TerminalSessionHandle {
             calls += SpawnCall(argv, env, cwd, rows, cols)
-            val s = sessionFactory(nextId++)
+            val s = sessionFactory(nextId.getAndIncrement())
             sessions += s
             return s
         }
@@ -148,8 +148,10 @@ class TerminalStateTest {
 
             // Releasing exitGate simulates SIGKILL (-9).
             exitGate.countDown()
-            waitUntil { state.terminalExitCode == -9 }
-            assertTrue(state.output.any { it.contains("signal 9") })
+            waitUntil {
+                state.terminalExitCode == -9 &&
+                    synchronized(state.output) { state.output.toList() }.any { it.contains("signal 9") }
+            }
 
             state.restartTerminal()
             waitUntil { launcher.sessions.size == 2 && state.terminalSession?.sessionId == launcher.sessions[1].sessionId }

@@ -141,7 +141,7 @@ fun CommandPalette(state: WorkbenchState, maxWidth: Dp, autoFocus: Boolean = tru
                     singleLine = true,
                     textStyle = TextStyle(color = c.inputForeground, fontSize = 14.sp),
                     cursorBrush = SolidColor(c.editorCursor),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Go),
                     keyboardActions = KeyboardActions(onGo = { items.firstOrNull()?.run?.invoke() }),
                     modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 )

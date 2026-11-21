@@ -155,6 +155,11 @@ fun settingDefs(themeNames: List<String>): List<SettingDef> = listOf(
         "Show the symbols row above the soft keyboard.",
         SettingControl.Bool({ it.extraKeys }, { s, v -> s.copy(extraKeys = v) }),
     ),
+    SettingDef(
+        Settings.FERRIDE_LSP_ENABLED, SettingGroup.Ferride, "Ferride › LSP", "Enabled",
+        "Enable Language Server Protocol diagnostics, completion, hover, and formatting via Ferrux.",
+        SettingControl.Bool({ it.lspEnabled }, { s, v -> s.copy(lspEnabled = v) }),
+    ),
 )
 
 /** The Settings editor tab (VS Code's settings UI). */

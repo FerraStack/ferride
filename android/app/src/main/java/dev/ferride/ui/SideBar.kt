@@ -63,9 +63,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.ferride.core.FerruxStatus
 import dev.ferride.core.FileNode
 import dev.ferride.theme.LocalWorkbenchColors
 import dev.ferride.workbench.Languages
+import dev.ferride.workbench.LspServerStatus
 import dev.ferride.workbench.SideView
 import dev.ferride.workbench.WorkbenchState
 
@@ -82,7 +84,7 @@ fun SideBar(state: WorkbenchState, modifier: Modifier = Modifier) {
             SideView.Explorer -> Explorer(state)
             SideView.Search -> SearchView(state)
             SideView.SourceControl -> SourceControlView(state)
-            SideView.Languages -> LanguagesView()
+            SideView.Languages -> LanguagesView(state)
         }
     }
 }
@@ -438,10 +440,19 @@ private fun Toggle(label: String, description: String, on: Boolean, onChange: (B
 // ----- Languages (the Extensions equivalent) ----------------------------------------
 
 @Composable
-private fun LanguagesView() {
+private fun LanguagesView(state: WorkbenchState) {
     val c = LocalWorkbenchColors.current
+    state.lsp.lspRevision // observe server status transitions
+    val ferruxReady = state.ferrux is FerruxStatus.Ready
+    val activeLang = state.activeTab?.model?.takeIf { !it.isClosed }?.language
+    val languages = remember(activeLang) {
+        Languages.all.sortedBy { if (it.id == activeLang) 0 else 1 }
+    }
     LazyColumn(Modifier.fillMaxSize()) {
-        items(Languages.all) { lang ->
+        items(languages, key = { it.id }) { lang ->
+            val spec = state.lsp.serverSpecFor(lang.id)
+            val status = state.lsp.statusForLanguage(lang.id)
+            val serverName = spec?.displayName ?: lang.server
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.size(36.dp).background(c.inputBackground, RoundedCornerShape(4.dp)),
@@ -453,7 +464,39 @@ private fun LanguagesView() {
                 Column(Modifier.weight(1f)) {
                     Text(lang.name, color = c.sideBarForeground, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Text("Syntax highlighting: built in (tree-sitter)", color = c.descriptionForeground, fontSize = 11.sp)
-                    Text("Language server: ${lang.server} — requires Ferrux", color = c.descriptionForeground, fontSize = 11.sp)
+                    val (statusText, statusColor) = when {
+                        !state.settings.lspEnabled -> "Language server: $serverName (disabled)" to c.descriptionForeground
+                        !ferruxReady -> "Language server: $serverName — requires Ferrux" to c.descriptionForeground
+                        spec == null -> "Language server: none" to c.descriptionForeground
+                        else -> when (status) {
+                            LspServerStatus.Stopped -> "Language server: $serverName (idle)" to c.descriptionForeground
+                            LspServerStatus.Starting -> "Language server: $serverName (starting…)" to c.focusBorder
+                            is LspServerStatus.Ready -> "Language server: ${status.serverName} (ready)" to c.sideBarForeground
+                            is LspServerStatus.Unavailable -> "Language server: $serverName (unavailable: ${status.reason})" to c.errorForeground
+                        }
+                    }
+                    Text(statusText, color = statusColor, fontSize = 11.sp)
+                }
+                if (ferruxReady && state.settings.lspEnabled && spec != null) {
+                    if (status is LspServerStatus.Ready || status is LspServerStatus.Starting) {
+                        Text(
+                            "Stop",
+                            color = c.descriptionForeground,
+                            fontSize = 11.sp,
+                            modifier = Modifier
+                                .clickable { state.lsp.stopLanguage(lang.id) }
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
+                        )
+                    }
+                    Text(
+                        if (status is LspServerStatus.Ready || status is LspServerStatus.Starting) "Restart" else "Start",
+                        color = c.focusBorder,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clickable { state.lsp.restartLanguage(lang.id, state.tabs) }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                    )
                 }
             }
         }

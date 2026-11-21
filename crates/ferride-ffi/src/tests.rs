@@ -218,7 +218,10 @@ fn lsp_session_over_socket_fd() {
             let m: Value = serde_json::from_slice(&body).unwrap();
             match m["method"].as_str() {
                 Some("initialize") => send(json!({"jsonrpc":"2.0","id":m["id"],"result":{
-                    "capabilities":{}, "serverInfo":{"name":"mock-ls"}}})),
+                    "capabilities":{
+                        "completionProvider":{"triggerCharacters":[".", ":"]},
+                        "documentFormattingProvider":true
+                    }, "serverInfo":{"name":"mock-ls"}}})),
                 Some("textDocument/didOpen") => {
                     send(
                         json!({"jsonrpc":"2.0","method":"window/showMessage","params":{"type":2,"message":"hi"}}),
@@ -233,6 +236,8 @@ fn lsp_session_over_socket_fd() {
                 Some("textDocument/completion") => send(json!({"jsonrpc":"2.0","id":m["id"],
                     "result":[{"label":"foo","detail":"fn foo()","insertText":"foo()"}]})),
                 Some("textDocument/hover") => send(json!({"jsonrpc":"2.0","id":m["id"],"result":null})),
+                Some("textDocument/formatting") => send(json!({"jsonrpc":"2.0","id":m["id"],
+                    "result":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":1}},"newText":"y"}]})),
                 Some("shutdown") => send(json!({"jsonrpc":"2.0","id":m["id"],"result":null})),
                 Some("exit") => break,
                 _ => {}
@@ -244,6 +249,8 @@ fn lsp_session_over_socket_fd() {
     let fd = client_end.into_raw_fd();
     let session = LspSession::connect_fds(fd, fd, Box::new(rec.clone())).unwrap();
     assert_eq!(session.initialize(Some("/w s".into())).unwrap(), "mock-ls");
+    assert!(session.supports_formatting());
+    assert_eq!(session.completion_trigger_characters(), vec![".", ":"]);
     session
         .did_open("/w s/a.rs".into(), "rust".into(), 1, "x".into())
         .unwrap();
@@ -257,6 +264,16 @@ fn lsp_session_over_socket_fd() {
         }]
     );
     assert_eq!(session.hover("/w s/a.rs".into(), 0, 0, None).unwrap(), None);
+    assert_eq!(
+        session.formatting("/w s/a.rs".into(), 4, true, None).unwrap(),
+        vec![LspTextEdit {
+            start_line: 0,
+            start_column: 0,
+            end_line: 0,
+            end_column: 1,
+            new_text: "y".into(),
+        }]
+    );
     session.shutdown().unwrap();
     server.join().unwrap();
     // The reader thread marks the session closed and then calls on_closed;

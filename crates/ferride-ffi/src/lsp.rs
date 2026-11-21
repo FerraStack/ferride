@@ -30,6 +30,16 @@ pub struct LspCompletion {
     pub insert_text: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct LspTextEdit {
+    pub start_line: i32,
+    /// UTF-16 column.
+    pub start_column: i32,
+    pub end_line: i32,
+    pub end_column: i32,
+    pub new_text: String,
+}
+
 /// Receives server-initiated events. Called on a background thread: post to
 /// the main thread before touching UI.
 #[uniffi::export(callback_interface)]
@@ -341,6 +351,40 @@ impl LspSession {
             Position::new(line.max(0) as u32, column.max(0) as u32),
             cancel.as_ref().map(|c| &c.token),
         )?)
+    }
+
+    /// Blocking; call off the UI thread.
+    pub fn formatting(
+        &self,
+        path: String,
+        tab_size: i32,
+        insert_spaces: bool,
+        cancel: Option<Arc<LspCancellation>>,
+    ) -> Result<Vec<LspTextEdit>, FerrideError> {
+        let edits = self.client.formatting_with(
+            uri(&path)?,
+            tab_size.max(1) as u32,
+            insert_spaces,
+            cancel.as_ref().map(|c| &c.token),
+        )?;
+        Ok(edits
+            .into_iter()
+            .map(|e| LspTextEdit {
+                start_line: e.range.start.line as i32,
+                start_column: e.range.start.character as i32,
+                end_line: e.range.end.line as i32,
+                end_column: e.range.end.character as i32,
+                new_text: e.new_text,
+            })
+            .collect())
+    }
+
+    pub fn supports_formatting(&self) -> bool {
+        self.client.supports_formatting()
+    }
+
+    pub fn completion_trigger_characters(&self) -> Vec<String> {
+        self.client.completion_trigger_characters()
     }
 
     pub fn shutdown(&self) -> Result<(), FerrideError> {

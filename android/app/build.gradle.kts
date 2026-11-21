@@ -231,6 +231,11 @@ android {
         buildConfig = true
     }
 
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     packaging {
         jniLibs {
             excludes += "**/libferruxterm.so"
