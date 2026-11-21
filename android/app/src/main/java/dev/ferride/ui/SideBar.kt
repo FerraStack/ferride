@@ -444,8 +444,12 @@ private fun LanguagesView(state: WorkbenchState) {
     val c = LocalWorkbenchColors.current
     state.lsp.lspRevision // observe server status transitions
     val ferruxReady = state.ferrux is FerruxStatus.Ready
+    val activeLang = state.activeTab?.model?.takeIf { !it.isClosed }?.language
+    val languages = remember(activeLang) {
+        Languages.all.sortedBy { if (it.id == activeLang) 0 else 1 }
+    }
     LazyColumn(Modifier.fillMaxSize()) {
-        items(Languages.all) { lang ->
+        items(languages, key = { it.id }) { lang ->
             val spec = state.lsp.serverSpecFor(lang.id)
             val status = state.lsp.statusForLanguage(lang.id)
             val serverName = spec?.displayName ?: lang.server
