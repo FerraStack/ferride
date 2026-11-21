@@ -93,6 +93,10 @@ run_palette_command() {
   for attempt in 1 2 3; do
     dismiss_system_dialogs
     dump="$(ui_dump || true)"
+    if grep -Eq "Search commands|Change File Encoding|Change Language Mode" <<<"$dump"; then
+      opened=1
+      break
+    fi
     if read -r cx cy < <(center_of_desc "Show All Commands" <<<"$dump") && [ -n "${cx:-}" ]; then
       adb shell input tap "$cx" "$cy"
     else
@@ -100,7 +104,7 @@ run_palette_command() {
       adb shell input keycombination 113 59 44
     fi
     sleep 1
-    if ui_dump | grep -Fq "Search commands"; then
+    if ui_dump | grep -Eq "Search commands|Change File Encoding|Change Language Mode"; then
       opened=1
       break
     fi
