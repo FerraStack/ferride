@@ -245,7 +245,19 @@ class MainActivity : ComponentActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val chord = event.isCtrlPressed || event.isAltPressed || event.keyCode == KeyEvent.KEYCODE_ESCAPE ||
             event.keyCode in KeyEvent.KEYCODE_F1..KeyEvent.KEYCODE_F12
-        if (chord && vm.state.onKeyEvent(event)) return true
+        val completionKey = !vm.state.paletteOpen && vm.state.lsp.completionPopup != null &&
+            event.keyCode in COMPLETION_KEYS
+        if ((chord || completionKey) && vm.state.onKeyEvent(event)) return true
         return super.dispatchKeyEvent(event)
+    }
+
+    companion object {
+        private val COMPLETION_KEYS = intArrayOf(
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_TAB,
+        )
     }
 }

@@ -302,7 +302,15 @@ class LspManagerTest {
             model.insert(".", true)
             state.onEditorChanged(tab, contentChanged = true)
             waitUntil { state.lsp.completionPopup != null && !state.lsp.completionPopup!!.loading }
-            state.lsp.dismissCompletion()
+            // Global key dispatch accepts completion even when the editor doesn't hold view focus
+            // (e.g. right after invoking Trigger Suggest from the Command Palette), but not while
+            // the Command Palette itself is open.
+            state.editorFocused = false
+            state.paletteOpen = true
+            assertFalse(state.onKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER)))
+            state.paletteOpen = false
+            assertTrue(state.onKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER)))
+            assertNull(state.lsp.completionPopup)
 
             // Format document replaces line 0 using LspTextEdit.
             state.lsp.formatDocument()

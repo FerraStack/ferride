@@ -656,7 +656,9 @@ class WorkbenchState(
     }
 
     fun log(line: String) {
-        output += line
+        synchronized(output) {
+            output += line
+        }
     }
 
     /**
@@ -1346,6 +1348,12 @@ class WorkbenchState(
             (paletteOpen || lsp.hoverPopup != null || lsp.completionPopup != null || find.visible || (sideBarVisible && !sideBarDocked))
         ) {
             escape()
+            return true
+        }
+        if (!paletteOpen && !find.visible && !(sideBarVisible && !sideBarDocked) &&
+            lsp.completionPopup != null && !event.isCtrlPressed && !event.isAltPressed &&
+            onEditorKeyDown(event.keyCode, event)
+        ) {
             return true
         }
         val cmd = commands.forKey(event, editorFocused) ?: return false
