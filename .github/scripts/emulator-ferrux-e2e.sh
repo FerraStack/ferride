@@ -89,16 +89,26 @@ expect_no_text() {
 }
 
 run_palette_command() {
-  local query="$1" dump cx cy
-  dismiss_system_dialogs
-  dump="$(ui_dump || true)"
-  if read -r cx cy < <(center_of_desc "Show All Commands" <<<"$dump") && [ -n "${cx:-}" ]; then
-    adb shell input tap "$cx" "$cy"
-  else
-    # Fallback to Ctrl+Shift+P: CTRL_LEFT=113, SHIFT_LEFT=59, P=44
-    adb shell input keycombination 113 59 44
+  local query="$1" attempt dump cx cy opened=0
+  for attempt in 1 2 3; do
+    dismiss_system_dialogs
+    dump="$(ui_dump || true)"
+    if read -r cx cy < <(center_of_desc "Show All Commands" <<<"$dump") && [ -n "${cx:-}" ]; then
+      adb shell input tap "$cx" "$cy"
+    else
+      # Fallback to Ctrl+Shift+P: CTRL_LEFT=113, SHIFT_LEFT=59, P=44
+      adb shell input keycombination 113 59 44
+    fi
+    sleep 1
+    if ui_dump | grep -Fq "Search commands"; then
+      opened=1
+      break
+    fi
+  done
+  if [ "$opened" -eq 0 ]; then
+    fail "Command Palette did not open in Commands mode for query: $query"
   fi
-  sleep 1
+  # MOVE_END=123 so typed text always follows the ">" command prefix.
   adb shell input keyevent 123
   adb shell input text "$query"
   sleep 1
@@ -190,8 +200,23 @@ if read -r fx fy < <(ui_dump | center_of "Ferrux") && [ -n "${fx:-}" ]; then
 else
   run_palette_command "Toggle%sTerminal"
 fi
-expect_no_text "Starting shell" "Terminal PTY started in Ferrux"
-sleep 2
+term_ready=0
+for _ in $(seq 1 15); do
+  dismiss_system_dialogs
+  dump="$(ui_dump || true)"
+  if grep -Fq 'class="dev.ferrux.terminal.TerminalView"' <<<"$dump"; then
+    term_ready=1
+    break
+  fi
+  if grep -Fq 'text="Retry"' <<<"$dump"; then
+    fail "Terminal PTY failed to start (Retry button shown)"
+  fi
+  sleep 1
+done
+if [ "$term_ready" -eq 0 ]; then
+  fail "TerminalView did not appear after opening Terminal panel"
+fi
+sleep 1
 alive "open terminal"
 # TerminalView calls requestFocus() on attach; send command directly to PTY.
 adb shell input text "touch%se2e_pty_verified.txt"
