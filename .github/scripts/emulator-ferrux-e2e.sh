@@ -206,13 +206,12 @@ else
 fi
 term_ready=0
 for _ in $(seq 1 15); do
-  dismiss_system_dialogs
-  dump="$(ui_dump || true)"
-  if grep -Eq 'content-desc="Restart Terminal"|class="dev.ferrux.terminal.TerminalView"' <<<"$dump" &&
-     ! grep -Fq "Starting shell" <<<"$dump"; then
+  if adb shell dumpsys activity top 2>/dev/null | grep -Fq 'dev.ferrux.terminal.TerminalView'; then
     term_ready=1
     break
   fi
+  dismiss_system_dialogs
+  dump="$(ui_dump || true)"
   if grep -Fq 'text="Retry"' <<<"$dump"; then
     fail "Terminal PTY failed to start (Retry button shown)"
   fi
@@ -221,19 +220,23 @@ done
 if [ "$term_ready" -eq 0 ]; then
   fail "TerminalView did not appear after opening Terminal panel"
 fi
-sleep 1
+sleep 2
 alive "open terminal"
 # TerminalView calls requestFocus() on attach; send command directly to PTY.
 adb shell input text "touch%se2e_pty_verified.txt"
 adb shell input keyevent 66
 sleep 2
 adb exec-out screencap -p > "$OUT/e2e_terminal.png"
-# Switch to Output tab in the open Panel and check log for terminal launch.
-if read -r ox oy < <(ui_dump | center_of "OUTPUT") && [ -n "${ox:-}" ]; then
-  adb shell input tap "$ox" "$oy"
-  sleep 1
-else
-  run_palette_command "Toggle%sOutput"
+# Switch to Output tab via Ctrl+Shift+U (unmounts TerminalView cleanly), with tap fallback.
+adb shell input keycombination 113 59 49
+sleep 1
+if ! ui_dump | grep -Fq "Started terminal shell"; then
+  if read -r ox oy < <(ui_dump | center_of "OUTPUT") && [ -n "${ox:-}" ]; then
+    adb shell input tap "$ox" "$oy"
+    sleep 1
+  else
+    run_palette_command "Toggle%sOutput"
+  fi
 fi
 expect_text "Started terminal shell" "Output panel confirms terminal PTY started"
 log "ok: Terminal PTY started and executed command"
