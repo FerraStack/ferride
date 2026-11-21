@@ -208,7 +208,8 @@ term_ready=0
 for _ in $(seq 1 15); do
   dismiss_system_dialogs
   dump="$(ui_dump || true)"
-  if grep -Fq 'class="dev.ferrux.terminal.TerminalView"' <<<"$dump"; then
+  if grep -Eq 'content-desc="Restart Terminal"|class="dev.ferrux.terminal.TerminalView"' <<<"$dump" &&
+     ! grep -Fq "Starting shell" <<<"$dump"; then
     term_ready=1
     break
   fi
