@@ -43,6 +43,12 @@ center_of() {
     awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }'
 }
 
+center_of_desc() {
+  grep -o "content-desc=\"$1\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" | head -1 |
+    sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/' |
+    awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }'
+}
+
 dismiss_system_dialogs() {
   local dump
   dump="$(ui_dump || true)"
@@ -83,9 +89,15 @@ expect_no_text() {
 }
 
 run_palette_command() {
-  local query="$1"
-  # Ctrl+Shift+P: CTRL_LEFT=113, SHIFT_LEFT=59, P=44, MOVE_END=123
-  adb shell input keycombination 113 59 44
+  local query="$1" dump cx cy
+  dismiss_system_dialogs
+  dump="$(ui_dump || true)"
+  if read -r cx cy < <(center_of_desc "Show All Commands" <<<"$dump") && [ -n "${cx:-}" ]; then
+    adb shell input tap "$cx" "$cy"
+  else
+    # Fallback to Ctrl+Shift+P: CTRL_LEFT=113, SHIFT_LEFT=59, P=44
+    adb shell input keycombination 113 59 44
+  fi
   sleep 1
   adb shell input keyevent 123
   adb shell input text "$query"
@@ -137,51 +149,71 @@ expect_text "e2e diagnostic" "Problems panel shows LSP diagnostic"
 adb exec-out screencap -p > "$OUT/e2e_lsp_problems.png"
 log "ok: LSP diagnostics received"
 
-# Close panel (Ctrl+J: CTRL=113, J=38).
-adb shell input keycombination 113 38
+# Close panel via its Close button.
+if read -r px py < <(ui_dump | center_of_desc "Close Panel") && [ -n "${px:-}" ]; then
+  adb shell input tap "$px" "$py"
+else
+  adb shell input keycombination 113 38
+fi
 sleep 1
 
 # 2. Hover + Completion + Format + Save.
 run_palette_command "Show%sHover"
 expect_text "e2e hover info" "Hover card shows LSP hover"
 adb exec-out screencap -p > "$OUT/e2e_lsp_hover.png"
-adb shell input keyevent 111
+if read -r hx hy < <(ui_dump | center_of_desc "Dismiss hover") && [ -n "${hx:-}" ]; then
+  adb shell input tap "$hx" "$hy"
+else
+  adb shell input keyevent 111
+fi
 sleep 1
 log "ok: LSP hover displayed"
 
 run_palette_command "Trigger%sSuggest"
 expect_text "e2e_println" "Completion popup shows LSP suggestion"
 adb exec-out screencap -p > "$OUT/e2e_lsp_completion.png"
-# Accept completion (Enter) then save (Ctrl+S: CTRL=113, S=47) so tab is clean.
-adb shell input keyevent 66
+# Tap completion item directly to accept it and dismiss popup, then save File.
+if read -r sx sy < <(ui_dump | center_of "e2e_println") && [ -n "${sx:-}" ]; then
+  adb shell input tap "$sx" "$sy"
+else
+  adb shell input keyevent 66
+fi
 sleep 1
-adb shell input keycombination 113 47
-sleep 1
+run_palette_command "File:%sSave"
 alive "LSP completion and save"
 log "ok: LSP completion accepted and saved"
 
 # 3. Verify live Terminal PTY via Ferrux: create a marker file in Ferrux $HOME.
-run_palette_command "Toggle%sTerminal"
+if read -r fx fy < <(ui_dump | center_of "Ferrux") && [ -n "${fx:-}" ]; then
+  adb shell input tap "$fx" "$fy"
+  sleep 2
+else
+  run_palette_command "Toggle%sTerminal"
+fi
 expect_no_text "Starting shell" "Terminal PTY started in Ferrux"
 sleep 2
 alive "open terminal"
-size="$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)"
-tx=$((${size%x*} / 2))
-ty=$((${size#*x} * 4 / 5))
-adb shell input tap "$tx" "$ty"
-sleep 1
-# Ferrux defaults cwd to HOME when SpawnRequest.cwd is null.
+# TerminalView calls requestFocus() on attach; send command directly to PTY.
 adb shell input text "touch%se2e_pty_verified.txt"
 adb shell input keyevent 66
 sleep 2
 adb exec-out screencap -p > "$OUT/e2e_terminal.png"
-# Check Output panel log for terminal launch and LSP ready.
-run_palette_command "Toggle%sOutput"
+# Switch to Output tab in the open Panel and check log for terminal launch.
+if read -r ox oy < <(ui_dump | center_of "OUTPUT") && [ -n "${ox:-}" ]; then
+  adb shell input tap "$ox" "$oy"
+  sleep 1
+else
+  run_palette_command "Toggle%sOutput"
+fi
 expect_text "Started terminal shell" "Output panel confirms terminal PTY started"
 log "ok: Terminal PTY started and executed command"
 
-# Close panel (Ctrl+J).
-adb shell input keycombination 113 38
+# Close panel via its Close button.
+if read -r px py < <(ui_dump | center_of_desc "Close Panel") && [ -n "${px:-}" ]; then
+  adb shell input tap "$px" "$py"
+else
+  adb shell input keycombination 113 38
+fi
 sleep 1
 
 # 4. Verify Open Ferrux Home sees the marker file created in Terminal PTY.
